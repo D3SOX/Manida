@@ -634,7 +634,9 @@ private fun PlayerControls(state: AppState, controller: MusicController, current
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PlayingTrackDetails(state, controller, current, motion, visible, artworkSwipe)
         Column(Modifier.fillMaxWidth()) {
-            Slider(value = (seeking ?: state.playback.positionMs.toFloat()).coerceIn(0f, duration), valueRange = 0f..duration, colors = sliderColors,
+            val sliderState = remember(duration) { SliderState(trackRange = 0f..duration) }
+            sliderState.value = (seeking ?: state.playback.positionMs.toFloat()).coerceIn(0f, duration)
+            Slider(state = sliderState, colors = sliderColors,
                 enabled = durationMs > 0 && state.playback.entryId != null, onValueChange = { seekRequest++; seeking = it },
                 onValueChangeFinished = {
                     val entry = state.playback.entryId
@@ -753,7 +755,9 @@ private fun MiniPlayerSeekBar(controller: MusicController, modifier: Modifier) {
     val inactive = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .6f)
     val interaction = remember { MutableInteractionSource() }
     val dragging by interaction.collectIsDraggedAsState()
-    Slider(value = value, onValueChange = { seekRequest++; seeking = it }, valueRange = 0f..duration,
+    val sliderState = remember(duration) { SliderState(trackRange = 0f..duration) }
+    sliderState.value = value
+    Slider(state = sliderState, onValueChange = { seekRequest++; seeking = it },
         enabled = playback.durationMs > 0, interactionSource = interaction,
         onValueChangeFinished = {
             val entry = playback.entryId
