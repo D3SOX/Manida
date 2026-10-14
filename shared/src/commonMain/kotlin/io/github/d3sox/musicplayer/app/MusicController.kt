@@ -304,8 +304,11 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
         scrobbling?.let { service -> scope.launch {
             service.observe().collect { status -> operations.withLock { mutableState.update { it.copy(scrobbling = status) } } }
         } }
-        scope.launch { library.observe().collect { tracks ->
-            operations.withLock { mutableState.update { it.copy(tracks = tracks) } }
+        scope.launch { library.observe().collect {
+            operations.withLock {
+                val tracks = library.tracks()
+                mutableState.update { it.copy(tracks = tracks) }
+            }
         } }
         playlists?.let { collections -> scope.launch {
             collections.observe().collect { updated ->
@@ -331,7 +334,7 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
             }
         } }
         action(serialized = false) {
-            refreshLibrary()
+            operations.withLock { refreshLibrary() }
             var recoveryError: String? = null
             suspend fun recover(block: suspend () -> Unit) {
                 try { block() }
@@ -358,8 +361,9 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
                     loadSnapshot(saved, play = false)
                     queueLoaded = true
                 }
+                refreshLibrary()
             }
-            refresh()
+            refreshDetails(loading = false)
             mutableState.update { it.copy(loading = false, error = recoveryError ?: it.error) }
         }
         localSources?.let { sources -> scope.launch {
@@ -419,6 +423,10 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
 
     suspend fun refresh(loading: Boolean = false) {
         refreshLibrary()
+        refreshDetails(loading)
+    }
+
+    private suspend fun refreshDetails(loading: Boolean) {
         val tracks = state.value.tracks
         val savedQueues = queue.saved()
         val profile = navidrome?.profile()
