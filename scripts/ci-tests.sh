@@ -46,7 +46,8 @@ if [[ "$mode" == desktop ]]; then
     xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24 -nolisten tcp' ./gradlew :shared:desktopTest --console=plain
 else
     export ANDROID_SERIAL=emulator-5554
-    setsid ./gradlew --no-daemon :shared:pairedFixture --console=plain > .test-environment/pairing.log 2>&1 &
+    setsid ./gradlew --no-daemon -Dorg.gradle.jvmargs=-Xmx512m --max-workers=2 \
+        -Pkotlin.compiler.execution.strategy=in-process :shared:pairedFixture --console=plain > .test-environment/pairing.log 2>&1 &
     pairing_group="$!"
     for _attempt in {1..600}; do
         if [[ -f .test-environment/paired-fixture/control-port ]]; then break; fi
