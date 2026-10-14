@@ -176,7 +176,7 @@ internal fun AppSettings(state: AppState, controller: MusicController, server: (
                 enabled -> controller.updatePreferences { it.copy(confirmNextUpInterruption = enabled) }
             }
             if (settings.showPreviousQueueTracks) {
-                SettingsSlider("Previous track limit", AppIcon.REPEAT_COUNT, settings.previousQueueTrackLimit.toFloat(), 1f..100f,
+                SettingsSlider("Previous track limit", AppIcon.REPEAT_COUNT, settings.previousQueueTrackLimit.toFloat(), 1f..100f, 98,
                     format = { it.roundToInt().toString() }) { value ->
                     controller.updatePreferences { it.copy(previousQueueTrackLimit = value.roundToInt()) }
                 }

@@ -54,4 +54,24 @@ class PlaybackSettingsUiTest {
             assertEquals(visualizer, saved.milkDrop)
         } finally { restored.close(); directory.toFile().deleteRecursively() }
     }
+
+    @Test fun previousTrackLimitButtonsChangeTheLimitByOneTrack() {
+        val directory = Files.createTempDirectory("manida-previous-limit")
+        val store = openMusicStore(directory.resolve("music.db").toString())
+        val preferences = MusicPreferences(store)
+        runBlocking { preferences.update { it.copy(showPreviousQueueTracks = true, previousQueueTrackLimit = 51) } }
+        val controller = MusicController(MusicLibrary(store), PlaybackQueue(store), MpvPlaybackEngine("null"), preferences = preferences)
+        try {
+            runComposeUiTest {
+                setContent { MusicPlayerApp(controller) }
+                waitUntil(timeoutMillis = 5_000) { controller.state.value.libraryReady }
+                onNodeWithContentDescription("Settings").performClick()
+                onNodeWithText("Playback").performScrollTo().performClick()
+                onNodeWithContentDescription("Decrease Previous track limit").performScrollTo().performClick()
+                waitUntil(timeoutMillis = 5_000) { controller.state.value.preferences.previousQueueTrackLimit == 50 }
+                onNodeWithContentDescription("Increase Previous track limit").performClick()
+                waitUntil(timeoutMillis = 5_000) { controller.state.value.preferences.previousQueueTrackLimit == 51 }
+            }
+        } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
 }
