@@ -63,7 +63,10 @@ class LinuxCrossfadeOutputTest {
                         engine.play()
                         engine.setGaplessPlayback(true)
                         engine.setVolume(0.8)
-                        val resumed = withTimeout(2_000) { engine.status.first { it.playing && it.volume == 0.8 } }
+                        // Each player polls separately, so the outgoing track may report resuming one poll later.
+                        val resumed = withTimeout(2_000) { engine.status.first {
+                            it.playing && it.volume == 0.8 && it.fadingOut?.playing != false
+                        } }
                         assertTrue(resumed.fadingOut?.playing == true, "Changing gapless interrupted the audible crossfade")
                         engine.setVolume(1.0)
                     }
