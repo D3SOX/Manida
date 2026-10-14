@@ -25,6 +25,57 @@ import java.util.UUID
 
 class SourcePlaybackTest {
     @Test
+    fun delayedLibraryUpdatesDoNotUndoNewFavoritesAndRatings(): Unit = runBlocking {
+        val directory = Files.createTempDirectory("delayed-library-feedback")
+        val store = openMusicStore(directory.resolve("library.db").toString())
+        val library = MusicLibrary(store)
+        val audio = Path.of(System.getProperty("musicplayer.testRoot"), ".test-environment", "music", "Fixture Artist",
+            "Fixture Album", "01 Northern Light.flac")
+        val track = library.importTrack(TrackMetadata("Playing song"), TrackSource("local", SourceKind.LOCAL, audio.toString()))
+        val other = library.importTrack(TrackMetadata("Another song"), TrackSource("other", SourceKind.LOCAL, audio.toString()))
+        val recoveryStarted = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val releaseRecovery = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val files = LocalFileEdits(store, library, directory.resolve("backups").toString())
+        val slowFiles = object : MusicFileEdits by files {
+            override suspend fun recover() {
+                recoveryStarted.complete(Unit)
+                releaseRecovery.await()
+            }
+        }
+        val loadingStarted = java.util.concurrent.CountDownLatch(1)
+        val releaseLoading = java.util.concurrent.CountDownLatch(1)
+        val decoder = MpvPlaybackEngine("null")
+        val engine = object : io.github.d3sox.musicplayer.playback.PlaybackEngine by decoder {
+            override fun loadQueue(tracks: List<io.github.d3sox.musicplayer.playback.PlayableTrack>, startIndex: Int,
+                positionMs: Long, play: Boolean) {
+                loadingStarted.countDown()
+                check(releaseLoading.await(3, java.util.concurrent.TimeUnit.SECONDS))
+                decoder.loadQueue(tracks, startIndex, positionMs, play)
+            }
+        }
+        val controller = MusicController(library, PlaybackQueue(store), engine, fileEdits = slowFiles)
+        try {
+            withTimeout(3_000) { recoveryStarted.await() }
+            val playing = controller.playTrack(track.id, listOf(track.id))
+            check(loadingStarted.await(3, java.util.concurrent.TimeUnit.SECONDS))
+            val favorite = controller.setFavorite(track.id, true)
+            val rating = controller.setRating(track.id, 4)
+            // Queue an observer snapshot behind the edits while the audio load holds the controller lock.
+            library.importTrack(other.metadata.copy(title = "Updated song"), other.sources.single(), linkTo = other.id)
+            kotlinx.coroutines.delay(300)
+            val drained = controller.setRating(other.id, 1)
+            releaseLoading.countDown()
+            playing.join(); favorite.join(); rating.join(); drained.join()
+            assertEquals(true, controller.state.value.tracks.first { it.id == track.id }.favorite)
+            assertEquals(4, controller.state.value.tracks.first { it.id == track.id }.rating)
+            assertEquals("Updated song", controller.state.value.tracks.first { it.id == other.id }.metadata.title)
+        } finally {
+            releaseLoading.countDown(); releaseRecovery.complete(Unit)
+            controller.closeAndJoin(); store.close(); directory.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
     fun startingMusicWhileFileRecoveryFinishesDoesNotReloadItPaused(): Unit = runBlocking {
         val directory = Files.createTempDirectory("startup-playback-order")
         val store = openMusicStore(directory.resolve("library.db").toString())
