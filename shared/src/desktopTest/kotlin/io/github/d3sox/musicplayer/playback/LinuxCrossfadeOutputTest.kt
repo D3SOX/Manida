@@ -16,7 +16,7 @@ import kotlin.test.*
 
 class LinuxCrossfadeOutputTest {
     @Test
-    fun crossfadeMixesBothTracksAndPausingFreezesBothPlayersUntilResume() = runBlocking {
+    fun crossfadeMixesBothTracksAndSurvivesPauseAndGaplessChanges() = runBlocking {
         val directory = Files.createTempDirectory("manida-crossfade-output")
         val sink = "manida_test_${UUID.randomUUID().toString().replace("-", "") }"
         var module: String? = null
@@ -52,12 +52,20 @@ class LinuxCrossfadeOutputTest {
                         assertNotEquals(middle.playbackId, middle.fadingOut?.playbackId)
                         engine.pause()
                         withTimeout(2_000) { engine.status.first { !it.playing && it.fadingOut?.playing == false } }
+                        engine.setGaplessPlayback(false)
+                        engine.setAudioEffects(AudioEffects())
                         delay(100) // Allow the native position poll to observe the completed pause.
                         val paused = engine.status.value
+                        assertNotNull(paused.fadingOut, "Changing gapless while paused cancelled the crossfade")
                         delay(250)
                         assertEquals(paused.positionMs.toDouble(), engine.status.value.positionMs.toDouble(), 60.0)
                         assertEquals(requireNotNull(paused.fadingOut).positionMs.toDouble(), requireNotNull(engine.status.value.fadingOut).positionMs.toDouble(), 60.0)
                         engine.play()
+                        engine.setGaplessPlayback(true)
+                        engine.setVolume(0.8)
+                        val resumed = withTimeout(2_000) { engine.status.first { it.playing && it.volume == 0.8 } }
+                        assertTrue(resumed.fadingOut?.playing == true, "Changing gapless interrupted the audible crossfade")
+                        engine.setVolume(1.0)
                     }
                     withTimeout(10_000) { engine.status.first { it.entryId == "second" && it.ended } }
                     delay(600)

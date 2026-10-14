@@ -89,6 +89,7 @@ class CrossfadePlaybackEngine(private val factory: () -> PlaybackEngine) : Playb
     override fun setGaplessPlayback(enabled: Boolean) = command {
         if (gapless != enabled) {
             gapless = enabled
+            if (crossfadeMs > 0) return@command
             cancelFade()
             val index = currentIndex()
             if (index >= 0) {
