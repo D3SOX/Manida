@@ -1,4 +1,6 @@
-# Manida
+<h1><img src="packaging/manida.svg" alt="" width="40" height="40" align="left">Manida</h1>
+
+[![GitHub Releases](https://img.shields.io/badge/GitHub-Releases-181717?logo=github&logoColor=white)](https://github.com/D3SOX/Manida/releases) [![F-Droid repository](https://img.shields.io/badge/F--Droid-Repository-1976D2?logo=fdroid&logoColor=white)][fdroid-repository] [![Obtainium](https://img.shields.io/badge/Obtainium-Install-D2BCFD?logo=obtainium&logoColor=black)][obtainium-install] [![Arch Linux repository](https://img.shields.io/badge/Arch_Linux-Repository-1793D1?logo=archlinux&logoColor=white)](https://manida.d3sox.me)
 
 Manida is a music player for Android and Linux, built with Kotlin and Compose. It plays local files and connects to Navidrome and Subsonic-compatible servers.
 
@@ -32,28 +34,53 @@ Linux MilkDrop monitors Manida's audio stream through PulseAudio or PipeWire's P
 
 The [release workflows](https://github.com/D3SOX/Manida/actions) produce APKs, Arch packages, portable Linux archives and AppImages. Published builds appear on [GitHub Releases](https://github.com/D3SOX/Manida/releases).
 
-Install the APK on Android. Manida's signed Arch repository runs on GitHub Pages at [manida.d3sox.me](https://manida.d3sox.me).
+Manida's signed Android and Arch repositories run on GitHub Pages at [manida.d3sox.me](https://manida.d3sox.me).
+
+### Android
+
+Download an APK from [GitHub Releases](https://github.com/D3SOX/Manida/releases), [install with Obtainium][obtainium-install], or add [Manida's F-Droid repository][fdroid-repository]. The Obtainium link includes alpha releases and excludes development builds.
+
+Scan this QR code in F-Droid to add the repository with its signing fingerprint:
+
+[<img src="packaging/fdroid-qr.png" alt="QR code for Manida's F-Droid repository, with the Manida logo" width="280" height="280">][fdroid-repository]
+
+You can also enter `https://manida.d3sox.me/fdroid/repo` in F-Droid's repository settings. Its SHA-256 signing fingerprint is:
+
+```text
+FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B
+```
+
+GitHub, Obtainium and this F-Droid repository distribute the same release APK and receive updates signed by the same app key. This is Manida's own repository; it is not a listing in the main f-droid.org repository.
 
 ### Arch Linux
 
-Download the [repository signing key](https://manida.d3sox.me/manida.asc). Check that its fingerprint matches:
+Download the repository signing key in a terminal and check its fingerprint:
+
+```sh
+wget -O manida.asc https://manida.d3sox.me/manida.asc
+gpg --show-keys --fingerprint manida.asc
+```
+
+It must match:
 
 ```text
 5948 F17F 1611 CC2B 995B C612 1F0D 5421 26D5 14AB
 ```
 
 ```sh
-gpg --show-keys --fingerprint manida.asc
 sudo pacman-key --add manida.asc
 sudo pacman-key --lsign-key 5948F17F1611CC2B995BC6121F0D542126D514AB
 ```
 
-Add this to `/etc/pacman.conf`:
+Add the repository with this terminal command:
 
-```ini
+```sh
+sudo tee -a /etc/pacman.conf >/dev/null <<'REPO'
+
 [manida]
 SigLevel = Required DatabaseRequired
 Server = https://manida.d3sox.me/arch/$arch
+REPO
 ```
 
 Install Manida, or update it with the rest of your system:
@@ -87,7 +114,7 @@ Development APKs install separately as **Manida dev** and use the public develop
 
 ## Build and test
 
-Install JDK 21, Android SDK platform 37, build tools 37.0.0, NDK 28.2.13676358 and CMake 3.22.1. Linux also needs CMake, Ninja, SDL2 and OpenGL development files, mpv, FFmpeg, libsecret and PulseAudio client tools. Desktop distributions use JDK 25 for their bundled runtime.
+Install JDK 21, Android SDK platform 37.0, build tools 37.0.0, NDK 28.2.13676358 and CMake 3.22.1. Linux also needs CMake, Ninja, SDL2 and OpenGL development files, mpv and its development library, FFmpeg, libsecret and PulseAudio client tools. Desktop distributions use JDK 25 for their bundled runtime.
 
 Set `JAVA_HOME` to JDK 21 and `ANDROID_HOME` to your Android SDK. Gradle detects installed toolchains or reads `JAVA_HOME_21_X64` and `JAVA_HOME_25_X64`.
 
@@ -110,7 +137,7 @@ Desktop UI tests need a display, such as `xvfb-run`, and the audio-monitor test 
 
 ## Release setup
 
-`development.yml` builds a rolling development prerelease on pushes to `master` or a manual workflow run. `release.yml` publishes tagged alpha releases after acceptance tests pass and deploys the signed Arch repository to GitHub Pages. A release tag such as `v0.1.0` must match both platform versions. Update Android's `versionCode` for each Android release.
+`development.yml` builds a rolling development prerelease on pushes to `master` or a manual workflow run. `release.yml` publishes tagged alpha releases after acceptance tests pass and deploys the signed Arch and F-Droid repositories to GitHub Pages. A release tag such as `v0.1.0` must match both platform versions. Update Android's `versionCode` for each Android release.
 
 Configure these repository secrets and variables for signed releases:
 
@@ -123,8 +150,10 @@ Configure these repository secrets and variables for signed releases:
 | `MANIDA_ARCH_SIGNING_KEY` | Secret | Armored private key for Arch packages |
 | `MANIDA_ARCH_SIGNING_PASSPHRASE` | Secret | Arch signing-key passphrase |
 | `MANIDA_ARCH_SIGNING_FINGERPRINT` | Variable | Full Arch signing-key fingerprint |
+| `MANIDA_FDROID_KEYSTORE_BASE64` | Secret | Base64-encoded F-Droid repository keystore, alias `manida-fdroid` |
+| `MANIDA_FDROID_KEYSTORE_PASSWORD` | Secret | F-Droid repository keystore and key password |
 
-GitHub Pages uses GitHub Actions as its source, with `manida.d3sox.me` as the custom domain. Its DNS `CNAME` points to `d3sox.github.io`. Each tagged release deploys the Arch repository after publishing the release assets. The `github-pages` environment must allow release tags matching `v*`. Development builds do not require release signing secrets.
+GitHub Pages uses GitHub Actions as its source, with `manida.d3sox.me` as the custom domain. Its DNS `CNAME` points to `d3sox.github.io`. Each tagged release deploys both repositories after publishing the release assets. F-Droid's landing page is `/fdroid`; its signed index and APKs are under `/fdroid/repo`. The `github-pages` environment must allow release tags matching `v*`. Development builds do not require release signing secrets.
 
 Release APKs use a dedicated production signing key. Local debug and performance builds use an Android debug key. Switching from one of those builds to the first production release requires a backup, uninstall and reinstall; Android cannot install the release over an APK signed by another key.
 
@@ -135,3 +164,6 @@ Manida uses [AGPL-3.0-only](LICENSE). Namida inspired the feature requirements. 
 MilkDrop rendering uses [projectM](https://github.com/projectM-visualizer/projectm/tree/4967dc003e5206d7df3ff447287f7609c47d2343), under LGPL-2.1-or-later. The desktop window follows the approach used by [Spotifast](https://github.com/crmne/spotifast). Third-party license notices ship with the native libraries. Release assets include the exact projectM and evaluator source archives used by the build.
 
 The bundled presets and textures retain their upstream authorship and notices, including the [preset pack's distribution notice](https://github.com/projectM-visualizer/presets-cream-of-the-crop/blob/0180df21f5e0bd39b9060cc5de420ed2f1f9e509/LICENSE.md). `python scripts/package-milkdrop-presets.py` reproduces the library from checksum-verified source archives. Each app unpacks the library on first use and reuses it afterward.
+
+[fdroid-repository]: https://manida.d3sox.me/fdroid/repo?fingerprint=FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B
+[obtainium-install]: https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22io.github.d3sox.musicplayer%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FD3SOX%2FManida%22%2C%22author%22%3A%22D3SOX%22%2C%22name%22%3A%22Manida%22%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5EManida%20%5B0-9%5D%2B%5B.%5D%5B0-9%5D%2B%5B.%5D%5B0-9%5D%2B%24%5C%22%7D%22%7D

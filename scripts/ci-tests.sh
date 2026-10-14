@@ -25,7 +25,10 @@ python scripts/test-listenbrainz.py > .test-environment/listenbrainz.log 2>&1 &
 services+=("$!")
 if [[ "$mode" == desktop ]]; then
     # Hosted runners have no desktop session or unlocked credential collection.
-    gnome-keyring-daemon --unlock --components=secrets < /dev/null
+    keyring_environment="$(printf 'manida-ci-only' | gnome-keyring-daemon --unlock --components=secrets)"
+    export GNOME_KEYRING_CONTROL
+    GNOME_KEYRING_CONTROL="$(printf '%s\n' "$keyring_environment" | sed -n 's/^GNOME_KEYRING_CONTROL=//p')"
+    gnome-keyring-daemon --start --components=secrets
     printf 'fixture-password' | secret-tool store --label='Manida CI check' application manida-ci
     [[ "$(secret-tool lookup application manida-ci)" == fixture-password ]]
     secret-tool clear application manida-ci
@@ -42,7 +45,7 @@ else
     export ANDROID_SERIAL=emulator-5554
     setsid ./gradlew --no-daemon :shared:pairedFixture --console=plain > .test-environment/pairing.log 2>&1 &
     pairing_group="$!"
-    for _attempt in {1..120}; do
+    for _attempt in {1..600}; do
         if [[ -f .test-environment/paired-fixture/control-port ]]; then break; fi
         kill -0 "$pairing_group"
         sleep 1

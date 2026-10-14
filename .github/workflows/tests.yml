@@ -44,11 +44,17 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - run: sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg mpv libsecret-tools openssh-server cmake ninja-build libsdl2-dev libgl1-mesa-dev pulseaudio-utils
+      - name: Enable emulator hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
       - uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: ${{ matrix.api }}
           target: ${{ matrix.target }}
           arch: x86_64
+          disable-linux-hw-accel: false
           profile: pixel_2
           emulator-options: -no-window -gpu swangle -noaudio -no-boot-anim -camera-back none
           script: bash scripts/ci-tests.sh android
@@ -56,4 +62,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: android-${{ matrix.api }}-test-results
-          path: androidApp/build/outputs/androidTest-results/connected/debug
+          path: |
+            androidApp/build/outputs/androidTest-results/connected/debug
+            .test-environment/pairing.log
+            .test-environment/sftp.log

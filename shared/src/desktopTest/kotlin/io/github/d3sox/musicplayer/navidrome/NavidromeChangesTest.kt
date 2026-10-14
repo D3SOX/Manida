@@ -36,6 +36,10 @@ class NavidromeChangesTest {
                 }
                 request.url.encodedPath.endsWith("/getPlaylists.view") ->
                     """{"subsonic-response":{"status":"ok","playlists":{"playlist":[]}}}"""
+                request.url.encodedPath.endsWith("/getAlbumList2.view") ->
+                    """{"subsonic-response":{"status":"ok","albumList2":{"album":[]}}}"""
+                request.url.encodedPath.endsWith("/getIndexes.view") ->
+                    """{"subsonic-response":{"status":"ok","indexes":{}}}"""
                 else -> error("Unexpected catalogue request: ${request.url.encodedPath}")
             }
             respond(body)

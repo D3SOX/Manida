@@ -54,20 +54,26 @@ def repository(release: Path, output: Path, signing_key: str):
 <p>Manida is in alpha. Local music and Navidrome/Subsonic in one library. Download the portable app or Android APK from
 <a href="https://github.com/D3SOX/Manida/releases">GitHub releases</a>.</p>
 <h2>Install with pacman</h2>
-<p>Download the <a href="manida.asc">release signing key</a> and check its fingerprint:</p>
-<pre>gpg --show-keys --fingerprint manida.asc</pre>
+<p>Download the release signing key in a terminal and check its fingerprint:</p>
+<pre>wget -O manida.asc https://manida.d3sox.me/manida.asc
+gpg --show-keys --fingerprint manida.asc</pre>
 <pre>{signing_key.upper()}</pre>
 <p>Import and trust this key:</p>
 <pre>sudo pacman-key --add manida.asc
 sudo pacman-key --lsign-key {signing_key.upper()}</pre>
-<p>Add this repository to <code>/etc/pacman.conf</code>:</p>
-<pre>[manida]
+<p>Add the repository with this terminal command:</p>
+<pre>sudo tee -a /etc/pacman.conf &gt;/dev/null &lt;&lt;'REPO'
+
+[manida]
 SigLevel = Required DatabaseRequired
-Server = https://manida.d3sox.me/arch/$arch</pre>
+Server = https://manida.d3sox.me/arch/$arch
+REPO</pre>
 <pre>sudo pacman -Syu manida</pre>
 <p>Packages and the repository database are signed with the key above. Manida uses mpv for playback
 and your desktop’s Secret Service for credentials. The portable app needs mpv, libsecret, GLib tools and font libraries installed.</p>
 <h2>Packages</h2><ul>{links}</ul>
+<h2>Android</h2><p><a href="/fdroid/">Add Manida to F-Droid</a> or download the APK from
+<a href="https://github.com/D3SOX/Manida/releases">GitHub releases</a>.</p>
 <p>Licensed under AGPL-3.0-only. <a href="https://github.com/D3SOX/Manida">Source code</a>.</p>
 </html>''')
     print(f"Created signed repository at {output}")
