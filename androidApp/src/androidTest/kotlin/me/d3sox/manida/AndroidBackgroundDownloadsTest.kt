@@ -43,6 +43,7 @@ class AndroidBackgroundDownloadsTest {
         val remote = client.savePlaylist("Background downloads ${UUID.randomUUID()}", listOf(first.id))
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         var playlistId: String? = null
+        var restoreNetwork: (() -> Unit)? = null
         try {
             controller.updatePreferences { it.copy(downloadsPaused = false, downloadOnMetered = false) }.join()
             controller.connectServer("http://127.0.0.1:14533", "fixture", "fixture-password").join()
@@ -64,6 +65,7 @@ class AndroidBackgroundDownloadsTest {
             assertEquals(15 * 60_000L, periodic.intervalMillis)
             scenario.close()
             client.savePlaylist(remote.name, listOf(first.id, added.id), remote.id)
+            restoreNetwork = useUnmeteredWifi()
             withTimeout(30_000) { controller.state.first { it.downloadNetwork.connected && !it.downloadNetwork.metered } }
             val output = ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(
                 "cmd jobscheduler run -f ${context.packageName} ${periodic.id}")).bufferedReader().use { it.readText() }
@@ -83,6 +85,7 @@ class AndroidBackgroundDownloadsTest {
             playlistId?.let { id -> if (Playlists(app.store).get(id) != null) controller.deletePlaylist(id).join() }
             try { client.deletePlaylist(remote.id) } catch (error: NavidromeException) { if (error.code != 70) throw error }
             controller.updatePreferences { original }.join()
+            restoreNetwork?.invoke()
             scenario.close(); http.close()
         }
     }
@@ -149,6 +152,7 @@ class AndroidBackgroundDownloadsTest {
         val preferences = MusicPreferences(app.store)
         val original = preferences.load()
         val scenario = ActivityScenario.launch(MainActivity::class.java)
+        var restoreNetwork: (() -> Unit)? = null
         try {
             controller.updatePreferences { it.copy(downloadsPaused = true, downloadOnMetered = false) }.join()
             controller.connectServer("http://127.0.0.1:14533", "fixture", "fixture-password").join()
@@ -157,6 +161,7 @@ class AndroidBackgroundDownloadsTest {
             controller.downloadTracks(listOf(track.id)).join()
             withTimeout(5_000) { controller.state.first { it.downloads[track.id]?.status == DownloadStatus.PENDING } }
             scenario.close()
+            restoreNetwork = useUnmeteredWifi()
             controller.setDownloadsPaused(false).join()
             withTimeout(30_000) { controller.state.first { it.downloadNetwork.connected && !it.downloadNetwork.metered } }
             val scheduler = context.getSystemService(JobScheduler::class.java)
@@ -186,6 +191,22 @@ class AndroidBackgroundDownloadsTest {
         } finally {
             scenario.close()
             controller.updatePreferences { original }.join()
+            restoreNetwork?.invoke()
+        }
+    }
+
+    /** CI emulators may only have metered cellular data, so turn on Wi-Fi and mark it unmetered for unmetered-only jobs. */
+    private fun useUnmeteredWifi(): () -> Unit {
+        fun shell(command: String): String = ParcelFileDescriptor.AutoCloseInputStream(
+            InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)).bufferedReader().use { it.readText() }
+        val originalMetered = shell("cmd netpolicy list wifi-networks").lineSequence().firstOrNull { it.startsWith("AndroidWifi;") }
+            ?.substringAfter(';')?.let { if (it == "none") "undefined" else it } ?: "undefined"
+        val wifiWasOn = shell("settings get global wifi_on").trim() != "0"
+        shell("svc wifi enable")
+        shell("cmd netpolicy set metered-network AndroidWifi false")
+        return {
+            shell("cmd netpolicy set metered-network AndroidWifi $originalMetered")
+            if (!wifiWasOn) shell("svc wifi disable")
         }
     }
 }
