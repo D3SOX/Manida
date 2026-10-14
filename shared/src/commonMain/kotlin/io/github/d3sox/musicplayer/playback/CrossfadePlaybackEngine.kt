@@ -91,7 +91,10 @@ class CrossfadePlaybackEngine(private val factory: () -> PlaybackEngine) : Playb
             gapless = enabled
             cancelFade()
             val index = currentIndex()
-            if (index >= 0) active.updateQueue(if (nativeQueue()) tracks else listOf(tracks[index]))
+            if (index >= 0) {
+                selectedEntry = tracks[index].entryId
+                active.updateQueue(if (nativeQueue()) tracks else listOf(tracks[index]))
+            }
             applyRepeat()
         }
     }

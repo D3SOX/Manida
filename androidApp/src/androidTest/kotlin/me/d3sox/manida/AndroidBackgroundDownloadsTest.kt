@@ -64,6 +64,7 @@ class AndroidBackgroundDownloadsTest {
             assertEquals(15 * 60_000L, periodic.intervalMillis)
             scenario.close()
             client.savePlaylist(remote.name, listOf(first.id, added.id), remote.id)
+            withTimeout(30_000) { controller.state.first { it.downloadNetwork.connected && !it.downloadNetwork.metered } }
             val output = ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(
                 "cmd jobscheduler run -f ${context.packageName} ${periodic.id}")).bufferedReader().use { it.readText() }
             check("Running job" in output) { output }
@@ -157,6 +158,7 @@ class AndroidBackgroundDownloadsTest {
             withTimeout(5_000) { controller.state.first { it.downloads[track.id]?.status == DownloadStatus.PENDING } }
             scenario.close()
             controller.setDownloadsPaused(false).join()
+            withTimeout(30_000) { controller.state.first { it.downloadNetwork.connected && !it.downloadNetwork.metered } }
             val scheduler = context.getSystemService(JobScheduler::class.java)
             val job = withTimeout(5_000) {
                 while (true) {

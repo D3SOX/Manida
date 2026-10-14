@@ -77,6 +77,15 @@ class AndroidArtworkUiTest {
     @Test
     fun aDeviceFlacCoverIsImportedAndDisplayedByTheNativePlayer() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
+        // Orchestrator's data-clear broadcast can reach MediaStore after the next test starts.
+        for ((command, completed) in listOf(
+            "am wait-for-broadcast-idle" to "All broadcast queues are idle!",
+            "content call --uri content://media --method wait_for_idle" to "Result:"
+        )) {
+            val output = ParcelFileDescriptor.AutoCloseInputStream(
+                instrumentation.uiAutomation.executeShellCommand(command)).bufferedReader().use { it.readText() }
+            check(completed in output) { output }
+        }
         val app = instrumentation.targetContext.applicationContext as MusicApplication
         val original = runBlocking { MusicPreferences(app.store).load() }
         val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE

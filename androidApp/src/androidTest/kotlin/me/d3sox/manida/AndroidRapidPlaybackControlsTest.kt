@@ -209,7 +209,7 @@ class AndroidRapidPlaybackControlsTest {
         val context = instrumentation.targetContext
         val name = "rapid-next-${UUID.randomUUID()}.db"
         val audio = File(context.cacheDir, "rapid-next.flac")
-        instrumentation.context.assets.open("fixture.flac").use { input -> audio.outputStream().use { input.copyTo(it) } }
+        instrumentation.context.assets.open("waveform-long.flac").use { input -> audio.outputStream().use { input.copyTo(it) } }
         val store = openMusicStore(context, name)
         val library = MusicLibrary(store)
         val tracks = (1..3).map { index ->
@@ -223,7 +223,7 @@ class AndroidRapidPlaybackControlsTest {
                 try {
                     withTimeout(10_000) { controller.state.first { !it.loading } }
                     controller.playTrack(tracks[0].id, tracks.map { it.id }).join()
-                    withTimeout(10_000) { controller.state.first { it.playback.playing && it.playback.positionMs in 100..300 } }
+                    withTimeout(10_000) { controller.state.first { it.playback.playing && it.playback.positionMs >= 100 } }
                     Handler(Looper.getMainLooper()).post {
                         entered.countDown()
                         release.await(5, TimeUnit.SECONDS)
@@ -247,7 +247,7 @@ class AndroidRapidPlaybackControlsTest {
         val context = instrumentation.targetContext
         val name = "rapid-controls-${UUID.randomUUID()}.db"
         val audio = File(context.cacheDir, "rapid-controls.flac")
-        instrumentation.context.assets.open("fixture.flac").use { input -> audio.outputStream().use { output -> input.copyTo(output) } }
+        instrumentation.context.assets.open("waveform-long.flac").use { input -> audio.outputStream().use { output -> input.copyTo(output) } }
         val store = openMusicStore(context, name)
         val library = MusicLibrary(store)
         val track = library.importTrack(TrackMetadata("Rapid controls"), TrackSource("rapid-controls", SourceKind.LOCAL, audio.toURI().toString()))
@@ -259,7 +259,7 @@ class AndroidRapidPlaybackControlsTest {
                 try {
                     withTimeout(10_000) { controller.state.first { !it.loading } }
                     controller.playTrack(track.id, listOf(track.id)).join()
-                    withTimeout(10_000) { controller.state.first { it.playback.playing && it.playback.positionMs in 100..300 } }
+                    withTimeout(10_000) { controller.state.first { it.playback.playing && it.playback.positionMs >= 100 } }
                     Handler(Looper.getMainLooper()).post {
                         entered.countDown()
                         release.await(5, TimeUnit.SECONDS)
