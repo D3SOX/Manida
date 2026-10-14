@@ -18,6 +18,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.uuid.Uuid
 import kotlin.math.pow
 
@@ -144,7 +147,11 @@ class MpvPlaybackEngine(audioOutput: String = "auto", pcmOutputFile: String? = n
                                 checked(native.mpv_set_property_string(handle, "loop-file", "no"))
                         }
                         mutableAudioLevel.value = if (audioLevelEnabled && failure == null && !idle && !paused && !atEnd) {
-                            val decibels = stringProperty("af-metadata/manida-level/lavfi.astats.Overall.RMS_level")?.toDoubleOrNull()
+                            // libmpv 0.37 crashes when querying a nested filter metadata key.
+                            val decibels = stringProperty("af-metadata/manida-level")?.let { metadata ->
+                                Json.parseToJsonElement(metadata).jsonObject["lavfi.astats.Overall.RMS_level"]
+                                    ?.jsonPrimitive?.content?.toDoubleOrNull()
+                            }
                             if (decibels?.isFinite() == true) 10.0.pow(decibels / 20).toFloat().coerceIn(0f, 1f) else 0f
                         } else 0f
                         mutableStatus.value = PlaybackStatus(currentTrack?.id,

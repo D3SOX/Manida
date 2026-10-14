@@ -562,7 +562,16 @@ class LocalFileEditsTest {
                     if (Files.exists(music.resolve("Renamed.flac"))) refreshedAfterMove.complete(Unit)
                 }
             }
-            withTimeout(3_000) { ready.await() }
+            // A clean folder emits changes only after an actual filesystem event.
+            val probe = music.resolve("watcher-ready.txt")
+            withTimeout(3_000) {
+                while (!ready.isCompleted) {
+                    Files.deleteIfExists(probe)
+                    Files.writeString(probe, "ready")
+                    delay(50)
+                }
+            }
+            Files.deleteIfExists(probe)
             val provider = object : FileEditAccess by FileSystemEditAccess {
                 override suspend fun rename(location: String, name: String) {
                     FileSystemEditAccess.rename(location, name)

@@ -22,7 +22,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-test-results
-          path: shared/build/test-results/desktopTest
+          path: |
+            shared/build/test-results/desktopTest
+            shared/hs_err_pid*.log
   android:
     runs-on: ubuntu-24.04
     strategy:
