@@ -200,7 +200,7 @@ class PlayerUiTest {
                 mainClock.autoAdvance = false
                 onNodeWithTag("now-playing").performTouchInput {
                     down(androidx.compose.ui.geometry.Offset(width * .5f, 80f))
-                    moveBy(androidx.compose.ui.geometry.Offset(0f, mini.top - 16f), 500)
+                    moveBy(androidx.compose.ui.geometry.Offset(0f, mini.top - 4f), 500)
                 }
                 mainClock.advanceTimeByFrame()
                 val transitioningWidth = paintedCircleWidth()

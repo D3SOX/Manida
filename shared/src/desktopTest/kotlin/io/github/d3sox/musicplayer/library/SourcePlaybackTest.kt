@@ -25,6 +25,61 @@ import java.util.UUID
 
 class SourcePlaybackTest {
     @Test
+    fun startingMusicWhileFileRecoveryFinishesDoesNotReloadItPaused(): Unit = runBlocking {
+        val directory = Files.createTempDirectory("startup-playback-order")
+        val store = openMusicStore(directory.resolve("library.db").toString())
+        val library = MusicLibrary(store)
+        val audio = Path.of(System.getProperty("musicplayer.testRoot"), ".test-environment", "music", "Fixture Artist",
+            "Fixture Album", "01 Northern Light.flac")
+        val track = library.importTrack(TrackMetadata("Startup song"), TrackSource("local", SourceKind.LOCAL, audio.toString()))
+        val recoveryStarted = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val releaseRecovery = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val startupFinished = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val files = LocalFileEdits(store, library, directory.resolve("backups").toString())
+        val slowFiles = object : MusicFileEdits by files {
+            override suspend fun recover() {
+                recoveryStarted.complete(Unit)
+                releaseRecovery.await()
+            }
+            override suspend fun history(): List<LocalFileEdit> {
+                startupFinished.complete(Unit)
+                return files.history()
+            }
+        }
+        val decoder = MpvPlaybackEngine("null")
+        val loads = java.util.concurrent.CopyOnWriteArrayList<Boolean>()
+        val engine = object : io.github.d3sox.musicplayer.playback.PlaybackEngine by decoder {
+            override fun loadQueue(tracks: List<io.github.d3sox.musicplayer.playback.PlayableTrack>, startIndex: Int,
+                positionMs: Long, play: Boolean) {
+                loads += play
+                decoder.loadQueue(tracks, startIndex, positionMs, play)
+            }
+        }
+        val sourceChecks = java.util.concurrent.atomic.AtomicInteger()
+        val overlappingRestore = java.util.concurrent.CountDownLatch(1)
+        val controller = MusicController(library, PlaybackQueue(store), engine, fileEdits = slowFiles,
+            sourceAccessible = {
+                if (sourceChecks.incrementAndGet() == 1) {
+                    releaseRecovery.complete(Unit)
+                    // A slow source lookup gives startup recovery time to finish during the play action.
+                    overlappingRestore.await(1, java.util.concurrent.TimeUnit.SECONDS)
+                } else overlappingRestore.countDown()
+                true
+            })
+        try {
+            withTimeout(3_000) { recoveryStarted.await() }
+            controller.playTrack(track.id, listOf(track.id)).join()
+            withTimeout(3_000) { startupFinished.await() }
+            assertEquals(listOf(true), loads, "Startup must not reload the user's new queue paused")
+            withTimeout(3_000) { controller.state.first { it.playback.playing } }
+        } finally {
+            releaseRecovery.complete(Unit)
+            overlappingRestore.countDown()
+            controller.closeAndJoin(); store.close(); directory.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
     fun connectingAnotherServerKeepsOldSongIdsFromReplacingTheLocalCopy() = runBlocking {
         val directory = Files.createTempDirectory("server-source-ownership")
         val store = openMusicStore(directory.resolve("library.db").toString())
