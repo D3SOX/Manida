@@ -1,0 +1,46 @@
+cmake_minimum_required(VERSION 3.22)
+project(manida_visualizer LANGUAGES C CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
+set(CMAKE_BUILD_RPATH "$ORIGIN")
+set(CMAKE_INSTALL_RPATH "$ORIGIN")
+include(FetchContent)
+
+# projectM 4.1.8 and its exact evaluator revision. Both archives are verified.
+set(ENABLE_SYSTEM_PROJECTM_EVAL OFF CACHE BOOL "" FORCE)
+set(ENABLE_PLAYLIST OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
+set(ENABLE_DEBUG_POSTFIX OFF CACHE BOOL "" FORCE)
+set(CMAKE_DEBUG_POSTFIX "" CACHE STRING "" FORCE)
+FetchContent_Declare(projectm_eval
+    URL https://codeload.github.com/projectM-visualizer/projectm-eval/tar.gz/e8c311e86f4d8c082e96e02b6a33525034eee6d4
+    URL_HASH SHA256=9e22b6d5bbbf2af9383d3f19bb6ef4956289cfa1608fefcadf149eb3180e4918)
+FetchContent_MakeAvailable(projectm_eval)
+FetchContent_Declare(projectm
+    URL https://codeload.github.com/projectM-visualizer/projectm/tar.gz/4967dc003e5206d7df3ff447287f7609c47d2343
+    URL_HASH SHA256=c9df02438e379191773bd1f019ce2391a1d645d00bfb559c183a801fb3f46e63)
+function(add_projectm)
+    # This release reads the outer project's version when generating its C API header.
+    set(CMAKE_PROJECT_VERSION 4.1.8)
+    set(CMAKE_PROJECT_VERSION_MAJOR 4)
+    set(CMAKE_PROJECT_VERSION_MINOR 1)
+    set(CMAKE_PROJECT_VERSION_PATCH 8)
+    FetchContent_MakeAvailable(projectm)
+endfunction()
+add_projectm()
+
+add_library(manida_visualizer SHARED visualizer.cpp)
+target_link_libraries(manida_visualizer PRIVATE libprojectM::projectM)
+if(ANDROID)
+    set_target_properties(projectM PROPERTIES VERSION "" SOVERSION "")
+    target_link_libraries(manida_visualizer PRIVATE GLESv3 log)
+else()
+    find_package(JNI REQUIRED)
+    find_package(SDL2 REQUIRED)
+    find_package(OpenGL REQUIRED)
+    target_compile_definitions(manida_visualizer PRIVATE GL_GLEXT_PROTOTYPES=1)
+    target_include_directories(manida_visualizer PRIVATE ${JNI_INCLUDE_DIRS})
+    target_link_libraries(manida_visualizer PRIVATE SDL2::SDL2 OpenGL::GL)
+endif()

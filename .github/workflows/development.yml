@@ -1,0 +1,103 @@
+name: Development builds
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: development-builds
+  cancel-in-progress: false
+jobs:
+  acceptance:
+    uses: ./.github/workflows/tests.yml
+  android:
+    needs: acceptance
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: sdkmanager 'platforms;android-37' 'build-tools;37.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+      - run: ./gradlew :androidApp:lintDevelopment :androidApp:assembleDevelopment --console=plain
+      - run: mkdir -p .test-environment/development && cp androidApp/build/outputs/apk/development/androidApp-development.apk .test-environment/development/manida-dev.apk
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: development-android
+          path: .test-environment/development/*.apk
+          if-no-files-found: error
+  linux:
+    needs: acceptance
+    runs-on: ubuntu-24.04
+    env:
+      MANIDA_NATIVE_BUILD_TYPE: RelWithDebInfo
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: |
+            25
+            21
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg mpv libsecret-tools xvfb dbus cmake ninja-build libsdl2-dev libgl1-mesa-dev pulseaudio-utils
+      - run: ./gradlew :desktopApp:createDistributable --console=plain
+      - run: python3 scripts/test-linux-player.py
+      - name: Create the Arch development package
+        run: |
+          version=$(sed -n 's/.*packageVersion = "\([^"]*\)".*/\1/p' desktopApp/build.gradle.kts)
+          docker run --rm -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \
+            -e "MANIDA_BUILD_UID=$(id -u)" -e "MANIDA_VERSION=$version" -e GITHUB_RUN_NUMBER \
+            archlinux:base@sha256:4e77cf2ea5f410e6f8be5abf93ccf17ce2436e87a138c167208356711a405dbd \
+            bash -euc 'pacman -Syu --noconfirm base-devel python
+              useradd --uid "$MANIDA_BUILD_UID" --create-home builder
+              runuser -u builder -- python3 scripts/package-linux.py --image desktopApp/build/compose/binaries/main/app/manida \
+                --output .test-environment/development --version "$MANIDA_VERSION" --pkgrel "0.$GITHUB_RUN_NUMBER" --release-tag development'
+      - name: Create the AppImage
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -n 's/.*packageVersion = "\([^"]*\)".*/\1/p' desktopApp/build.gradle.kts)
+          python3 scripts/package-appimage.py --image desktopApp/build/compose/binaries/main/app/manida \
+            --output .test-environment/development --version "$version-dev-${GITHUB_SHA:0:12}"
+      - name: Check the AppImage without FUSE
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: MANIDA_TEST_APP="$(find "$GITHUB_WORKSPACE/.test-environment/development" -name '*.AppImage' -print -quit)" python3 scripts/test-linux-player.py LinuxPlayerTest.test_packaged_player_registers_desktop_media_controls
+      - run: python3 scripts/package-native-sources.py --output .test-environment/development
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: development-linux
+          path: .test-environment/development/
+          if-no-files-found: error
+  publish:
+    needs: [android, linux]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: development-*
+          merge-multiple: true
+          path: development
+      - name: Publish the development prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          cd development
+          sha256sum -- *.apk *.tar.gz *.pkg.tar.zst *.AppImage > SHA256SUMS
+          printf 'Development build from commit %s. Android installs as Manida dev. Linux packages replace Manida.\n' "$GITHUB_SHA" > notes.txt
+          if gh release view development >/dev/null 2>&1; then
+            gh release edit development --prerelease --title 'Manida development' --notes-file notes.txt
+            gh api --method PATCH "repos/$GH_REPO/git/refs/tags/development" -f sha="$GITHUB_SHA" -F force=true
+            gh release view development --json assets --jq '.assets[].name' | while IFS= read -r asset; do
+              case "$asset" in *.apk|*.tar.gz|*.pkg.tar.zst|*.AppImage|SHA256SUMS|PKGBUILD) gh release delete-asset development "$asset" --yes ;; esac
+            done
+          else
+            gh release create development --prerelease --target "$GITHUB_SHA" --title 'Manida development' --notes-file notes.txt
+          fi
+          gh release upload development --clobber ./*.apk ./*.tar.gz ./*.pkg.tar.zst ./*.AppImage ./SHA256SUMS ./PKGBUILD

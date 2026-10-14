@@ -1,0 +1,14 @@
+package io.github.d3sox.musicplayer.storage
+
+import androidx.room.Room
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import kotlinx.coroutines.Dispatchers
+import java.io.File
+
+fun openMusicStore(path: String): MusicStore {
+    File(path).absoluteFile.parentFile?.mkdirs()
+    return MusicStore(Room.databaseBuilder<MusicDatabase>(name = path)
+        .setDriver(BundledSQLiteDriver())
+        .setQueryCoroutineContext(Dispatchers.IO)
+        .build())
+}

@@ -1,0 +1,179 @@
+package io.github.d3sox.musicplayer.ui
+
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.v2.runComposeUiTest
+import io.github.d3sox.musicplayer.app.MusicController
+import io.github.d3sox.musicplayer.library.*
+import io.github.d3sox.musicplayer.playback.MpvPlaybackEngine
+import io.github.d3sox.musicplayer.queue.PlaybackQueue
+import io.github.d3sox.musicplayer.settings.MusicPreferences
+import io.github.d3sox.musicplayer.storage.openMusicStore
+import kotlinx.coroutines.runBlocking
+import java.nio.file.Files
+import kotlin.test.Test
+import kotlin.test.assertTrue
+
+@OptIn(ExperimentalTestApi::class)
+class CollectionSortingUiTest {
+    @Test fun libraryAndPlaylistCountsUseSingularForOneAndPluralForMultiple() {
+        val directory = Files.createTempDirectory("library-count-labels")
+        val store = openMusicStore(directory.resolve("music.db").toString())
+        val library = MusicLibrary(store)
+        val playlists = io.github.d3sox.musicplayer.playlists.Playlists(store)
+        val song = runBlocking {
+            library.importTrack(TrackMetadata("Song", "Artist", "Album", genres = listOf("Genre")),
+                TrackSource("local", SourceKind.LOCAL, "/music/song.mp3"))
+        }
+        runBlocking { playlists.create("Evening", listOf(song.id)) }
+        val controller = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"), playlists = playlists)
+        try {
+            runComposeUiTest {
+                setContent { MusicPlayerApp(controller) }
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.libraryReady }
+                onNodeWithText("1 song").assertIsDisplayed()
+                openLibraryPage("Albums")
+                onNodeWithText("1 album").assertIsDisplayed()
+                onNodeWithText("Album").performClick()
+                onNodeWithText("Album · 1 song · 0:00").assertIsDisplayed()
+                openLibraryPage("Playlists")
+                onNodeWithText("1 playlist").assertIsDisplayed()
+                onNodeWithText("Evening").performClick()
+                onNodeWithText("Playlist · 1 song").assertIsDisplayed()
+                openLibraryPage("Songs")
+                runBlocking { controller.createPlaylist("Morning").join() }
+                openLibraryPage("Playlists")
+                onNodeWithContentDescription("Back").performClick()
+                onNodeWithText("2 playlists").assertIsDisplayed()
+            }
+        } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
+
+    @Test fun switchingFromSongsToPlaylistsKeepsASortControlVisibleThroughoutTheTransition() {
+        val directory = Files.createTempDirectory("sort-navigation-flicker")
+        val store = openMusicStore(directory.resolve("music.db").toString())
+        val library = MusicLibrary(store)
+        val preferences = MusicPreferences(store)
+        runBlocking {
+            library.importTrack(TrackMetadata("Song", "Artist"), TrackSource("local", SourceKind.LOCAL, "/music/song.mp3"))
+            preferences.update { it.copy(libraryTabs = listOf(LibraryTab.SONGS, LibraryTab.PLAYLISTS, LibraryTab.STATISTICS)) }
+        }
+        val controller = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"), preferences = preferences,
+            playlists = io.github.d3sox.musicplayer.playlists.Playlists(store))
+        try {
+            runComposeUiTest {
+                setContent { MusicPlayerApp(controller) }
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.libraryReady }
+                onNodeWithContentDescription("Song order").assertIsDisplayed()
+                mainClock.autoAdvance = false
+                onNode(hasText("Playlists") and hasAnyAncestor(hasTestTag("library-navigation"))).performClick()
+                repeat(40) { frame ->
+                    mainClock.advanceTimeByFrame()
+                    val controls = onAllNodes(hasContentDescription("Song order") or hasContentDescription("Collection order")).fetchSemanticsNodes()
+                    kotlin.test.assertEquals(1, controls.size, "Sort control disappeared on navigation frame $frame")
+                }
+                onNodeWithContentDescription("Collection order").assertIsDisplayed()
+            }
+        } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
+
+    @Test fun collectionOptionsInsertAllSongsNextAfterTheLastInsertionOrAtTheEnd() {
+        val directory = Files.createTempDirectory("collection-queue-actions")
+        val store = openMusicStore(directory.resolve("music.db").toString())
+        val library = MusicLibrary(store)
+        val songs = runBlocking { LocalFiles(library).scan(java.nio.file.Path.of(System.getProperty("musicplayer.testRoot"), ".test-environment", "music").toString()) }
+        val controller = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"))
+        try {
+            runComposeUiTest {
+                setContent { MusicPlayerApp(controller) }
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.libraryReady }
+                openLibraryPage("Albums"); onNodeWithText("Fixture Album").performClick()
+                onNodeWithContentDescription("Play collection").performClick()
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.queue.contextName == "Fixture Album" }
+                val album = controller.state.value.queue.entries.map { it.trackId }
+                for (label in listOf("Play next", "Play after", "Add to queue")) {
+                    runBlocking {
+                        controller.playTrack(songs[0].id, listOf(songs[0].id)).join(); controller.pause().join()
+                        controller.enqueue(listOf(songs[0].id, songs[2].id), io.github.d3sox.musicplayer.queue.QueueAction.APPEND).join()
+                        controller.enqueue(songs[1].id, io.github.d3sox.musicplayer.queue.QueueAction.PLAY_NEXT).join()
+                    }
+                    val before = controller.state.value.queue.upNext.map { it.trackId }
+                    onNodeWithContentDescription("Collection options").performClick()
+                    onNodeWithText(label, substring = false).performClick()
+                    waitUntil(timeoutMillis = 3_000) { controller.state.value.queue.upNext.size == 6 }
+                    val expected = when (label) {
+                        "Play next" -> album + before
+                        "Play after" -> before.take(1) + album + before.drop(1)
+                        else -> before + album
+                    }
+                    kotlin.test.assertEquals(expected, controller.state.value.queue.upNext.map { it.trackId })
+                }
+            }
+        } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
+
+    @Test fun collectionDetailsHaveAnArtworkHeaderAndCanPlayOrManageAllTheirSongs() {
+        val directory = Files.createTempDirectory("collection-hero")
+        val store = openMusicStore(directory.resolve("music.db").toString())
+        val library = MusicLibrary(store)
+        val songs = runBlocking { LocalFiles(library).scan(java.nio.file.Path.of(System.getProperty("musicplayer.testRoot"), ".test-environment", "music").toString()) }
+        val controller = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"), playlists = io.github.d3sox.musicplayer.playlists.Playlists(store))
+        try {
+            runComposeUiTest {
+                setContent { MusicPlayerApp(controller) }
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.libraryReady }
+                openLibraryPage("Albums"); onNodeWithText("Fixture Album").performClick()
+                onNodeWithContentDescription("Collection artwork: Fixture Album", useUnmergedTree = true).assertIsDisplayed()
+                onNodeWithContentDescription("Shuffle collection").performClick().assertIsSelected()
+                onNodeWithContentDescription("Play collection").performClick()
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.queue.unshuffledEntryIds != null }
+                kotlin.test.assertEquals(songs.map { it.id }.sorted(), controller.state.value.queue.entries.map { it.trackId }.sorted())
+                runBlocking { controller.pause().join() }
+                onNodeWithContentDescription("Collection options").performClick()
+                onNodeWithText("Manage playlists").performClick()
+                onNodeWithTag("playlist-membership-sheet").assertIsDisplayed()
+            }
+        } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
+
+    @Test
+    fun collectionSortingChangesTheVisibleOrderAndRemembersItIndependentlyFromSongs() {
+        val directory = Files.createTempDirectory("collection-sorting")
+        val store = openMusicStore(directory.resolve("music.db").toString())
+        val library = MusicLibrary(store)
+        runBlocking {
+            listOf("Alpha" to 1, "Zulu" to 3).forEach { (album, count) -> repeat(count) { index ->
+                library.importTrack(TrackMetadata("$album song $index", "An artist", album, year = if (album == "Alpha") 2000 else 2020),
+                    TrackSource("$album-$index", SourceKind.LOCAL, "/music/$album-$index.flac", modifiedAt = if (album == "Alpha") 1_000 else 2_000))
+            } }
+        }
+        val preferences = MusicPreferences(store)
+        val player = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"), preferences = preferences)
+        try {
+            runComposeUiTest {
+                setContent { MusicPlayerApp(player) }
+                waitUntil(timeoutMillis = 3_000) { !player.state.value.loading }
+                openLibraryPage("Albums")
+                onNodeWithContentDescription("Collection view").performClick()
+                onNodeWithText("List").performClick()
+                assertTrue(onNodeWithText("Alpha").fetchSemanticsNode().boundsInRoot.top < onNodeWithText("Zulu").fetchSemanticsNode().boundsInRoot.top)
+                onNodeWithContentDescription("Collection order").performClick()
+                onNodeWithText("Song count").performClick()
+                waitUntil(timeoutMillis = 3_000) {
+                    onNodeWithText("Zulu").fetchSemanticsNode().boundsInRoot.top < onNodeWithText("Alpha").fetchSemanticsNode().boundsInRoot.top
+                }
+                onNodeWithContentDescription("Collection order").performClick()
+                onNodeWithContentDescription("Descending").performClick()
+                waitUntil(timeoutMillis = 3_000) {
+                    onNodeWithText("Alpha").fetchSemanticsNode().boundsInRoot.top < onNodeWithText("Zulu").fetchSemanticsNode().boundsInRoot.top
+                }
+                openLibraryPage("Songs")
+                onNodeWithContentDescription("Song order").assertIsDisplayed()
+                openLibraryPage("Albums")
+                assertTrue(onNodeWithText("Alpha").fetchSemanticsNode().boundsInRoot.top < onNodeWithText("Zulu").fetchSemanticsNode().boundsInRoot.top)
+                onNodeWithContentDescription("Collection order").performClick()
+                onNodeWithText("Year").assertIsDisplayed()
+                onNodeWithText("Artist").assertIsDisplayed()
+            }
+        } finally { runBlocking { player.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
+}

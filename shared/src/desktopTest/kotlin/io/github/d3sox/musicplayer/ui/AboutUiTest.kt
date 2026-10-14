@@ -1,0 +1,54 @@
+package io.github.d3sox.musicplayer.ui
+
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.v2.runComposeUiTest
+import io.github.d3sox.musicplayer.app.MusicController
+import io.github.d3sox.musicplayer.library.MusicLibrary
+import io.github.d3sox.musicplayer.playback.MpvPlaybackEngine
+import io.github.d3sox.musicplayer.queue.PlaybackQueue
+import io.github.d3sox.musicplayer.storage.openMusicStore
+import kotlinx.coroutines.runBlocking
+import java.nio.file.Files
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+@OptIn(ExperimentalTestApi::class)
+class AboutUiTest {
+    @Test fun aboutHasCenteredBrandingAndButtonsThatOpenTheSourceAndOfflineLicense() {
+        val directory = Files.createTempDirectory("about-manida")
+        val store = openMusicStore(directory.resolve("music.db").toString())
+        val controller = MusicController(MusicLibrary(store), PlaybackQueue(store), MpvPlaybackEngine("null"))
+        var opened: String? = null
+        try {
+            runComposeUiTest {
+                setContent {
+                    CompositionLocalProvider(LocalUriHandler provides object : UriHandler {
+                        override fun openUri(uri: String) { opened = uri }
+                    }) { MusicPlayerApp(controller) }
+                }
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.libraryReady }
+                onNodeWithContentDescription("Settings").performClick()
+                onNodeWithText("About Manida").performScrollTo().performClick()
+                val logo = onNodeWithContentDescription("Manida logo").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+                val page = onNodeWithTag("settings-page").fetchSemanticsNode().boundsInRoot
+                assertTrue(kotlin.math.abs(logo.center.x - page.center.x) < 2f, "The app logo must be centered")
+                for (label in listOf("Source code", "View license")) {
+                    val bounds = onNodeWithText(label).assertHasClickAction().fetchSemanticsNode().boundsInRoot
+                    assertTrue(kotlin.math.abs(bounds.center.x - page.center.x) < 2f, "$label must be centered")
+                }
+                onNodeWithText("Source code").performClick()
+                assertEquals("https://github.com/D3SOX/Manida", opened)
+                onNodeWithText("View license").performClick()
+                waitUntil(timeoutMillis = 3_000) {
+                    onAllNodesWithText("GNU AFFERO GENERAL PUBLIC LICENSE", substring = true).fetchSemanticsNodes().isNotEmpty()
+                }
+                onNodeWithContentDescription("Back").performClick()
+                onNodeWithContentDescription("Manida logo").assertIsDisplayed()
+            }
+        } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
+}

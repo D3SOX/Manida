@@ -1,0 +1,246 @@
+package io.github.d3sox.musicplayer.ui
+
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionOnScreen
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toSize
+import io.github.d3sox.musicplayer.app.AppState
+import io.github.d3sox.musicplayer.app.MusicController
+import io.github.d3sox.musicplayer.library.*
+import io.github.d3sox.musicplayer.queue.QueueOrigin
+import kotlin.random.Random
+import io.github.d3sox.musicplayer.settings.HomeSectionId
+
+@Composable
+internal fun HomeScreen(state: AppState, controller: MusicController, tracks: List<Track>,
+    destination: LibraryDestination?, backEnabled: Boolean, settings: () -> Unit) {
+    val now = rememberLibraryTime()
+    var seed by rememberSaveable { mutableIntStateOf(Random.nextInt()) }
+    val feed = remember(tracks, state.listens, now, seed) {
+        // The minute clock can predate a listen that has just arrived.
+        homeFeed(tracks, state.listens, kotlin.time.Clock.System.now().toEpochMilliseconds(), seed)
+    }
+    var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    var handled by rememberSaveable { mutableIntStateOf(-1) }
+    LaunchedEffect(destination) {
+        if (destination?.tab == LibraryTab.HOME && destination.revision != handled) {
+            selected = destination.collectionId; handled = destination.revision
+        }
+    }
+    val navigate = LocalLibraryNavigate.current
+    val homeQueues = remember(state.savedQueues) { state.savedQueues.filter { it.kind != io.github.d3sox.musicplayer.queue.SavedQueueKind.RECOVERY } }
+    val catalog = remember(tracks) { tracks.associateBy { it.id } }
+    AnimatedNavigation(selected, null, canGoBack = backEnabled && selected != null,
+        onBack = { selected = null }, depth = { if (it == null) 0 else 1 }) { mixId ->
+        val mix = feed.mixes.firstOrNull { it.id == mixId }
+        if (mixId == "customize-home") HomeCustomization(state.preferences.homeSections, controller) { selected = null }
+        else if (mix != null) Column(Modifier.fillMaxSize()) {
+            CollectionHeader(mix.title) { selected = null }
+            CompositionLocalProvider(LocalLibraryOrigin provides QueueOrigin(LibraryTab.HOME, mix.id),
+                LocalLibraryScrollKey provides "home:mix:${mix.id}") {
+                SongList(mix.tracks, controller, Modifier.weight(1f), contextName = mix.title,
+                    shuffleContext = true, header = {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(mix.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            PageAction("Play mix", AppIcon.PLAY) {
+                                controller.playTrack(mix.tracks.first().id, mix.tracks.map { it.id }, 0, mix.title,
+                                    shuffleContext = true, origin = QueueOrigin(LibraryTab.HOME, mix.id))
+                            }
+                        }
+                    })
+            }
+        } else LazyColumn(Modifier.fillMaxSize().testTag("home-page"),
+            state = rememberLibraryListState(controller, "home"), contentPadding = PaddingValues(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            item(key = "intro") {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(countLabel(tracks.size, "song"), Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (feed.mixes.isNotEmpty()) TextButton(onClick = { seed = Random.nextInt() }) {
+                        Icon(AppIcon.SHUFFLE.vector, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text("Refresh mixes")
+                    }
+                    AppIconButton(AppIcon.TABS, "Customize Home") { selected = "customize-home" }
+                }
+            }
+            if (feed.added.isEmpty()) item(key = "empty") {
+                Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Icon(AppIcon.LIBRARY.vector, null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
+                        Text(when { state.tracks.isEmpty() -> "No music yet"; tracks.isEmpty() -> "No music matches your filters"; else -> "No music available" },
+                            style = MaterialTheme.typography.titleLarge)
+                        Text(when {
+                            state.tracks.isEmpty() -> "Add local music or connect your Navidrome or Subsonic server in Settings."
+                            tracks.isEmpty() -> "Change your search or music source filters to see more of your library."
+                            else -> "Reconnect your music sources or scan your library in Settings."
+                        }, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        PageAction("Music settings", AppIcon.SETTINGS, onClick = settings)
+                    }
+                }
+            }
+            state.preferences.homeSections.forEach { section ->
+                when (section) {
+                    HomeSectionId.MIXES -> if (feed.mixes.isNotEmpty()) item(key = "mixes") {
+                HomeSection("Mixes") {
+                    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(feed.mixes, key = { it.id }) { entry ->
+                            HomeCollectionCard(entry.title, entry.description, entry.tracks, state, controller, LibraryTab.HOME, entry.id, AppIcon.SHUFFLE,
+                                "Open mix: ${entry.title}") { selected = entry.id }
+                        }
+                    }
+                }
+            }
+                    HomeSectionId.RECENT -> if (feed.recent.isNotEmpty()) item(key = "recent") {
+                HomeSongs("Recent listens", feed.recent, state, controller) { navigate(LibraryTab.HISTORY, null) }
+            }
+                    HomeSectionId.TOP -> if (feed.top.isNotEmpty()) item(key = "top") {
+                HomeSongs("Top listens", feed.top, state, controller) { navigate(LibraryTab.STATISTICS, null) }
+            }
+                    HomeSectionId.RECENT_ALBUMS -> if (feed.recentAlbums.isNotEmpty()) item(key = "recent-albums") {
+                HomeCollections("Recent albums", feed.recentAlbums, LibraryTab.ALBUMS, state, controller, navigate)
+            }
+                    HomeSectionId.RECENT_ARTISTS -> if (feed.recentArtists.isNotEmpty()) item(key = "recent-artists") {
+                HomeCollections("Recent artists", feed.recentArtists, LibraryTab.ARTISTS, state, controller, navigate)
+            }
+                    HomeSectionId.TOP_ALBUMS -> if (feed.topAlbums.isNotEmpty()) item(key = "top-albums") {
+                HomeCollections("Top albums", feed.topAlbums, LibraryTab.ALBUMS, state, controller, navigate)
+            }
+                    HomeSectionId.TOP_ARTISTS -> if (feed.topArtists.isNotEmpty()) item(key = "top-artists") {
+                HomeCollections("Top artists", feed.topArtists, LibraryTab.ARTISTS, state, controller, navigate)
+            }
+                    HomeSectionId.REDISCOVER -> if (feed.rediscover.isNotEmpty()) item(key = "rediscover") {
+                HomeSongs("Rediscover", feed.rediscover, state, controller)
+            }
+                    HomeSectionId.PLAYLISTS -> if (state.playlists.isNotEmpty()) item(key = "playlists") {
+                HomeSection("Your playlists", { navigate(LibraryTab.PLAYLISTS, null) }) {
+                    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(state.playlists.take(20), key = { it.id }) { playlist ->
+                            HomeCollectionCard(playlist.name, countLabel(playlist.trackIds.size, "song"), playlist.trackIds.mapNotNull(catalog::get), state, controller, LibraryTab.PLAYLISTS, playlist.id,
+                                AppIcon.QUEUE, "Open playlist: ${playlist.name}", artwork = playlist.artworkPath(state)) {
+                                navigate(LibraryTab.PLAYLISTS, playlist.id)
+                            }
+                        }
+                    }
+                }
+            }
+                    HomeSectionId.SAVED_QUEUES -> if (homeQueues.isNotEmpty()) item(key = "saved-queues") {
+                HomeSection("Saved queues") {
+                    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(homeQueues.take(20), key = { it.id }) { queue ->
+                            HomeCollectionCard(queue.name, countLabel(queue.snapshot.entries.size, "song"),
+                                queue.snapshot.entries.mapNotNull { catalog[it.trackId] }, state, controller, LibraryTab.HOME, queue.id, AppIcon.QUEUE,
+                                "Select saved queue: ${queue.name}") { controller.loadSavedQueue(queue.id) }
+                        }
+                    }
+                }
+            }
+                    HomeSectionId.ADDED -> if (feed.added.isNotEmpty()) item(key = "added") {
+                HomeSongs("Recently added", feed.added, state, controller) { navigate(LibraryTab.RECENT, null) }
+            }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeSection(title: String, all: (() -> Unit)? = null, content: @Composable () -> Unit) {
+    Column(Modifier.testTag("home-section:$title"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
+            if (all != null) TextButton(all, Modifier.semantics { contentDescription = "See all $title" }) { Text("See all") }
+        }
+        content()
+    }
+}
+
+@Composable
+private fun HomeSongs(title: String, songs: List<Track>, state: AppState, controller: MusicController, all: (() -> Unit)? = null) {
+    val ids = remember(songs) { songs.map { it.id } }
+    HomeSection(title, all) {
+        LazyRow(Modifier.testTag("home-songs:$title"), contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            itemsIndexed(songs, key = { _, track -> track.id }) { index, track ->
+                var bounds by remember(track.id) { mutableStateOf<Rect?>(null) }
+                SongActionHost(track, state, controller, ids, index, contextName = title, artworkOrigin = { bounds }) { _, _, menu, menuOpen ->
+                    Card(Modifier.width(152.dp).testTag("home-song:$title:${track.id}").clip(RoundedCornerShape(16.dp))
+                        .combinedClickable(onClick = { controller.playTrack(track.id, ids, index, title, origin = QueueOrigin(LibraryTab.HOME), preserveManualQueue = true) }, onLongClick = menu)) {
+                        Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            CollectionArtwork(state.artwork[track.id], track.metadata.title, AppIcon.MUSIC,
+                                Modifier.fillMaxWidth().aspectRatio(1f).onGloballyPositioned { bounds = Rect(it.positionOnScreen(), it.size.toSize()) }
+                                    .graphicsLayer { alpha = if (menuOpen) 0f else 1f })
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(track.metadata.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(track.metadata.artist.ifBlank { "Unknown artist" }, style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                                AppIconButton(AppIcon.MORE, "Track options: ${track.metadata.title}", onClick = menu)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeCollections(title: String, collections: List<TrackCollection>, tab: LibraryTab, state: AppState, controller: MusicController, navigate: (LibraryTab, String?) -> Unit) {
+    HomeSection(title, { navigate(tab, null) }) {
+        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(collections, key = { it.id }) { collection ->
+                HomeCollectionCard(collection.title, if (tab == LibraryTab.ALBUMS) collection.subtitle else countLabel(collection.tracks.size, "song"),
+                    collection.tracks, state, controller, tab, collection.id, tab.icon(), "Open ${tab.label.lowercase().removeSuffix("s")}: ${collection.title}") {
+                    navigate(tab, collection.id)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeCollectionCard(title: String, subtitle: String, tracks: List<Track>, state: AppState, controller: MusicController, tab: LibraryTab, id: String, icon: AppIcon,
+    label: String, artwork: String? = null, open: () -> Unit) {
+    val entry = CollectionItem(id, title, subtitle, artwork, icon, tracks.size, trackIds = tracks.map { it.id })
+    CollectionActionHost(entry, tab, state, controller, open) { menu ->
+    Card(Modifier.width(168.dp).clip(MaterialTheme.shapes.medium)
+        .combinedClickable(onClick = open, onLongClick = menu).semantics { contentDescription = label }) {
+        Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val covers = tracks.distinctBy { albumCollectionId(it.metadata) }.take(4)
+            if (artwork != null || covers.size < 4) CollectionArtwork(artwork ?: tracks.firstNotNullOfOrNull { state.artwork[it.id] },
+                title, icon, Modifier.fillMaxWidth().aspectRatio(1f))
+            else Column(Modifier.fillMaxWidth().aspectRatio(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                covers.chunked(2).forEach { row ->
+                    Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        row.forEach { track -> CollectionArtwork(state.artwork[track.id], title, icon, Modifier.weight(1f).fillMaxHeight()) }
+                    }
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                AppIconButton(AppIcon.MORE, "Collection options: $title", onClick = menu)
+            }
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+    }
+    }
+}

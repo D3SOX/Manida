@@ -1,0 +1,91 @@
+package io.github.d3sox.musicplayer.sftp
+
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+
+class SftpFilesTest {
+    @Test
+    fun anUploadDestinationInAMissingMusicFolderIsReportedAsAbsent() {
+        val directory = Files.createTempDirectory("manida-sftp-missing-destination")
+        try {
+            val fixture = Path.of(System.getProperty("musicplayer.testRoot"), ".test-environment", "sftp-fixture")
+            val files = SftpFiles(SftpProfile("127.0.0.1", 14534, System.getProperty("user.name"), directory.toString(),
+                Files.readString(fixture.resolve("fingerprint"))), SftpAuthentication(privateKey = Files.readString(fixture.resolve("client"))))
+            assertEquals(false, files.exists("New Artist/New Album/song.flac"))
+            assertEquals(false, Files.exists(directory.resolve("New Artist")))
+        } finally { directory.toFile().deleteRecursively() }
+    }
+
+    @Test
+    fun anUploadCanCreateMusicFoldersButCannotTraverseASymbolicLink() {
+        val directory = Files.createTempDirectory("manida-sftp-folders")
+        try {
+            val music = Files.createDirectory(directory.resolve("music"))
+            val outside = Files.createDirectory(directory.resolve("outside"))
+            Files.createSymbolicLink(music.resolve("linked"), outside)
+            val fixture = Path.of(System.getProperty("musicplayer.testRoot"), ".test-environment", "sftp-fixture")
+            val original = Path.of(System.getProperty("musicplayer.testRoot"), "androidApp", "src", "androidTest", "assets", "fixture.flac")
+            val files = SftpFiles(SftpProfile("127.0.0.1", 14534, System.getProperty("user.name"), music.toString(),
+                Files.readString(fixture.resolve("fingerprint"))), SftpAuthentication(privateKey = Files.readString(fixture.resolve("client"))))
+            files.upload("New Artist/New Album/song.flac", original.toFile())
+            assertEquals(-1L, Files.mismatch(original, music.resolve("New Artist/New Album/song.flac")))
+            assertFailsWith<IllegalArgumentException> { files.upload("linked/Album/song.flac", original.toFile()) }
+            assertEquals(emptyList(), outside.toFile().list()!!.toList())
+            assertFailsWith<IllegalArgumentException> { files.upload("../outside/song.flac", original.toFile()) }
+            Unit
+        } finally { directory.toFile().deleteRecursively() }
+    }
+
+    @Test
+    fun anUploadBecomesACompleteMusicFileWithoutOverwritingAnExistingSong() {
+        val directory = Files.createTempDirectory("manida-sftp-upload")
+        try {
+            val music = Files.createDirectory(directory.resolve("music"))
+            Files.createDirectories(music.resolve("Artist/Album"))
+            val fixture = Path.of(System.getProperty("musicplayer.testRoot"), ".test-environment", "sftp-fixture")
+            val original = Path.of(System.getProperty("musicplayer.testRoot"), "androidApp", "src", "androidTest", "assets", "fixture.flac")
+            val files = SftpFiles(SftpProfile("127.0.0.1", 14534, System.getProperty("user.name"), music.toString(),
+                Files.readString(fixture.resolve("fingerprint"))), SftpAuthentication(privateKey = Files.readString(fixture.resolve("client"))))
+            files.upload("Artist/Album/song.flac", original.toFile())
+            assertEquals(-1L, Files.mismatch(original, music.resolve("Artist/Album/song.flac")))
+            val collision = assertFailsWith<SftpFailure> { files.upload("Artist/Album/song.flac", original.toFile()) }
+            assertEquals(SftpFailure.Kind.CONFLICT, collision.kind)
+            assertEquals(-1L, Files.mismatch(original, music.resolve("Artist/Album/song.flac")))
+            assertEquals(listOf("song.flac"), music.resolve("Artist/Album").toFile().list()!!.sorted())
+        } finally { directory.toFile().deleteRecursively() }
+    }
+
+    @Test
+    fun anUntrustedHostKeyStopsTheConnectionBeforeCredentialsCanBeUsed() {
+        val directory = Files.createTempDirectory("manida-sftp-host-key")
+        try {
+            val profile = SftpProfile("127.0.0.1", 14534, System.getProperty("user.name"), directory.toString(),
+                "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+            val failure = assertFailsWith<SftpFailure> {
+                SftpFiles(profile, SftpAuthentication(password = "must-not-be-sent")).download("song.flac", directory.resolve("received.flac").toFile())
+            }
+            assertEquals(SftpFailure.Kind.HOST_KEY, failure.kind)
+            assertEquals(null, failure.cause)
+            assertEquals(false, Files.exists(directory.resolve("received.flac")))
+        } finally { directory.toFile().deleteRecursively() }
+    }
+
+    @Test
+    fun aPinnedOpenSshServerCanTransferTheOriginalMusicFile() {
+        val directory = Files.createTempDirectory("manida-sftp-transfer")
+        try {
+            val fixture = Path.of(System.getProperty("musicplayer.testRoot"), ".test-environment", "sftp-fixture")
+            val original = Path.of(System.getProperty("musicplayer.testRoot"), "androidApp", "src", "androidTest", "assets", "fixture.flac")
+            Files.copy(original, directory.resolve("song.flac"))
+            val files = SftpFiles(SftpProfile("127.0.0.1", 14534, System.getProperty("user.name"), directory.toString(),
+                Files.readString(fixture.resolve("fingerprint"))),
+                SftpAuthentication(privateKey = Files.readString(fixture.resolve("client"))))
+            val received = directory.resolve("received.flac")
+            files.download("song.flac", received.toFile())
+            assertEquals(-1L, Files.mismatch(original, received))
+        } finally { directory.toFile().deleteRecursively() }
+    }
+}

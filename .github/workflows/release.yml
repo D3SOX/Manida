@@ -1,0 +1,135 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  acceptance:
+    uses: ./.github/workflows/tests.yml
+  android:
+    needs: acceptance
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: python3 scripts/check-release-version.py "$GITHUB_REF_NAME"
+      - run: sdkmanager 'platforms;android-37' 'build-tools;37.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+      - run: ./gradlew :androidApp:lintRelease :androidApp:assembleRelease --console=plain
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg python3-pil
+      - name: Check the optimized APK and MilkDrop
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 36
+          target: google_apis_ps16k
+          arch: x86_64
+          profile: pixel_2
+          avd-name: manida_release_ci
+          emulator-options: -no-window -gpu swangle -noaudio -no-boot-anim -camera-back none
+          script: MANIDA_TEST_SERIAL=emulator-5554 /usr/bin/python3 scripts/test-android-package.py
+      - name: Sign the Android release
+        env:
+          MANIDA_ANDROID_KEYSTORE_BASE64: ${{ secrets.MANIDA_ANDROID_KEYSTORE_BASE64 }}
+          MANIDA_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.MANIDA_ANDROID_KEYSTORE_PASSWORD }}
+          MANIDA_ANDROID_KEY_PASSWORD: ${{ secrets.MANIDA_ANDROID_KEY_PASSWORD }}
+          MANIDA_ANDROID_KEY_ALIAS: ${{ vars.MANIDA_ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          signing_directory=$(mktemp -d)
+          trap 'rm -rf -- "$signing_directory"' EXIT
+          printf '%s' "$MANIDA_ANDROID_KEYSTORE_BASE64" | base64 --decode > "$signing_directory/manida.jks"
+          chmod 600 "$signing_directory/manida.jks"
+          mkdir -p .test-environment/android-release
+          python3 scripts/sign-android.py --input androidApp/build/outputs/apk/release/androidApp-release-unsigned.apk \
+            --output ".test-environment/android-release/manida-${GITHUB_REF_NAME#v}.apk" \
+            --keystore "$signing_directory/manida.jks" --alias "$MANIDA_ANDROID_KEY_ALIAS"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-android
+          path: .test-environment/android-release/*.apk
+          if-no-files-found: error
+  linux:
+    needs: acceptance
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: |
+            25
+            21
+      - run: python3 scripts/check-release-version.py "$GITHUB_REF_NAME"
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg mpv libsecret-tools xvfb dbus cmake ninja-build libsdl2-dev libgl1-mesa-dev pulseaudio-utils
+      - run: ./gradlew :desktopApp:createDistributable --console=plain
+      - run: python3 scripts/test-linux-player.py
+      - name: Create and sign the Arch repository
+        env:
+          MANIDA_ARCH_SIGNING_KEY: ${{ secrets.MANIDA_ARCH_SIGNING_KEY }}
+          MANIDA_ARCH_SIGNING_PASSPHRASE: ${{ secrets.MANIDA_ARCH_SIGNING_PASSPHRASE }}
+          MANIDA_ARCH_SIGNING_FINGERPRINT: ${{ vars.MANIDA_ARCH_SIGNING_FINGERPRINT }}
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \
+            -e GITHUB_ACTIONS -e GITHUB_REF_NAME -e MANIDA_ARCH_SIGNING_KEY \
+            -e MANIDA_ARCH_SIGNING_PASSPHRASE -e MANIDA_ARCH_SIGNING_FINGERPRINT \
+            -e "MANIDA_BUILD_UID=$(id -u)" \
+            archlinux:base@sha256:4e77cf2ea5f410e6f8be5abf93ccf17ce2436e87a138c167208356711a405dbd \
+            bash -euc 'pacman -Syu --noconfirm base-devel gnupg python
+              useradd --uid "$MANIDA_BUILD_UID" --create-home builder
+              runuser -u builder -- bash scripts/ci-package-linux.sh'
+      - name: Create the AppImage
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/package-appimage.py --image desktopApp/build/compose/binaries/main/app/manida --output .test-environment/release --version "${GITHUB_REF_NAME#v}"
+      - run: python3 scripts/package-native-sources.py --output .test-environment/release
+      - name: Check the AppImage without FUSE
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: MANIDA_TEST_APP="$GITHUB_WORKSPACE/.test-environment/release/manida-${GITHUB_REF_NAME#v}-x86_64.AppImage" python3 scripts/test-linux-player.py LinuxPlayerTest.test_packaged_player_registers_desktop_media_controls
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-linux
+          path: .test-environment/release/
+          if-no-files-found: error
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: .test-environment/pages
+  publish:
+    needs: [android, linux]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cd release
+          sha256sum -- *.apk *.tar.gz *.pkg.tar.zst *.AppImage > SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Manida ${GITHUB_REF_NAME#v}" \
+            --prerelease --generate-notes ./*
+  pages:
+    needs: [linux, publish]
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        id: pages

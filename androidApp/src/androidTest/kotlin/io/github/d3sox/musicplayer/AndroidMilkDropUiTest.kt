@@ -1,0 +1,77 @@
+package io.github.d3sox.musicplayer
+
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.test.core.app.ActivityScenario
+import androidx.test.platform.app.InstrumentationRegistry
+import io.github.d3sox.musicplayer.library.*
+import io.github.d3sox.musicplayer.visualizer.VisualizerPcm
+import io.github.d3sox.musicplayer.visualizer.milkDropLibrary
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.*
+import org.junit.Rule
+import org.junit.Test
+import java.io.File
+
+class AndroidMilkDropUiTest {
+    @get:Rule val compose = createEmptyComposeRule()
+    @Test fun presetsCanBeSelectedAndTheVisualizerStopsInTheBackgroundAndWhenClosed() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val app = instrumentation.targetContext.applicationContext as MusicApplication
+        val file = File(app.filesDir, "milkdrop-ui.wav")
+        instrumentation.context.assets.open("fixture.wav").use { input -> file.outputStream().use { input.copyTo(it) } }
+        val track = runBlocking {
+            app.controller.updatePreferences { it.copy(precomputeWaveforms = false) }.join()
+            app.controller.library.importTrack(TrackMetadata("MilkDrop fixture", artist = "Manida", durationMs = 2000),
+                TrackSource("milkdrop:ui", SourceKind.LOCAL, file.toURI().toString())).also { app.controller.reload().join() }
+        }
+        try {
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                compose.waitUntil(5_000) { app.controller.state.value.libraryReady }
+                runBlocking { app.controller.playTrack(track.id, listOf(track.id)).join(); app.controller.pause().join() }
+                compose.waitUntil(5_000) { app.controller.state.value.playback.durationMs > 0 }
+                compose.onNodeWithTag("mini-player").performClick()
+                compose.onNodeWithContentDescription("MilkDrop visualizer").performClick()
+                compose.waitUntil(60_000) { VisualizerPcm.enabled }
+                compose.onNodeWithContentDescription("MilkDrop visualization").assertIsDisplayed()
+                runBlocking { app.controller.setQueueRepeat(io.github.d3sox.musicplayer.playback.RepeatMode.ONE).join(); app.controller.togglePlayback().join() }
+                compose.onNodeWithText("Next preset").performClick()
+                val presets = runBlocking { milkDropLibrary(File(app.filesDir, "milkdrop")) }.presets
+                compose.onNodeWithText(presets[1].name).assertExists()
+                compose.onNodeWithContentDescription("Choose MilkDrop preset").performClick()
+                compose.onNodeWithText("Search presets").performTextInput("postcard from Fractopia")
+                compose.onNodeWithText("Flexi + Rovastar - postcard from Fractopia").performClick()
+                compose.onNodeWithText("Flexi + Rovastar - postcard from Fractopia").assertExists()
+                compose.onNodeWithContentDescription("Change presets automatically").performClick()
+                compose.onNodeWithText("Unlock preset").assertExists()
+                compose.waitForIdle()
+                requireNotNull(instrumentation.uiAutomation.takeScreenshot()).let { bitmap ->
+                    val values = android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, "milkdrop-ui-${android.os.Build.VERSION.SDK_INT}.png")
+                        put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/png")
+                        put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ManidaTests")
+                    }
+                    val uri = requireNotNull(app.contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values))
+                    requireNotNull(app.contentResolver.openOutputStream(uri)).use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+                    bitmap.recycle()
+                }
+                fun shell(command: String) = android.os.ParcelFileDescriptor.AutoCloseInputStream(
+                    instrumentation.uiAutomation.executeShellCommand(command)).use { it.readBytes() }
+                shell("input keyevent 3")
+                compose.waitUntil(3_000) { !VisualizerPcm.enabled }
+                shell("am start --user 0 -W --activity-single-top --activity-clear-top -n io.github.d3sox.musicplayer/.MainActivity")
+                compose.waitUntil(5_000) { VisualizerPcm.enabled }
+                compose.waitForIdle()
+                compose.onNodeWithContentDescription("MilkDrop visualization").assertIsDisplayed()
+                compose.onNodeWithText("Close visualizer").performClick()
+                compose.onNodeWithContentDescription("MilkDrop visualization").assertDoesNotExist()
+                compose.waitUntil(5_000) { !VisualizerPcm.enabled }
+                compose.onNodeWithContentDescription("MilkDrop visualizer").performClick()
+                compose.waitUntil(5_000) { VisualizerPcm.enabled }
+                compose.onNodeWithText("Close visualizer").performClick()
+                compose.onNodeWithContentDescription("MilkDrop visualization").assertDoesNotExist()
+                compose.waitUntil(3_000) { !VisualizerPcm.enabled }
+            }
+        } finally { runBlocking { app.controller.pause().join() }; file.delete() }
+    }
+}

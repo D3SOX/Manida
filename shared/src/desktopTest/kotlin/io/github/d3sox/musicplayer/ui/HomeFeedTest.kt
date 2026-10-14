@@ -1,0 +1,49 @@
+package io.github.d3sox.musicplayer.ui
+
+import io.github.d3sox.musicplayer.history.Listen
+import io.github.d3sox.musicplayer.library.*
+import kotlin.test.*
+
+class HomeFeedTest {
+    private val now = 1_800_000_000_000L
+    private val day = 86_400_000L
+    private fun track(id: String, artist: String = "Artist", album: String = "Album", number: Int = 1,
+        available: Boolean = true, favorite: Boolean = false, added: Long = now) = Track(id,
+        TrackMetadata(id, artist, album, durationMs = 1_000, trackNumber = number),
+        listOf(TrackSource("source:$id", SourceKind.LOCAL, "/music/$id.flac", available = available)), favorite, added)
+    private fun listen(track: Track, ago: Long, qualified: Boolean = true) = Listen("${track.id}:$ago", track.id, "playback:$ago",
+        now - ago, track.metadata, listenedMs = if (qualified) 800 else 100, playedMs = if (qualified) 800 else 100, durationMs = 1_000)
+
+    @Test fun sectionsRespectListeningDatesQualificationsAlbumIdentityAndAvailability() {
+        val first = track("First", number = 2, favorite = true)
+        val second = track("Second", number = 1, added = now + 10)
+        val old = track("Old", "Other artist", "Album", added = now - 100 * day)
+        val unavailable = track("Unavailable", available = false)
+        val listens = listOf(listen(first, 1_000), listen(first, day), listen(second, 500, qualified = false),
+            listen(old, 90 * day), listen(unavailable, 0), listen(first, -day), listen(track("Removed"), 0))
+        val feed = homeFeed(listOf(first, second, old, unavailable), listens, now, 42)
+        assertEquals(listOf(second, first, old), feed.recent)
+        assertEquals(listOf(first), feed.top, "Partial, future and old listens do not count as top listens")
+        assertEquals(listOf(old), feed.rediscover)
+        assertEquals(second, feed.added.first())
+        assertEquals(2, feed.recentAlbums.size, "Albums with the same title but different artists stay separate")
+        assertEquals(listOf(second, first), feed.recentAlbums.first().tracks, "Album cards open the entire album in track order")
+        assertEquals(listOf(first), feed.mixes.first { it.id == "favorites" }.tracks)
+        assertEquals(listOf(second), feed.mixes.first { it.id == "discovery" }.tracks)
+        assertTrue(feed.mixes.flatMap { it.tracks }.none { it == unavailable })
+    }
+
+    @Test fun filtersAndStableRefreshSeedsAreAppliedToEverySectionAndMix() {
+        val tracks = (0 until 60).map { track("Track $it", "Artist $it", "Album $it") }
+        val first = homeFeed(tracks, emptyList(), now, 42)
+        val second = homeFeed(tracks, emptyList(), now, 42)
+        assertEquals(first, second)
+        assertNotEquals(first.mixes.first().tracks, homeFeed(tracks, emptyList(), now, 99).mixes.first().tracks)
+        assertTrue(first.mixes.all { it.tracks.size <= 50 })
+        val filtered = homeFeed(tracks.take(2), tracks.map { listen(it, day) }, now, 42)
+        assertEquals(tracks.take(2).toSet(), filtered.recent.toSet())
+        assertTrue(filtered.mixes.flatMap { it.tracks }.all { it in tracks.take(2) })
+        val empty = homeFeed(emptyList(), tracks.map { listen(it, day) }, now, 42)
+        assertTrue(empty.mixes.isEmpty() && empty.recent.isEmpty() && empty.top.isEmpty())
+    }
+}

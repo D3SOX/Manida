@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="media3_controls_seek_to_previous_description">Previous</string>
+    <string name="media3_controls_seek_to_next_description">Next</string>
+</resources>

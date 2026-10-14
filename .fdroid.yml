@@ -1,0 +1,29 @@
+Categories:
+  - Multimedia
+License: AGPL-3.0-only
+SourceCode: https://github.com/D3SOX/Manida
+IssueTracker: https://github.com/D3SOX/Manida/issues
+
+AutoName: Manida
+Summary: Local music and Navidrome in one library
+Description: |-
+  Play local music and your Navidrome library, online or offline.
+  Download songs and playlists, organize your queue, and edit music files.
+  Choose system or artwork colors, including an AMOLED black theme.
+  Pair with Manida on Linux to synchronize playlists and listening history.
+
+RepoType: git
+Repo: https://github.com/D3SOX/Manida.git
+
+Builds:
+  - versionName: 0.1.0
+    versionCode: 1
+    commit: v0.1.0
+    subdir: androidApp
+    gradle:
+      - yes
+
+AutoUpdateMode: Version v%v
+UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$
+CurrentVersion: 0.1.0
+CurrentVersionCode: 1
