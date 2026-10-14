@@ -16,8 +16,8 @@ jobs:
           java-version: |
             25
             21
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg mpv libsecret-tools openssh-server xvfb xauth dbus cmake ninja-build libsdl2-dev libgl1-mesa-dev pulseaudio pulseaudio-utils
-      - run: bash scripts/ci-tests.sh desktop
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg mpv libmpv-dev libsecret-tools gnome-keyring openssh-server xvfb xauth dbus cmake ninja-build libsdl2-dev libgl1-mesa-dev pulseaudio pulseaudio-utils
+      - run: dbus-run-session -- bash scripts/ci-tests.sh desktop
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -42,7 +42,7 @@ jobs:
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
           log-accepted-android-sdk-licenses: false
-      - run: sdkmanager 'platforms;android-37' 'build-tools;37.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+      - run: sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg mpv libsecret-tools openssh-server cmake ninja-build libsdl2-dev libgl1-mesa-dev pulseaudio-utils
       - uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:

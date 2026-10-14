@@ -24,6 +24,11 @@ services+=("$!")
 python scripts/test-listenbrainz.py > .test-environment/listenbrainz.log 2>&1 &
 services+=("$!")
 if [[ "$mode" == desktop ]]; then
+    # Hosted runners have no desktop session or unlocked credential collection.
+    gnome-keyring-daemon --unlock --components=secrets < /dev/null
+    printf 'fixture-password' | secret-tool store --label='Manida CI check' application manida-ci
+    [[ "$(secret-tool lookup application manida-ci)" == fixture-password ]]
+    secret-tool clear application manida-ci
     if ! pactl info >/dev/null 2>&1; then
         pulseaudio --daemonize=no --exit-idle-time=-1 > .test-environment/pulseaudio.log 2>&1 &
         services+=("$!")
