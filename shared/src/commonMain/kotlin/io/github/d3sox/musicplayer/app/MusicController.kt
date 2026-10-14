@@ -346,16 +346,18 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
                 val authorization = scrobbling?.pendingLastFmAuthorization()
                 mutableState.update { it.copy(lastFmAuthorization = authorization) }
             }
-            if (preferences != null) {
-                engine.setSpeed(state.value.preferences.speed)
-                engine.setPitch(state.value.preferences.pitch)
-                engine.setAudioEffects(state.value.preferences.audioEffects)
-                engine.setCrossfadeDuration(state.value.preferences.crossfadeDurationMs)
-            }
-            val saved = queue.snapshot()
-            if (saved.currentIndex >= 0 && !queueLoaded) {
-                loadSnapshot(saved, play = false)
-                queueLoaded = true
+            operations.withLock {
+                if (preferences != null) {
+                    engine.setSpeed(state.value.preferences.speed)
+                    engine.setPitch(state.value.preferences.pitch)
+                    engine.setAudioEffects(state.value.preferences.audioEffects)
+                    engine.setCrossfadeDuration(state.value.preferences.crossfadeDurationMs)
+                }
+                val saved = queue.snapshot()
+                if (saved.currentIndex >= 0 && !queueLoaded) {
+                    loadSnapshot(saved, play = false)
+                    queueLoaded = true
+                }
             }
             refresh()
             mutableState.update { it.copy(loading = false, error = recoveryError ?: it.error) }
