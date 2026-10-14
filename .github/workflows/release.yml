@@ -20,6 +20,9 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: python3 scripts/check-release-version.py "$GITHUB_REF_NAME"
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          log-accepted-android-sdk-licenses: false
       - run: sdkmanager 'platforms;android-37' 'build-tools;37.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
       - run: ./gradlew :androidApp:lintRelease :androidApp:assembleRelease --console=plain
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg python3-pil
