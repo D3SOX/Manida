@@ -679,17 +679,22 @@ private fun PlayerControls(state: AppState, controller: MusicController, current
             AppIconButton(AppIcon.NEXT, "Next track", Modifier.size(48.dp).then(motion.anchor(PlayerPanel.PLAYING, PlayerElement.NEXT, visible))) { controller.skip(1) }
             PlayerRepeatControl(state.queue, controller, onRepeatCount, Modifier.size(48.dp))
         }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            AppIconButton(AppIcon.DEVICES, "Audio output", onClick = onOutput)
-            MilkDropButton(onVisualizer)
-            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically) {
+                Row {
+                    AppIconButton(AppIcon.DEVICES, "Audio output", onClick = onOutput)
+                    MilkDropButton(onVisualizer)
+                }
+                AppIconButton(AppIcon.QUEUE, "Queue", onClick = onQueue)
+            }
+            Box(Modifier.fillMaxWidth().padding(horizontal = 96.dp), contentAlignment = Alignment.Center) {
                 if (state.preferences.showAudioInfo) state.playback.audioInfo?.let { info ->
                     Text(audioInfoLabel(info), style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("playing-audio-info"))
                 }
             }
-            AppIconButton(AppIcon.QUEUE, "Queue", onClick = onQueue)
         }
         AppVolume(controller)
     }
