@@ -34,6 +34,8 @@ class AndroidMilkDropUiTest {
                 compose.onNodeWithContentDescription("MilkDrop visualizer").performClick()
                 compose.waitUntil(60_000) { VisualizerPcm.enabled }
                 compose.onNodeWithContentDescription("MilkDrop visualization").assertIsDisplayed()
+                compose.onNodeWithContentDescription("Change presets automatically").performClick()
+                compose.onNodeWithText("Unlock preset").assertExists()
                 runBlocking { app.controller.setQueueRepeat(io.github.d3sox.musicplayer.playback.RepeatMode.ONE).join(); app.controller.togglePlayback().join() }
                 compose.onNodeWithText("Next preset").performClick()
                 val presets = runBlocking { milkDropLibrary(File(app.filesDir, "milkdrop")) }.presets
@@ -42,8 +44,6 @@ class AndroidMilkDropUiTest {
                 compose.onNodeWithText("Search presets").performTextInput("postcard from Fractopia")
                 compose.onNodeWithText("Flexi + Rovastar - postcard from Fractopia").performClick()
                 compose.onNodeWithText("Flexi + Rovastar - postcard from Fractopia").assertExists()
-                compose.onNodeWithContentDescription("Change presets automatically").performClick()
-                compose.onNodeWithText("Unlock preset").assertExists()
                 compose.waitForIdle()
                 requireNotNull(instrumentation.uiAutomation.takeScreenshot()).let { bitmap ->
                     val values = android.content.ContentValues().apply {
