@@ -23,7 +23,7 @@ jobs:
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
           log-accepted-android-sdk-licenses: false
-      - run: sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+      - run: sdkmanager 'platforms;android-37.1' 'build-tools;37.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
       - run: ./gradlew :androidApp:lintRelease :androidApp:assembleRelease --console=plain
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg python3-pil
       - name: Enable emulator hardware acceleration

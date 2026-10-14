@@ -11,7 +11,9 @@ kotlin {
     jvmToolchain(21)
     android {
         namespace = "io.github.d3sox.musicplayer.shared"
-        compileSdk = 37
+        compileSdk {
+            version = release(37) { minorApiLevel = 1 }
+        }
         minSdk = 31
         withHostTest {}
         androidResources { enable = true }

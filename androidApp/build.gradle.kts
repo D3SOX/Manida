@@ -5,7 +5,9 @@ plugins {
 
 android {
     namespace = "me.d3sox.manida"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) { minorApiLevel = 1 }
+    }
     ndkVersion = "28.2.13676358"
     defaultConfig {
         applicationId = "me.d3sox.manida"
