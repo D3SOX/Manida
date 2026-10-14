@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import shutil
 import urllib.request
+from build_mpv import source_archive
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -25,6 +26,9 @@ def package(output):
                 destination.unlink()
                 raise RuntimeError(f"Native source checksum mismatch for {name}")
         print("Verified " + destination.name)
+    mpv = source_archive()
+    shutil.copyfile(mpv, output / mpv.name)
+    print("Verified " + mpv.name)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)

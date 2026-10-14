@@ -66,6 +66,8 @@ jobs:
   linux:
     needs: acceptance
     runs-on: ubuntu-24.04
+    env:
+      LD_LIBRARY_PATH: ${{ github.workspace }}/.test-environment/mpv-runtime/lib
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
@@ -75,7 +77,8 @@ jobs:
             25
             21
       - run: python3 scripts/check-release-version.py "$GITHUB_REF_NAME"
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg mpv libmpv-dev libsecret-tools xvfb dbus cmake ninja-build libsdl2-dev libgl1-mesa-dev pulseaudio-utils
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg mpv libmpv-dev libsecret-tools xvfb dbus cmake ninja-build libsdl2-dev libgl1-mesa-dev pulseaudio-utils meson pkg-config libavcodec-dev libavfilter-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev libplacebo-dev libass-dev libpulse-dev libasound2-dev
+      - run: python3 scripts/build_mpv.py --prefix .test-environment/mpv-runtime
       - run: ./gradlew :desktopApp:createDistributable --console=plain
       - run: python3 scripts/test-linux-player.py
       - name: Create and sign the Arch repository
@@ -95,7 +98,7 @@ jobs:
       - name: Create the AppImage
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/package-appimage.py --image desktopApp/build/compose/binaries/main/app/manida --output .test-environment/release --version "${GITHUB_REF_NAME#v}"
+        run: python3 scripts/package-appimage.py --image desktopApp/build/compose/binaries/main/app/manida --output .test-environment/release --version "${GITHUB_REF_NAME#v}" --mpv-library .test-environment/mpv-runtime/lib/libmpv.so.2
       - run: python3 scripts/package-native-sources.py --output .test-environment/release
       - name: Check the AppImage without FUSE
         env:

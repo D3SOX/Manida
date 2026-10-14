@@ -116,7 +116,7 @@ chmod +x ./manida-0.1.0-x86_64.AppImage
 
 If FUSE is unavailable, run it with `APPIMAGE_EXTRACT_AND_RUN=1`. AppImages bundle the JVM, mpv, FFmpeg and the visualizer. The host supplies its C and C++ runtimes and graphics drivers. CI builds them on Ubuntu 24.04.
 
-The portable archive bundles the JVM and projectM. Install mpv, FFmpeg, libsecret, SDL2 and PulseAudio client tools on the host. A Secret Service provider, such as KDE's wallet service, stores server credentials.
+The portable archive bundles the JVM and projectM. Install mpv 0.40 or later, FFmpeg, libsecret, SDL2 and PulseAudio client tools on the host. A Secret Service provider, such as KDE's wallet service, stores server credentials.
 
 Development APKs install separately as **Manida dev** and use the public development key in `packaging/development.keystore`. Linux development packages replace Manida and use the same local data directory.
 
@@ -167,7 +167,7 @@ GitHub Pages uses GitHub Actions as its source, with `manida.d3sox.me` as the cu
 
 Manida uses [AGPL-3.0-only](LICENSE). Namida inspired the feature requirements. Manida does not include its implementation or assets.
 
-MilkDrop rendering uses [projectM](https://github.com/projectM-visualizer/projectm/tree/4967dc003e5206d7df3ff447287f7609c47d2343), under LGPL-2.1-or-later. The desktop window follows the approach used by [Spotifast](https://github.com/crmne/spotifast). Third-party license notices ship with the native libraries. Release assets include the exact projectM and evaluator source archives used by the build.
+MilkDrop rendering uses [projectM](https://github.com/projectM-visualizer/projectm/tree/4967dc003e5206d7df3ff447287f7609c47d2343), under LGPL-2.1-or-later. The desktop window follows the approach used by [Spotifast](https://github.com/crmne/spotifast). Third-party license notices ship with the native libraries. Release assets include the exact projectM, evaluator and mpv source archives used by the build.
 
 The bundled presets and textures retain their upstream authorship and notices, including the [preset pack's distribution notice](https://github.com/projectM-visualizer/presets-cream-of-the-crop/blob/0180df21f5e0bd39b9060cc5de420ed2f1f9e509/LICENSE.md). `python scripts/package-milkdrop-presets.py` reproduces the library from checksum-verified source archives. Each app unpacks the library on first use and reuses it afterward.
 

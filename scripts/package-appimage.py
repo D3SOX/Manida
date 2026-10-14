@@ -17,7 +17,7 @@ SYSTEM = re.compile(r"^(ld-linux|lib(c|m|dl|pthread|rt|resolv|gcc_s|stdc\+\+)\.s
 def elf(path):
     with path.open("rb") as file: return file.read(4) == b"\x7fELF"
 
-def package(image, output, version, tool):
+def package(image, output, version, tool, mpv_library=None):
     if not (image / "bin/manida").is_file(): raise ValueError("Run :desktopApp:createDistributable first")
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-dev-[a-f0-9]+)?", version): raise ValueError("Invalid package version")
     if not tool.is_file():
@@ -38,9 +38,11 @@ def package(image, output, version, tool):
             source = shutil.which(name)
             if source is None: raise RuntimeError(f"Install {name} before packaging")
             shutil.copyfile(source, binaries / name); (binaries / name).chmod(0o755)
-        listing = subprocess.check_output(["ldconfig", "-p"], text=True)
-        mpv = next((Path(line.split("=>")[1].strip()) for line in listing.splitlines()
-                    if line.strip().startswith("libmpv.so") and "x86-64" in line), None)
+        mpv = mpv_library
+        if mpv is None:
+            listing = subprocess.check_output(["ldconfig", "-p"], text=True)
+            mpv = next((Path(line.split("=>")[1].strip()) for line in listing.splitlines()
+                        if line.strip().startswith("libmpv.so") and "x86-64" in line), None)
         if mpv is None: raise RuntimeError("Install libmpv before packaging")
         shutil.copyfile(mpv, libraries / mpv.name)
         (libraries / "libmpv.so").symlink_to(mpv.name)
@@ -65,6 +67,9 @@ def package(image, output, version, tool):
         licenses = app / "usr/share/licenses/manida"
         licenses.mkdir(parents=True)
         shutil.copyfile(ROOT / "LICENSE", licenses / "LICENSE")
+        mpv_licenses = mpv.parent.parent / "share/licenses/mpv"
+        if mpv_licenses.is_dir():
+            shutil.copytree(mpv_licenses, licenses / "mpv")
         for source in origins:
             if shutil.which("dpkg-query"):
                 result = subprocess.run(["dpkg-query", "-S", str(source)], capture_output=True, text=True)
@@ -102,5 +107,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--version", required=True)
     parser.add_argument("--tool", type=Path, default=ROOT / ".test-environment/appimage-tools/appimagetool-x86_64.AppImage")
+    parser.add_argument("--mpv-library", type=Path)
     args = parser.parse_args()
-    package(args.image.resolve(), args.output.resolve(), args.version, args.tool.resolve())
+    package(args.image.resolve(), args.output.resolve(), args.version, args.tool.resolve(),
+            args.mpv_library.resolve() if args.mpv_library else None)

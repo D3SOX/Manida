@@ -97,6 +97,7 @@ tasks.withType<Test>().configureEach {
     if (name == "desktopTest") {
         dependsOn(visualizerNative)
         systemProperty("java.library.path", layout.buildDirectory.dir("native/runtime").get().asFile.absolutePath)
+        System.getenv("LD_LIBRARY_PATH")?.let { systemProperty("jna.library.path", it) }
     }
 }
 

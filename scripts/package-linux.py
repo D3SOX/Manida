@@ -56,7 +56,7 @@ pkgdesc='Local music and Subsonic servers in one library'
 arch=('x86_64')
 url='https://github.com/D3SOX/Manida'
 license=('AGPL-3.0-only')
-depends=('mpv' 'ffmpeg' 'libsecret' 'libpulse' 'sdl2' 'glib2' 'fontconfig' 'libxrender' 'libxtst' 'xdg-desktop-portal' 'xdg-desktop-portal-impl')
+depends=('mpv>=0.40' 'ffmpeg' 'libsecret' 'libpulse' 'sdl2' 'glib2' 'fontconfig' 'libxrender' 'libxtst' 'xdg-desktop-portal' 'xdg-desktop-portal-impl')
 optdepends=('networkmanager: automatic metered-network detection')
 options=('!strip' '!debug')
 source=('{archive_name}::https://github.com/D3SOX/Manida/releases/download/{tag}/{archive_name}')
