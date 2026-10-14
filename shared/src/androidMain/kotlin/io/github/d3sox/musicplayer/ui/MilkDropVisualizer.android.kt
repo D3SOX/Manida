@@ -117,6 +117,7 @@ class MilkDropSurface(context: Context, library: MilkDropLibrary, initialSelecte
     eligible: List<Int>, selected: (Int) -> Unit, error: (String?) -> Unit) : GLSurfaceView(context) {
     private var subscription: AutoCloseable? = null
     private var resumed = false
+    private var attached = false
     private var playing = false
     val renderer = MilkDropRenderer(library, initialSelected, initialAutomatic, eligible,
         { ContextCompat.getMainExecutor(context).execute { selected(it) } },
@@ -129,24 +130,34 @@ class MilkDropSurface(context: Context, library: MilkDropLibrary, initialSelecte
     fun release() { renderer.stopRendering(); pauseRendering() }
     fun resumeRendering() {
         resumed = true
+        if (!attached) return
         updateAudio()
         renderer.resumeRendering(); onResume()
         requestRender()
     }
     fun setPlaying(value: Boolean) { playing = value; renderer.playing.set(value); updateAudio() }
     private fun updateAudio() {
-        if (resumed && playing && subscription == null) subscription = VisualizerPcm.subscribe()
-        else if (!resumed || !playing) { subscription?.close(); subscription = null }
-        renderMode = if (resumed && playing) RENDERMODE_CONTINUOUSLY else RENDERMODE_WHEN_DIRTY
+        if (resumed && attached && playing && subscription == null) subscription = VisualizerPcm.subscribe()
+        else if (!resumed || !attached || !playing) { subscription?.close(); subscription = null }
+        renderMode = if (resumed && attached && playing) RENDERMODE_CONTINUOUSLY else RENDERMODE_WHEN_DIRTY
     }
     fun pauseRendering() {
-        // Detachment can precede Compose's disposal callback. Stop tapping audio before waiting for GL.
         resumed = false
+        suspendRendering()
+    }
+    private fun suspendRendering() {
+        // Stop tapping audio before waiting for GL, including temporary view detachment.
         updateAudio()
         renderer.pauseRendering(); queueEvent { renderer.release() }; onPause()
     }
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        attached = true
+        if (resumed) resumeRendering()
+    }
     override fun onDetachedFromWindow() {
-        pauseRendering()
+        attached = false
+        suspendRendering()
         super.onDetachedFromWindow()
     }
 }

@@ -115,6 +115,7 @@ class AndroidLocalLibraryTest {
         val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE
         ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(
             "pm grant ${context.packageName} $permission")).use { it.readBytes() }
+        instrumentation.awaitMediaStoreIdle()
         val name = "checkpoint-${UUID.randomUUID()}.db"
         var store = openMusicStore(context, name)
         var uri: android.net.Uri? = null
@@ -133,6 +134,7 @@ class AndroidLocalLibraryTest {
             }
             context.contentResolver.update(uri, ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }, null, null)
             assertEquals(listOf("device"), scanner.pendingRefreshLocations())
+            instrumentation.awaitMediaStoreIdle()
             scanner.scan("device")
             assertEquals(emptyList<String>(), scanner.pendingRefreshLocations())
             io.github.d3sox.musicplayer.settings.MusicPreferences(store).update { it.copy(excludeFolders = listOf("Music/Manida-checkpoint")) }
