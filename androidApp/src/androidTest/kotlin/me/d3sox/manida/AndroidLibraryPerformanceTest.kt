@@ -56,6 +56,7 @@ class AndroidLibraryPerformanceTest {
                 compose.waitForIdle()
                 val output = requireNotNull(InstrumentationRegistry.getArguments().getString("additionalTestOutputDir"))
                 File(output, "scroll-gfxinfo.txt").apply { parentFile!!.mkdirs() }.writeText(shell("dumpsys gfxinfo ${app.packageName}"))
+                compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
                 compose.onNodeWithContentDescription("Track options: Scroll song 000").assertIsDisplayed()
             }
         } finally { runBlocking { app.controller.pause().join() }; audio.delete() }
