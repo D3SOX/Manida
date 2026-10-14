@@ -31,6 +31,8 @@ executed = 0
 for name in classes:
     print("::group::" + name, flush=True)
     result = subprocess.run([str(ROOT / "gradlew"), ":androidApp:connectedDebugAndroidTest",
+                             "-Dorg.gradle.jvmargs=-Xmx1g", "--max-workers=2",
+                             "-Pkotlin.compiler.execution.strategy=in-process",
                              "-Pandroid.injected.device.serial=" + serial,
                              "-Pandroid.testInstrumentationRunnerArguments.class=me.d3sox.manida." + name,
                              "--console=plain"], cwd=ROOT)
