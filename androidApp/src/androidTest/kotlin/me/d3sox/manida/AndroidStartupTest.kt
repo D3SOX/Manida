@@ -18,6 +18,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
+@ColdStartupCheck
 @RunWith(AndroidJUnit4::class)
 class AndroidStartupTest {
     @get:Rule val compose = createEmptyComposeRule()

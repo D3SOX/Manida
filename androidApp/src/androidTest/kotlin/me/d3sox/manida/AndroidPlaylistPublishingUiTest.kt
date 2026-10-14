@@ -39,6 +39,7 @@ class AndroidPlaylistPublishingUiTest {
                 playlistId = controller.state.value.playlists.single { it.name == name }.id
                 compose.openLibraryPage("Playlists")
                 compose.onNodeWithText(name).performClick()
+                compose.onNodeWithContentDescription("Playlist options").performClick()
                 compose.onNodeWithText("Publish to your music server").performClick()
                 compose.onNodeWithText("Publish").performClick()
                 compose.waitUntil(10_000) {

@@ -705,8 +705,9 @@ class PlayerUiTest {
                 onNodeWithTag("mini-player").performClick()
                 onNodeWithContentDescription("Queue").performClick()
                 onNodeWithContentDescription("Saved queues").performClick()
-                onNodeWithContentDescription("Queue name").performTextInput("Evening")
                 onNodeWithText("Save current queue").performClick()
+                onNodeWithContentDescription("Queue name").performTextInput("Evening")
+                onNodeWithText("Save queue").performClick()
                 waitUntil(timeoutMillis = 3_000) { runBlocking { queue.saved().size == 1 } }
                 onNodeWithText("Done").performClick()
                 runBlocking { controller.enqueue(original.entries.first().trackId,
@@ -724,6 +725,7 @@ class PlayerUiTest {
 
                 onNodeWithContentDescription("Saved queues").performClick()
                 onNodeWithText("Manage saved queues").performClick()
+                onNodeWithContentDescription("Saved queue options: Evening").performClick()
                 onNodeWithContentDescription("Remove saved queue: Evening").performClick()
                 waitUntil(timeoutMillis = 3_000) { runBlocking { queue.saved().isEmpty() } }
                 assertEquals(updated.entries, controller.state.value.queue.entries)

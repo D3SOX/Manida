@@ -102,7 +102,8 @@ class AndroidM3uPlaylistsUiTest {
                 assertEquals(listOf(trackId, trackId), controller.state.value.playlists.single { it.name == name }.trackIds)
                 compose.onNodeWithText("Done").performClick()
                 compose.onNodeWithText(name).performClick()
-                compose.onNodeWithContentDescription("Export M3U").performClick()
+                compose.onNodeWithContentDescription("Playlist options").performClick()
+                compose.onNodeWithText("Export M3U").performClick()
                 compose.waitUntil(5_000) { instrumentation.uiAutomation.rootInActiveWindow?.findAccessibilityNodeInfosByText("$name.m3u8")?.any { it.isEditable } == true }
                 val field = instrumentation.uiAutomation.rootInActiveWindow.findAccessibilityNodeInfosByText("$name.m3u8").first { it.isEditable }
                 check(field.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {

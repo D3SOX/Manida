@@ -74,7 +74,7 @@ class AndroidLibraryUpdatesUiTest {
                 compose.onNodeWithContentDescription("Search settings query").performTextInput("crossfade")
                 capture("settings-search")
                 compose.onNodeWithText("Crossfade").performClick()
-                compose.onNodeWithContentDescription("Crossfade").assertIsDisplayed()
+                compose.onNodeWithContentDescription("Crossfade").performScrollTo().assertIsDisplayed()
                 compose.onNodeWithContentDescription("Back").performClick()
                 compose.onNodeWithContentDescription("Back").performClick()
                 runBlocking {

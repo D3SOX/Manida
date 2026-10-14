@@ -18,6 +18,7 @@ android {
         externalNativeBuild { cmake { arguments += listOf("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON", "-DANDROID_STL=c++_shared") } }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
+        testInstrumentationRunnerArguments["notAnnotation"] = "me.d3sox.manida.ColdStartupCheck"
     }
     buildFeatures { compose = true }
     signingConfigs.create("development") {

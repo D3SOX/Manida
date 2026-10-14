@@ -26,8 +26,8 @@ class AndroidCrossfadeSettingsUiTest {
                 runBlocking { app.controller.reload().join() }
                 compose.onNodeWithContentDescription("Settings").performClick()
                 compose.onNodeWithText("Playback").performScrollTo().performClick()
-                compose.onNodeWithContentDescription("Crossfade").performScrollTo().performClick()
-                compose.onNodeWithText("4 seconds").performScrollTo().performClick()
+                compose.onNodeWithContentDescription("Crossfade").performScrollTo()
+                    .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.SetProgress) { it(4f) }
                 compose.waitUntil(timeoutMillis = 5_000) { app.controller.state.value.playback.crossfadeDurationMs == 4_000L }
                 assertEquals(4_000L, runBlocking { preferences.load() }.crossfadeDurationMs)
                 compose.onNodeWithContentDescription("Back").performClick()
@@ -35,9 +35,10 @@ class AndroidCrossfadeSettingsUiTest {
                 scenario.recreate()
                 compose.onNodeWithContentDescription("Settings").performClick()
                 compose.onNodeWithText("Playback").performScrollTo().performClick()
-                compose.onNodeWithContentDescription("Crossfade").performScrollTo().assertTextContains("4 seconds")
-                compose.onNodeWithContentDescription("Crossfade").performClick()
-                compose.onNodeWithText("Off").performScrollTo().performClick()
+                compose.onNodeWithContentDescription("Crossfade").performScrollTo()
+                    .assertRangeInfoEquals(androidx.compose.ui.semantics.ProgressBarRangeInfo(4f, 0f..12f, 11))
+                compose.onNodeWithContentDescription("Crossfade")
+                    .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.SetProgress) { it(0f) }
                 compose.waitUntil(timeoutMillis = 5_000) { app.controller.state.value.playback.crossfadeDurationMs == 0L }
             }
         } finally { runBlocking { app.controller.updatePreferences { original }.join() } }

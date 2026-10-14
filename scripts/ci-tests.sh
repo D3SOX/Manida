@@ -57,12 +57,6 @@ else
     adb -s "$ANDROID_SERIAL" push .test-environment/sftp-fixture/client /data/local/tmp/manida-sftp-client
     adb -s "$ANDROID_SERIAL" push .test-environment/sftp-fixture/android-fixture.properties /data/local/tmp/manida-sftp-fixture.properties
     adb -s "$ANDROID_SERIAL" push .test-environment/paired-fixture/control-port /data/local/tmp/manida-sync-control-port
-    ./gradlew :androidApp:connectedDebugAndroidTest --console=plain
-    python3 - <<'PY'
-from pathlib import Path
-import xml.etree.ElementTree as ET
-reports = list(Path("androidApp/build/outputs/androidTest-results/connected/debug").glob("TEST-*.xml"))
-if not reports or not any(int(ET.parse(report).getroot().get("tests", "0")) > 0 for report in reports):
-    raise SystemExit("Android acceptance produced no executed tests")
-PY
+    python3 scripts/test-android-suite.py
+    MANIDA_TEST_SERIAL="$ANDROID_SERIAL" python3 scripts/test-android-startup.py
 fi

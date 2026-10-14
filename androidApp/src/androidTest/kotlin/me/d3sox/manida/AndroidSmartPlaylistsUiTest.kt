@@ -43,7 +43,8 @@ class AndroidSmartPlaylistsUiTest {
             compose.onNodeWithText("Smart offline songs").performClick()
             compose.onNodeWithContentDescription("Automatically download playlist").performClick()
             compose.waitUntil(10_000) { controller.state.value.downloads[northern.id]?.status == DownloadStatus.COMPLETE }
-            compose.onNodeWithText("Edit rules").performClick()
+            compose.onNodeWithContentDescription("Playlist options").performClick()
+                compose.onNodeWithText("Edit rules").performClick()
             compose.onNodeWithText("Search text").performTextReplacement("Night Walk")
             compose.onNodeWithText("Save").performClick()
             compose.waitUntil(10_000) { controller.state.value.downloads[night.id]?.status == DownloadStatus.COMPLETE }

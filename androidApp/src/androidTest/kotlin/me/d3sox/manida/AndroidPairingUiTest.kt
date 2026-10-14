@@ -33,7 +33,7 @@ class AndroidPairingUiTest {
             compose.onNodeWithText("Paired devices").performScrollTo().performClick()
             compose.onNodeWithText("Enter code").performScrollTo().performClick()
             compose.onNodeWithText("Pairing invitation").performTextInput(invitation)
-            compose.onNodeWithText("Pair device").performScrollTo().performClick()
+            compose.onNodeWithText("Pair device").performClick()
             compose.waitUntil(10_000) { devices.state.value.peers.size == 1 && !devices.state.value.busy }
             compose.onNodeWithText("Linux desktop").assertExists()
             compose.onNodeWithContentDescription("Sync with Linux desktop").performScrollTo().performClick()

@@ -78,7 +78,9 @@ class AndroidUpdatedLibraryUiTest {
                 capture("playlist-queue-actions")
                 compose.onNodeWithText("Play next", substring = false).performClick()
                 compose.waitUntil(3_000) { app.controller.state.value.queue.entries.size == 3 }
-                compose.onNodeWithContentDescription("Automatically download playlist").performClick()
+                compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.Dismiss)).onLast()
+                    .performSemanticsAction(SemanticsActions.Dismiss) { it() }
+                compose.onNodeWithContentDescription("Automatically download playlist").performScrollTo().performClick()
                 compose.waitUntil(3_000) { app.controller.state.value.playlists.single().autoDownload }
                 compose.onNodeWithContentDescription("Automatically download playlist").assertIsOn()
                 capture("playlist-downloads-enabled")

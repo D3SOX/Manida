@@ -11,3 +11,10 @@ internal fun ComposeTestRule.openLibraryPage(label: String) {
         onNode(destination).performClick()
     } else onNode(destination).performClick()
 }
+
+internal fun ComposeTestRule.openFileAction(label: String) {
+    if (onAllNodes(hasText(label) and hasClickAction()).fetchSemanticsNodes().isEmpty()) {
+        onNodeWithText("File actions").performClick()
+    }
+    onNodeWithText(label).performScrollTo().performClick()
+}

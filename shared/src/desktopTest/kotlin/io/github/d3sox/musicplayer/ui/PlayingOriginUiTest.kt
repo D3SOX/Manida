@@ -46,7 +46,9 @@ class PlayingOriginUiTest {
                     onNodeWithContentDescription("Settings").performClick()
                     onNodeWithContentDescription("Back").performClick()
                     waitUntil(timeoutMillis = 3_000) { controller.state.value.preferences.lastLibraryTab == LibraryTab.RECENT }
-                    onNodeWithText("More").assertIsSelected()
+                    val recent = (hasText("Recently added") or hasContentDescription("Recently added")) and hasClickAction()
+                    if (onAllNodes(recent).fetchSemanticsNodes().isNotEmpty()) onNode(recent).assertIsSelected()
+                    else onNodeWithText("More").assertIsSelected()
                     openLibraryPage(page)
                     if (onAllNodesWithTag("track-row:${songs[0].id}").fetchSemanticsNodes().isEmpty() &&
                         onAllNodesWithText(title).fetchSemanticsNodes().isNotEmpty()) onNodeWithText(title).performClick()

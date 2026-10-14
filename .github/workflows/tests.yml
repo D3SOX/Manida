@@ -61,13 +61,13 @@ jobs:
           arch: x86_64
           disable-linux-hw-accel: false
           profile: pixel_2
-          emulator-options: -no-window -gpu swangle -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-window -gpu swangle -noaudio -no-boot-anim -camera-back virtualscene -camera-front emulated
           script: bash scripts/ci-tests.sh android
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: android-${{ matrix.api }}-test-results
           path: |
-            androidApp/build/outputs/androidTest-results/connected/debug
+            .test-environment/android-class-results
             .test-environment/pairing.log
             .test-environment/sftp.log

@@ -41,8 +41,8 @@ class AndroidListeningHistoryUiTest {
                 compose.onNodeWithText(track.metadata.title).performClick()
                 compose.waitUntil(10_000) { controller.state.value.playback.ended && controller.state.value.listens.singleOrNull()?.ended == true }
                 compose.openLibraryPage("History")
-                compose.onNodeWithText("Listening history").assertIsDisplayed()
-                compose.onNodeWithText("Played").assertIsDisplayed()
+                compose.onNodeWithTag("listening-history").assertIsDisplayed()
+                compose.onNodeWithText("Played", substring = true).assertIsDisplayed()
                 compose.openLibraryPage("Statistics")
                 compose.onNodeWithText("1 play").assertIsDisplayed()
                 compose.onNodeWithText("Most played").performScrollTo().assertIsDisplayed()

@@ -66,7 +66,7 @@ class AndroidLibrarySelectionUiTest {
             compose.onNodeWithText("Old ambient").assertDoesNotExist()
             compose.onNodeWithContentDescription("Track options: New ambient").performClick()
             compose.onNodeWithText("Select song").performClick()
-            compose.onNodeWithContentDescription("Select all").performClick()
+            compose.onNodeWithContentDescription("Select none").assertExists()
             compose.onNodeWithText("1 song selected").assertIsDisplayed()
             compose.onNodeWithContentDescription("Selection actions").performClick()
             compose.onNodeWithText("Add to favorites").performClick()

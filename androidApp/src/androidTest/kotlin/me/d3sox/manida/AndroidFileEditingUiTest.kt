@@ -51,18 +51,18 @@ class AndroidFileEditingUiTest {
                 fun options() = compose.onNode(hasContentDescription("Track options: Northern Light") and
                     hasAnyAncestor(hasTestTag("track-row:${app.controller.state.value.songAt(uri.toString())!!.id}"))).performClick()
                 options()
-                compose.onNodeWithText("Delete local file").performClick()
+                compose.openFileAction("Delete local file")
                 compose.onNodeWithText("Delete local file?").assertIsDisplayed()
                 org.junit.Assert.assertEquals(0, trashed())
                 compose.onNodeWithText("Cancel").performClick()
                 org.junit.Assert.assertEquals(0, trashed())
                 options()
-                compose.onNodeWithText("Delete local file").performClick()
+                compose.openFileAction("Delete local file")
                 compose.onNodeWithText("Delete", substring = false).performClick()
                 compose.waitUntil(5_000) { app.controller.state.value.fileEdits.any { edit -> edit.trackId == app.controller.state.value.songAt(uri.toString())!!.id && edit.applied } }
                 org.junit.Assert.assertEquals(1, trashed())
                 options()
-                compose.onNodeWithText("Undo file edit").performClick()
+                compose.openFileAction("Undo file edit")
                 compose.waitUntil(5_000) { app.controller.state.value.fileEdits.single { edit -> edit.trackId == app.controller.state.value.songAt(uri.toString())!!.id }.undone }
                 org.junit.Assert.assertEquals(0, trashed())
                 assertTrue(requireNotNull(resolver.openInputStream(uri)).use { input -> input.readBytes() }.contentEquals(bytes))
@@ -110,7 +110,7 @@ class AndroidFileEditingUiTest {
                     .performScrollToNode(hasTestTag("track-row:${app.controller.state.value.songAt(song.toString())!!.id}"))
                 compose.onNode(hasContentDescription("Track options: Northern Light") and
                     hasAnyAncestor(hasTestTag("track-row:${app.controller.state.value.songAt(song.toString())!!.id}"))).performClick()
-                compose.onNodeWithText("Replace artwork").performClick()
+                compose.openFileAction("Replace artwork")
                 fun clickPickerItem(text: String) {
                     var requested = false
                     try {
@@ -239,7 +239,7 @@ class AndroidFileEditingUiTest {
                     .performScrollToNode(hasTestTag("track-row:${app.controller.state.value.songAt(uri.toString())!!.id}"))
                 compose.onNode(hasContentDescription("Track options: Northern Light") and
                     hasAnyAncestor(hasTestTag("track-row:${app.controller.state.value.songAt(uri.toString())!!.id}"))).performClick()
-                compose.onNodeWithText("Edit tags").performClick()
+                compose.openFileAction("Edit tags")
                 compose.waitUntil(5_000) { compose.onAllNodes(hasText("Save changes") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
                 compose.onNode(hasText("Title") and hasSetTextAction()).performTextReplacement("Android edited music")
                 compose.onNode(hasText("Year") and hasSetTextAction()).performScrollTo().performTextReplacement("2026")
@@ -252,14 +252,14 @@ class AndroidFileEditingUiTest {
                     .performScrollToNode(hasTestTag("track-row:${app.controller.state.value.songAt(uri.toString())!!.id}"))
                 compose.onNodeWithContentDescription("Track options: Android edited music").performClick()
                 compose.onNodeWithText("File actions").performClick()
-                compose.onNodeWithText("Undo file edit").performClick()
+                compose.openFileAction("Undo file edit")
                 compose.waitUntil(5_000) {
                     app.controller.state.value.tracks.any { track -> track.sources.any { source -> source.location == uri.toString() } && track.metadata.title == "Northern Light" }
                 }
                 assertTrue(requireNotNull(resolver.openInputStream(uri)).use { it.readBytes() }.contentEquals(bytes))
                 compose.onNode(hasContentDescription("Track options: Northern Light") and
                     hasAnyAncestor(hasTestTag("track-row:${app.controller.state.value.songAt(uri.toString())!!.id}"))).performClick()
-                compose.onNodeWithText("Rename file").performClick()
+                compose.openFileAction("Rename file")
                 compose.waitUntil(5_000) { compose.onAllNodes(hasText("fixture.flac") and hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
                 compose.onNode(hasText("File name") and hasSetTextAction()).performTextReplacement("Android renamed music.flac")
                 compose.onNodeWithText("Rename", substring = false).performClick()
@@ -269,7 +269,7 @@ class AndroidFileEditingUiTest {
                 }
                 compose.onNode(hasContentDescription("Track options: Northern Light") and
                     hasAnyAncestor(hasTestTag("track-row:${app.controller.state.value.songAt(uri.toString())!!.id}"))).performClick()
-                compose.onNodeWithText("Undo file edit").performClick()
+                compose.openFileAction("Undo file edit")
                 compose.waitUntil(5_000) { app.controller.state.value.fileEdits.filter { it.changedName == "Android renamed music.flac" }.all { it.undone } }
                 requireNotNull(resolver.query(uri, arrayOf(MediaStore.Audio.Media.DISPLAY_NAME), null, null, null)).use { cursor ->
                     check(cursor.moveToFirst()); org.junit.Assert.assertEquals("fixture.flac", cursor.getString(0))
