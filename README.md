@@ -1,6 +1,6 @@
 <h1><img src="packaging/manida.svg" alt="" width="40" height="40" align="left">Manida</h1>
 
-[![GitHub Releases](https://img.shields.io/badge/GitHub-Releases-181717?logo=github&logoColor=white)](https://github.com/D3SOX/Manida/releases) [![F-Droid repository](https://img.shields.io/badge/F--Droid-Repository-1976D2?logo=fdroid&logoColor=white)][fdroid-repository] [![Obtainium](https://img.shields.io/badge/Obtainium-Install-D2BCFD?logo=obtainium&logoColor=black)][obtainium-install] [![Arch Linux repository](https://img.shields.io/badge/Arch_Linux-Repository-1793D1?logo=archlinux&logoColor=white)](https://manida.d3sox.me)
+[![GitHub Releases](https://img.shields.io/badge/GitHub-Releases-181717?logo=github&logoColor=white&style=for-the-badge)](https://github.com/D3SOX/Manida/releases) [![F-Droid repository](https://img.shields.io/badge/F--Droid-Repository-1976D2?logo=fdroid&logoColor=white&style=for-the-badge)][fdroid-repository] [![Obtainium](https://img.shields.io/badge/Obtainium-Install-D2BCFD?logo=obtainium&logoColor=black&style=for-the-badge)][obtainium-install] [![Arch Linux repository](https://img.shields.io/badge/Arch_Linux-Repository-1793D1?logo=archlinux&logoColor=white&style=for-the-badge)](https://manida.d3sox.me)
 
 Manida is a music player for Android and Linux, built with Kotlin and Compose. It plays local files and connects to Navidrome and Subsonic-compatible servers.
 
