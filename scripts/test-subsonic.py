@@ -9,12 +9,12 @@ import subprocess
 import time
 import urllib.request
 import urllib.parse
+from test_containers import image
 
 ROOT = Path(__file__).resolve().parent.parent
 DIRECTORY = ROOT / ".test-environment/subsonic"
 NAME = "musicplayer-subsonic-test"
 LABEL = "io.github.d3sox.musicplayer.subsonic-test"
-IMAGE = "sentriz/gonic@sha256:516fd9645614ba3a596d86174216c3e944808b9ec970c581678713be4c8b1d49"
 ADDRESS = "http://127.0.0.1:14537"
 
 def owned():
@@ -58,7 +58,7 @@ def start():
                         "--env", "GONIC_LISTEN_ADDR=0.0.0.0:4747", "--env", "GONIC_MUSIC_PATH=/music",
                         "--env", "GONIC_CACHE_PATH=/data/cache", "--env", "GONIC_DB_PATH=/data/gonic.db",
                         "--env", "GONIC_PODCAST_PATH=/data/podcasts", "--env", "GONIC_PLAYLISTS_PATH=/data/playlists",
-                        "--env", "GONIC_SCAN_AT_START_ENABLED=true", IMAGE], check=True, stdout=subprocess.DEVNULL)
+                        "--env", "GONIC_SCAN_AT_START_ENABLED=true", image("subsonic")], check=True, stdout=subprocess.DEVNULL)
     elif not existing["State"]["Running"]:
         subprocess.run(["docker", "start", NAME], check=True, stdout=subprocess.DEVNULL)
     for _ in range(60):

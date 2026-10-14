@@ -12,12 +12,12 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from test_containers import image
 
 ROOT = Path(__file__).resolve().parent.parent
 ENVIRONMENT = ROOT / ".test-environment"
 NAME = "musicplayer-navidrome-test"
 LABEL = "io.github.d3sox.musicplayer.test"
-IMAGE = "deluan/navidrome@sha256:38dc2727bfcfd5ede290f8ada114fc90368146f265ae4701ddddbcbe2a44ee52"
 ADDRESS = "http://127.0.0.1:14533"
 PORT = 14533
 MUSIC_FOLDER = "music"
@@ -88,7 +88,7 @@ def start():
             "--mount", f"type=bind,source={data},target=/data",
             "--mount", f"type=bind,source={ENVIRONMENT / MUSIC_FOLDER},target=/music,readonly",
             "--env", "ND_SCANSCHEDULE=1m", "--env", "ND_LOGLEVEL=warn",
-            "--env", "ND_ENABLEEXTERNALSERVICES=false", "--env", "ND_ENABLEINSIGHTS=false", IMAGE))
+            "--env", "ND_ENABLEEXTERNALSERVICES=false", "--env", "ND_ENABLEINSIGHTS=false", image("navidrome")))
     elif not existing["State"]["Running"]:
         checked(docker("start", NAME))
     for attempt in range(120):

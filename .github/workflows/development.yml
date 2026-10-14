@@ -52,9 +52,9 @@ jobs:
       - name: Create the Arch development package
         run: |
           version=$(sed -n 's/.*packageVersion = "\([^"]*\)".*/\1/p' desktopApp/build.gradle.kts)
-          docker run --rm -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \
+          docker compose -f scripts/compose.yaml run --rm -T -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \
             -e "MANIDA_BUILD_UID=$(id -u)" -e "MANIDA_VERSION=$version" -e GITHUB_RUN_NUMBER \
-            archlinux:base@sha256:4e77cf2ea5f410e6f8be5abf93ccf17ce2436e87a138c167208356711a405dbd \
+            arch \
             bash -euc 'pacman -Syu --noconfirm base-devel python
               useradd --uid "$MANIDA_BUILD_UID" --create-home builder
               runuser -u builder -- python3 scripts/package-linux.py --image desktopApp/build/compose/binaries/main/app/manida \
@@ -95,7 +95,6 @@ jobs:
         run: |
           set -euo pipefail
           cd development
-          sha256sum -- *.apk *.tar.gz *.pkg.tar.zst *.AppImage > SHA256SUMS
           printf 'Development build from commit %s. Android installs as Manida dev. Linux packages replace Manida.\n' "$GITHUB_SHA" > notes.txt
           if gh release view development >/dev/null 2>&1; then
             gh release edit development --prerelease --title 'Manida development' --notes-file notes.txt
@@ -106,4 +105,4 @@ jobs:
           else
             gh release create development --prerelease --target "$GITHUB_SHA" --title 'Manida development' --notes-file notes.txt
           fi
-          gh release upload development --clobber ./*.apk ./*.tar.gz ./*.pkg.tar.zst ./*.AppImage ./SHA256SUMS ./PKGBUILD
+          gh release upload development --clobber ./*.apk ./*.tar.gz ./*.pkg.tar.zst ./*.AppImage ./PKGBUILD

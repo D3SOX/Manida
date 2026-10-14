@@ -1,0 +1,30 @@
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      kotlin:
+        patterns: ["org.jetbrains.kotlin*"]
+      compose:
+        patterns: ["org.jetbrains.compose*"]
+      media3:
+        patterns: ["androidx.media3:*"]
+      camerax:
+        patterns: ["androidx.camera:*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: pip
+    directory: /scripts
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker-compose
+    directory: /scripts
+    schedule:
+      interval: weekly
