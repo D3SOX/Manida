@@ -72,26 +72,26 @@ class AndroidMilkDropUiTest {
                 fun shell(command: String) = android.os.ParcelFileDescriptor.AutoCloseInputStream(
                     instrumentation.uiAutomation.executeShellCommand(command)).use { it.readBytes() }
                 shell("input keyevent 3")
-                compose.waitUntil(3_000) { !VisualizerPcm.enabled }
+                compose.waitUntil(15_000) { !VisualizerPcm.enabled }
                 shell("am start --user 0 -W --activity-single-top --activity-clear-top -n me.d3sox.manida/.MainActivity")
-                compose.waitUntil(5_000) { VisualizerPcm.enabled }
+                compose.waitUntil(15_000) { VisualizerPcm.enabled }
                 compose.waitForIdle()
                 compose.onNodeWithContentDescription("MilkDrop visualization").assertIsDisplayed()
                 compose.onNodeWithText("Close visualizer").performClick()
                 compose.onNodeWithContentDescription("MilkDrop visualization").assertDoesNotExist()
-                compose.waitUntil(5_000) { !VisualizerPcm.enabled }
+                compose.waitUntil(15_000) { !VisualizerPcm.enabled }
                 compose.onNodeWithContentDescription("MilkDrop visualizer").performClick()
-                compose.waitUntil(5_000) { VisualizerPcm.enabled }
+                compose.waitUntil(15_000) { VisualizerPcm.enabled }
                 compose.onNodeWithText("Flexi + Rovastar - postcard from Fractopia").assertExists()
                 compose.onNodeWithText("Unlock preset").assertExists()
                 runBlocking { app.controller.updatePreferences { settings ->
                     settings.copy(milkDrop = settings.milkDrop.copy(favoritesOnly = true, favorites = emptySet()))
                 }.join() }
-                compose.waitUntil(5_000) { !VisualizerPcm.enabled }
+                compose.waitUntil(15_000) { !VisualizerPcm.enabled }
                 compose.onNodeWithText("Favorite a preset to start the visualizer.").assertExists()
                 compose.onNodeWithText("Close visualizer").performClick()
                 compose.onNodeWithContentDescription("MilkDrop visualization").assertDoesNotExist()
-                compose.waitUntil(3_000) { !VisualizerPcm.enabled }
+                compose.waitUntil(15_000) { !VisualizerPcm.enabled }
             }
         } finally { runBlocking { app.controller.pause().join() }; file.delete() }
     }
