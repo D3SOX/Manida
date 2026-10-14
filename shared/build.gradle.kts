@@ -11,9 +11,7 @@ kotlin {
     jvmToolchain(21)
     android {
         namespace = "io.github.d3sox.musicplayer.shared"
-        compileSdk {
-            version = release(37) { minorApiLevel = 1 }
-        }
+        compileSdk = 37
         minSdk = 31
         withHostTest {}
         androidResources { enable = true }
@@ -30,7 +28,10 @@ kotlin {
             implementation(libs.material3)
             implementation(compose.materialIconsExtended)
             implementation("sh.calvin.reorderable:reorderable:3.1.0")
-            implementation(libs.material.kolor)
+            implementation(libs.material.kolor.get().copy()) {
+                // MaterialKolor declares an alpha version; use the app's stable Material 3.
+                exclude(group = "org.jetbrains.compose.material3", module = "material3")
+            }
             implementation(libs.room.runtime)
             implementation(libs.sqlite.bundled)
             implementation(libs.ktor.client.core)

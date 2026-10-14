@@ -603,6 +603,7 @@ private fun PlayerCover(state: AppState, track: Track, modifier: Modifier, motio
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlayerControls(state: AppState, controller: MusicController, current: Track, requested: Boolean,
     modifier: Modifier, motion: PlayerMotion, visible: Boolean, artworkSwipe: PlayingArtworkSwipe,
@@ -634,9 +635,7 @@ private fun PlayerControls(state: AppState, controller: MusicController, current
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PlayingTrackDetails(state, controller, current, motion, visible, artworkSwipe)
         Column(Modifier.fillMaxWidth()) {
-            val sliderState = remember(duration) { SliderState(trackRange = 0f..duration) }
-            sliderState.value = (seeking ?: state.playback.positionMs.toFloat()).coerceIn(0f, duration)
-            Slider(state = sliderState, colors = sliderColors,
+            Slider(value = (seeking ?: state.playback.positionMs.toFloat()).coerceIn(0f, duration), valueRange = 0f..duration, colors = sliderColors,
                 enabled = durationMs > 0 && state.playback.entryId != null, onValueChange = { seekRequest++; seeking = it },
                 onValueChangeFinished = {
                     val entry = state.playback.entryId
@@ -755,9 +754,7 @@ private fun MiniPlayerSeekBar(controller: MusicController, modifier: Modifier) {
     val inactive = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .6f)
     val interaction = remember { MutableInteractionSource() }
     val dragging by interaction.collectIsDraggedAsState()
-    val sliderState = remember(duration) { SliderState(trackRange = 0f..duration) }
-    sliderState.value = value
-    Slider(state = sliderState, onValueChange = { seekRequest++; seeking = it },
+    Slider(value = value, onValueChange = { seekRequest++; seeking = it }, valueRange = 0f..duration,
         enabled = playback.durationMs > 0, interactionSource = interaction,
         onValueChangeFinished = {
             val entry = playback.entryId
