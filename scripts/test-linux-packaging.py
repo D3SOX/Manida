@@ -40,6 +40,12 @@ class LinuxPackagingTest(unittest.TestCase):
             )
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
             repository = site / "arch/x86_64"
+            self.assertIn("Your music.", (site / "index.html").read_text())
+            self.assertIn(fingerprint, (site / "index.html").read_text())
+            for screenshot in ["home", "now-playing", "queue", "audio-effects"]:
+                self.assertTrue((site / f"assets/screenshots/{screenshot}.png").is_file())
+            self.assertTrue((site / "theme.js").is_file())
+            self.assertTrue((site / "assets/fdroid-qr-dark.png").is_file())
             self.assertFalse(any(path.is_symlink() for path in site.rglob("*")), "Pages artifacts must contain regular files")
             package = next(repository.glob("*.pkg.tar.zst"))
             for path in [package, repository / "manida.db"]:

@@ -9,7 +9,7 @@ object ProjectMNative {
     }
     external fun create(width: Int, height: Int, desktop: Boolean, textures: String): Long
     external fun load(handle: Long, path: String, smooth: Boolean)
-    external fun render(handle: Long, pcm: FloatArray, width: Int, height: Int): Int
+    external fun render(handle: Long, pcm: FloatArray, width: Int, height: Int, animate: Boolean = true): Int
     external fun pixels(handle: Long): ByteArray
     external fun destroy(handle: Long)
 }

@@ -8,8 +8,9 @@ import kotlinx.serialization.json.Json
 object SessionPlaybackCommands {
     const val STATUS = "me.d3sox.manida.PLAYBACK_STATUS"
     const val CROSSFADE = "me.d3sox.manida.CROSSFADE"
+    const val GAPLESS = "me.d3sox.manida.GAPLESS"
     const val REPEAT = "me.d3sox.manida.REPEAT"
-    val actions = listOf(STATUS, CROSSFADE, REPEAT)
+    val actions = listOf(STATUS, CROSSFADE, GAPLESS, REPEAT)
     fun command(action: String) = SessionCommand(action, Bundle.EMPTY)
     fun encodeStatus(status: PlaybackStatus) = Bundle().apply { putString("status", Json.encodeToString(status)) }
     fun decodeStatus(bundle: Bundle): PlaybackStatus {

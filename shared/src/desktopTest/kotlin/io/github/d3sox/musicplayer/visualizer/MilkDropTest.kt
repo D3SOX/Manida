@@ -49,6 +49,18 @@ class MilkDropTest {
                         // Some presets need beats or longer feedback before this steady tone becomes visible.
                         if (preset in visible)
                             assertTrue(colored > 50, "${preset.name} must draw the supplied audio, colored pixels=$colored")
+                        if (preset == visible.first()) {
+                            val robot = java.awt.Robot()
+                            val bounds = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration.bounds
+                            fun screen() = robot.createScreenCapture(bounds).getRGB(0, 0, bounds.width, bounds.height, null, 0, bounds.width)
+                            val paused = screen()
+                            assertTrue(paused.any { it and 0xffffff != 0 }, "The SDL window must be visible before checking its frozen frame")
+                            repeat(4) {
+                                ProjectMNative.render(handle, FloatArray(2048) { .9f }, 320, 240, animate = false)
+                                Thread.sleep(25)
+                            }
+                            assertContentEquals(paused, screen(), "Paused rendering must keep the previous picture")
+                        }
                     }
                     assertFailsWith<IllegalStateException> { ProjectMNative.load(handle, File(directory, "missing.milk").path, false) }
                 } finally { ProjectMNative.destroy(handle) }

@@ -52,5 +52,6 @@ interface PlaybackEngine : AutoCloseable {
     fun setPitch(pitch: Double)
     suspend fun setAudioEffects(effects: AudioEffects)
     fun setCrossfadeDuration(milliseconds: Long) { require(milliseconds == 0L) { "This decoder does not support crossfade" } }
+    fun setGaplessPlayback(enabled: Boolean) {}
     fun setRepeat(mode: RepeatMode, playCount: Int? = null)
 }

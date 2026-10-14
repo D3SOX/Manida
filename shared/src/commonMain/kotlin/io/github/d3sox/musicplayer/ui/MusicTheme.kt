@@ -17,6 +17,9 @@ import io.github.d3sox.musicplayer.settings.ColorMode
 internal expect fun platformColorScheme(dark: Boolean): ColorScheme?
 
 @Composable
+internal expect fun platformSystemBars(dark: Boolean)
+
+@Composable
 internal fun MusicTheme(settings: MusicSettings, artworkColor: Color?, content: @Composable () -> Unit) {
     val mode = settings.themeMode
     val dark = when (mode) {
@@ -25,6 +28,7 @@ internal fun MusicTheme(settings: MusicSettings, artworkColor: Color?, content: 
         ThemeMode.DARK -> true
     }
     val platform = if (settings.colors == ColorMode.SYSTEM) platformColorScheme(dark) else null
+    platformSystemBars(dark)
     val seed = when (settings.colors) {
         ColorMode.ARTWORK -> artworkColor ?: Color(0xFF6750A4)
         ColorMode.CUSTOM -> Color(settings.customColor)

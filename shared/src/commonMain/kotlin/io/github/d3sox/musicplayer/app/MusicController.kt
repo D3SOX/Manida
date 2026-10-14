@@ -91,6 +91,7 @@ data class AppState(
     val lastFmAuthorization: LastFmAuthorization? = null,
     val localScan: io.github.d3sox.musicplayer.library.LocalScanProgress? = null,
     val lastLocalScanCount: Int? = null,
+    val sleepTimerEndsAt: Long? = null,
 )
 
 data class PlaybackSeek(val entryId: String, val positionMs: Long)
@@ -119,6 +120,7 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
     private val networkAccess: suspend (String) -> Unit = {}) : AutoCloseable {
     private val supervisor = SupervisorJob()
     private val scope = CoroutineScope(supervisor + Dispatchers.Default)
+    private var sleepTimer: kotlinx.coroutines.Job? = null
     private val mutableState = MutableStateFlow(AppState())
     private val mutableSeeks = MutableSharedFlow<PlaybackSeek>()
     private val mutableNotices = MutableSharedFlow<ActionNotice>(extraBufferCapacity = 16,
@@ -355,6 +357,7 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
                     engine.setPitch(state.value.preferences.pitch)
                     engine.setAudioEffects(state.value.preferences.audioEffects)
                     engine.setCrossfadeDuration(state.value.preferences.crossfadeDurationMs)
+                    engine.setGaplessPlayback(state.value.preferences.gaplessPlayback)
                 }
                 val saved = queue.snapshot()
                 if (saved.currentIndex >= 0 && !queueLoaded) {
@@ -558,6 +561,7 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
         mutableState.update { it.copy(preferences = settings) }
         if (settings.audioEffects != previous.audioEffects) engine.setAudioEffects(settings.audioEffects)
         if (settings.crossfadeDurationMs != previous.crossfadeDurationMs) engine.setCrossfadeDuration(settings.crossfadeDurationMs)
+        if (settings.gaplessPlayback != previous.gaplessPlayback) engine.setGaplessPlayback(settings.gaplessPlayback)
         if (queueLoaded && settings.sourcePriority != previous.sourcePriority)
             engine.updateQueue(playableQueue(queue.snapshot()))
         if (settings.undoRetentionDays != previous.undoRetentionDays || settings.undoBackupBytes != previous.undoBackupBytes) {
@@ -946,6 +950,24 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
         else { queue.restore(previous.queue); queueLoaded = false; mutableState.update { it.copy(queue = previous.queue) } }
     }
     fun pause() = requestPlayback(false)
+    fun setSleepTimer(minutes: Int?) = action {
+        require(minutes == null || minutes in 1..180) { "Choose a sleep timer between 1 and 180 minutes" }
+        sleepTimer?.cancel()
+        val duration = minutes?.times(60_000L)
+        val deadline = duration?.let { kotlin.time.Clock.System.now().toEpochMilliseconds() + it }
+        mutableState.update { it.copy(sleepTimerEndsAt = deadline) }
+        sleepTimer = duration?.let {
+            scope.launch {
+                delay(it)
+                operations.withLock {
+                    if (state.value.sleepTimerEndsAt == deadline) {
+                        pause().join()
+                        mutableState.update { state -> state.copy(sleepTimerEndsAt = null) }
+                    }
+                }
+            }
+        }
+    }
     fun play() = requestPlayback(true)
     private fun requestPlayback(play: Boolean?) = action(serialized = false) {
         val load = transport.withLock {

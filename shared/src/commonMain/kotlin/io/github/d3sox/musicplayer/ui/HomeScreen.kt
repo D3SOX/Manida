@@ -96,7 +96,7 @@ internal fun HomeScreen(state: AppState, controller: MusicController, tracks: Li
                     }
                 }
             }
-            state.preferences.homeSections.forEach { section ->
+            state.preferences.homeSections.filterNot { it in state.preferences.disabledHomeSections }.forEach { section ->
                 when (section) {
                     HomeSectionId.MIXES -> if (feed.mixes.isNotEmpty()) item(key = "mixes") {
                 HomeSection("Mixes") {

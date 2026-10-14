@@ -166,7 +166,8 @@ fun MusicPlayerApp(controller: MusicController, onAddMusic: (() -> Unit)? = null
                 }
                 if (page == AppPage.LIBRARY || page == AppPage.SEARCH) {
                     PlayerPanels(panelState, controller, playerSheet, if (page == AppPage.LIBRARY) navigationHeight else 0.dp,
-                        onPairedDevices = { returnToSettings = false; page = AppPage.PAIRED_DEVICES }) { returnToSettings = false; page = AppPage.SAVED_QUEUES }
+                        onPairedDevices = { returnToSettings = false; page = AppPage.PAIRED_DEVICES },
+                        onAudioEffects = { returnToSettings = false; page = AppPage.AUDIO_EFFECTS }) { returnToSettings = false; page = AppPage.SAVED_QUEUES }
                 }
                 val noticeInset by animateDpAsState(when (page) {
                     AppPage.LIBRARY -> navigationHeight + if (hasPlayer) 96.dp else 0.dp

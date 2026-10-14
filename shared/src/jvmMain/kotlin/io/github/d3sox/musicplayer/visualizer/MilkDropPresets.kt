@@ -55,10 +55,11 @@ suspend fun milkDropLibrary(directory: File): MilkDropLibrary = presetPreparatio
         } finally { staging.deleteRecursively() }
     }
     val catalog = Json.decodeFromString<List<BundledPreset>>(File(bundled, "catalog.json").readText())
-    val presets = catalog.map { MilkDropPreset(MilkDropPresetInfo(it.name, it.collection, it.category), File(bundled, it.path)) }
+    val presets = catalog.map { MilkDropPreset(MilkDropPresetInfo(it.name, it.collection, it.category, it.path), File(bundled, it.path)) }
     val custom = directory.walkTopDown().onEnter { it == directory || !it.name.startsWith(".") }
         .filter { it.isFile && it.extension.equals("milk", true) }
-        .map { MilkDropPreset(MilkDropPresetInfo(it.nameWithoutExtension, "Custom", it.parentFile.relativeTo(directory).path), it) }
+        .map { MilkDropPreset(MilkDropPresetInfo(it.nameWithoutExtension, "Custom", it.parentFile.relativeTo(directory).path,
+            "custom/${it.relativeTo(directory).path}"), it) }
     MilkDropLibrary((presets + custom).sortedWith(compareBy<MilkDropPreset> {
         when (it.info.collection) { "Original MilkDrop" -> 0; "Cream of the Crop" -> 1; else -> 2 }
     }.thenBy { it.name.lowercase() }),

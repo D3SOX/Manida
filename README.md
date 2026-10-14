@@ -10,17 +10,25 @@ I started it because I couldn't find a music player with all the features I want
 
 ## What it does
 
-- Browse songs, albums, artists, genres and folders. Search the whole library and filter the results by type. Choose your library tabs and rearrange Home's sections.
+- Browse songs, albums, artists, genres and folders. Search the whole library and filter the results by type. Choose your library tabs, rearrange Home's sections and hide the sections you don't use.
 - Manage playlists, smart playlists and M3U imports and exports. Publish playlists to your music server and keep their changes synced.
 - Keep a separate Up next queue. Save queues with their played history, current song and playback position. Switch between live queues and snapshots, export them to playlists, and enable recovery snapshots if you want them.
 - Download server music for offline playback. Match local and server copies of the same song instead of showing duplicates.
-- Use gapless playback, crossfade, speed and pitch controls, repeat counts, an equalizer and mono audio. Browse AutoEQ headphone profiles or save your own settings as a profile.
+- Use gapless playback, crossfade, speed and pitch controls, repeat counts, an equalizer, mono audio and a sleep timer. Open common playback settings from Now playing. Browse AutoEQ headphone profiles or save your own settings as a profile.
 - Show waveforms from the actual audio. Prepare a library in the background with bounded parallel decoding and a persistent cache.
 - Edit local tags and artwork, or edit Navidrome's music files over SFTP. Find metadata through MusicBrainz.
 - Track listening history and scrobble through your music server, Last.fm or ListenBrainz.
 - Pair devices with a camera QR scan or a manual code. Sync playlists, favorites, ratings, listening history and saved queue contents. Playback positions stay separate on each device.
 - Choose light, dark, system or artwork-based colors, including a custom color palette. Desktop has a volume slider in the mini player, right-click menus and MPRIS media controls.
-- Run MilkDrop presets through projectM. Android has an in-app visualizer. Linux opens a separate window. The full original MilkDrop collection and projectM's Cream of the Crop pack ship offline: 10,347 presets and 67 textures, with search, collection and category filters, and automatic preset changes.
+- Run MilkDrop presets through projectM. Android has an in-app visualizer. Linux opens a separate window. The full original MilkDrop collection and projectM's Cream of the Crop pack ship offline: 10,347 presets and 67 textures, with search, collection and category filters, favorite presets, a favorites-only mode and automatic preset changes. Locked presets stay selected when you reopen the visualizer.
+
+## Screenshots
+
+These Android emulator screenshots use a fictional library.
+
+| Home | Now playing | Queue | Audio effects |
+| --- | --- | --- | --- |
+| <img src="packaging/screenshots/home.png" alt="Home with favorite mixes and recent albums" width="220"> | <img src="packaging/screenshots/now-playing.png" alt="Now playing with artwork, waveform and playback controls" width="220"> | <img src="packaging/screenshots/queue.png" alt="Queue with played history and Up next" width="220"> | <img src="packaging/screenshots/audio-effects.png" alt="Audio effects with headphone profiles and equalizer controls" width="220"> |
 
 ## Platforms and servers
 
