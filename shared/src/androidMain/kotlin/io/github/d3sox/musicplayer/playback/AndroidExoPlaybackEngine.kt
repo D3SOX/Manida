@@ -170,23 +170,21 @@ class AndroidExoPlaybackEngine(context: Context, outputMonitor: AudioProcessor? 
         }
     }
     override fun updateQueue(tracks: List<PlayableTrack>) = command {
-        for (index in mediaItemCount - 1 downTo 0) {
-            if (tracks.none { it.entryId == getMediaItemAt(index).mediaId }) removeMediaItem(index)
-        }
-        tracks.forEachIndexed { destination, track ->
-            val origin = (0 until mediaItemCount).firstOrNull { getMediaItemAt(it).mediaId == track.entryId }
-            if (origin == null) addMediaItem(destination, mediaItem(track))
-            else {
-                val current = getMediaItemAt(origin)
-                val preserveAudio = origin == currentMediaItemIndex && current.localConfiguration?.uri.toString() != track.location
-                val sourceId = if (preserveAudio) current.mediaMetadata.extras?.getString("sourceId") else track.sourceId
-                val updated = current.buildUpon().setMediaMetadata(current.mediaMetadata.buildUpon()
-                    .setTitle(track.title).setArtist(track.artist)
-                    .setExtras(Bundle().apply { putString("trackId", track.id); putString("sourceId", sourceId) }).build())
-                if (!preserveAudio) updated.setUri(track.location)
-                replaceMediaItem(origin, updated.build())
-                if (origin != destination) moveMediaItem(origin, destination)
-            }
+        val current = currentMediaItem
+        val destination = tracks.indexOfFirst { it.entryId == current?.mediaId }
+        val updated = tracks.map(::mediaItem)
+        if (current == null || destination < 0) {
+            replaceMediaItems(0, mediaItemCount, updated)
+        } else {
+            val track = tracks[destination]
+            val sourceId = if (current.localConfiguration?.uri.toString() != track.location)
+                current.mediaMetadata.extras?.getString("sourceId") else track.sourceId
+            val metadata = current.mediaMetadata.buildUpon().setTitle(track.title).setArtist(track.artist)
+                .setExtras(Bundle().apply { putString("trackId", track.id); putString("sourceId", sourceId) }).build()
+            // Keep the current media source and decoder; replace each surrounding range in one operation.
+            replaceMediaItem(currentMediaItemIndex, current.buildUpon().setMediaMetadata(metadata).build())
+            replaceMediaItems(0, currentMediaItemIndex, updated.take(destination))
+            replaceMediaItems(destination + 1, mediaItemCount, updated.drop(destination + 1))
         }
     }
     override fun play() = command { play() }
