@@ -102,6 +102,7 @@ tasks.withType<Test>().configureEach {
 }
 
 tasks.register<JavaExec>("pairedFixture") {
+    maxHeapSize = "256m"
     val compilation = kotlin.targets.getByName("desktop").compilations.getByName("test")
     dependsOn(compilation.compileTaskProvider)
     classpath(compilation.output.allOutputs, compilation.runtimeDependencyFiles)
