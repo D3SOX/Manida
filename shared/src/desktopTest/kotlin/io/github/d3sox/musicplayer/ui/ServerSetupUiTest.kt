@@ -43,6 +43,9 @@ class ServerSetupUiTest {
             runBlocking { client.setFavorite(original.id, true) }
             runComposeUiTest {
                 setContent { MusicPlayerApp(controller) }
+                waitUntil(timeoutMillis = 5_000) {
+                    onAllNodesWithContentDescription("Settings").fetchSemanticsNodes().isNotEmpty()
+                }
                 onNodeWithContentDescription("Settings").performClick()
                 onNodeWithText("Music server").performScrollTo().performClick()
                 onNodeWithText("Refresh library").performClick()
@@ -103,6 +106,9 @@ class ServerSetupUiTest {
         try {
             runComposeUiTest {
                 setContent { MusicPlayerApp(controller) }
+                waitUntil(timeoutMillis = 5_000) {
+                    onAllNodesWithContentDescription("Settings").fetchSemanticsNodes().isNotEmpty()
+                }
                 onNodeWithContentDescription("Settings").performClick()
                 onNodeWithText("Music server").performScrollTo().performClick()
                 onNodeWithText("Server address").performTextInput(
@@ -137,6 +143,9 @@ class ServerSetupUiTest {
         try {
             runComposeUiTest {
                 setContent { MusicPlayerApp(controller) }
+                waitUntil(timeoutMillis = 5_000) {
+                    onAllNodesWithContentDescription("Settings").fetchSemanticsNodes().isNotEmpty()
+                }
                 onNodeWithContentDescription("Settings").performClick()
                 onNodeWithText("Music server").performScrollTo().performClick()
                 onNodeWithText("Server address").performTextInput(
