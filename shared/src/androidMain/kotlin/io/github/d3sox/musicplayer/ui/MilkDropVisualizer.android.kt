@@ -192,9 +192,11 @@ class MilkDropRenderer(private val library: MilkDropLibrary, initialSelected: In
         try {
             val wait = 33_333_333L - (System.nanoTime() - drawnAt)
             if (wait > 0) Thread.sleep(wait / 1_000_000, (wait % 1_000_000).toInt())
+            val previousFrame = drawnAt
             drawnAt = System.nanoTime()
             if (handle == 0L) handle = ProjectMNative.create(width, height, false, library.textures.path)
-            if (!playing.get()) changedAt = System.nanoTime()
+            // Pausing stops continuous rendering, so a long gap between frames also restarts the preset timer.
+            if (!playing.get() || drawnAt - previousFrame > 1_000_000_000L) changedAt = drawnAt
             if (loaded >= 0 && playing.get() && automatic.get() && System.nanoTime() - changedAt >= 20_000_000_000L)
                 selected.updateAndGet { milkDropNextPreset(eligible.get(), it) ?: -1 }
             val next = selected.get()
