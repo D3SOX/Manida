@@ -227,8 +227,7 @@ class DownloadUiTest {
                 onNodeWithText("Evening").performClick()
                 onNodeWithContentDescription("Automatically download playlist").performClick()
                 onNodeWithText("Songs").performClick()
-                onNodeWithContentDescription("Track options: Northern Light").performClick()
-                onNodeWithText("Add to playlist").performClick()
+                onNodeWithContentDescription("Quick action: Add to playlist: Northern Light").performClick()
                 onNodeWithText("Evening").performClick()
                 onNodeWithText("Apply").performClick()
                 waitUntil(timeoutMillis = 5_000) { controller.state.value.downloads[track.id]?.status == DownloadStatus.COMPLETE }

@@ -40,6 +40,9 @@ if [[ "$mode" == desktop ]]; then
             sleep 1
         done
     fi
+    # PulseAudio removes its automatic dummy sink when a test creates a real sink.
+    pactl load-module module-null-sink sink_name=manida_ci_audio >/dev/null
+    pactl set-default-sink manida_ci_audio
     xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24 -nolisten tcp' ./gradlew :shared:desktopTest --console=plain
 else
     export ANDROID_SERIAL=emulator-5554
