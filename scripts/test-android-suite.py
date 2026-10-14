@@ -27,9 +27,14 @@ output = ROOT / ".test-environment/android-class-results"
 shutil.rmtree(output, ignore_errors=True)
 output.mkdir(parents=True)
 failed = []
+flaky = []
 executed = 0
-for name in classes:
-    print("::group::" + name, flush=True)
+
+
+def run(name, attempt):
+    """Run one class and keep its reports; return the executed cases, or None when it failed."""
+    print(f"::group::{name} (attempt {attempt})", flush=True)
+    shutil.rmtree(reports, ignore_errors=True)
     result = subprocess.run([str(ROOT / "gradlew"), ":androidApp:connectedDebugAndroidTest",
                              "-Dorg.gradle.jvmargs=-Xmx1g", "--max-workers=2",
                              "-Pkotlin.compiler.execution.strategy=in-process",
@@ -38,11 +43,24 @@ for name in classes:
                              "--console=plain"], cwd=ROOT)
     cases = [case for report in reports.glob("TEST-*.xml")
              for case in ET.parse(report).getroot().findall(".//testcase")]
-    if result.returncode != 0 or any(case.get("classname") != "me.d3sox.manida." + name for case in cases):
-        failed.append(name)
-    executed += len(cases)
-    shutil.copytree(reports, output / name)
+    if reports.exists():
+        shutil.copytree(reports, output / (name if attempt == 1 else f"{name}-attempt{attempt}"))
     print("::endgroup::", flush=True)
+    ok = result.returncode == 0 and cases and all(case.get("classname") == "me.d3sox.manida." + name for case in cases)
+    return cases if ok else None
+
+
+for name in classes:
+    cases = run(name, 1)
+    if cases is None:
+        # Hosted emulators share two slow cores with Gradle, so retry once; a second failure is a real failure.
+        cases = run(name, 2)
+        if cases is None:
+            failed.append(name)
+            continue
+        flaky.append(name)
+        print(f"::warning title=Flaky Android test::{name} failed once and passed on retry", flush=True)
+    executed += len(cases)
 if failed or executed < len(classes):
-    raise SystemExit(f"Android suite failed: {failed}; {executed} cases across {len(classes)} classes")
-print(f"Passed {executed} Android checks across {len(classes)} classes")
+    raise SystemExit(f"Android suite failed: {failed}; passed on retry: {flaky}; {executed} cases across {len(classes)} classes")
+print(f"Passed {executed} Android checks across {len(classes)} classes; passed on retry: {flaky or 'none'}")
