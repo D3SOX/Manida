@@ -44,7 +44,7 @@ jobs:
           java-version: |
             25
             21
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg mpv libsecret-tools xvfb dbus cmake ninja-build libsdl2-dev libgl1-mesa-dev pulseaudio-utils
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg mpv libmpv-dev libsecret-tools xvfb dbus cmake ninja-build libsdl2-dev libgl1-mesa-dev pulseaudio-utils
       - run: ./gradlew :desktopApp:createDistributable --console=plain
       - run: python3 scripts/test-linux-player.py
       - name: Create the Arch development package
