@@ -53,7 +53,7 @@ class AndroidBackgroundDownloadsTest {
             val periodic = withTimeout(5_000) {
                 while (true) {
                     val pending = scheduler.allPendingJobs.firstOrNull {
-                        it.service.className == "io.github.d3sox.musicplayer.DownloadService" && it.isPeriodic
+                        it.service.className == DownloadService::class.java.name && it.isPeriodic
                     }
                     if (pending != null) return@withTimeout pending
                     delay(50)
@@ -115,7 +115,7 @@ class AndroidBackgroundDownloadsTest {
             val job = withTimeout(5_000) {
                 while (true) {
                     val pending = scheduler.allPendingJobs.firstOrNull {
-                        it.service.className == "io.github.d3sox.musicplayer.DownloadService" && it.isUserInitiated
+                        it.service.className == DownloadService::class.java.name && it.isUserInitiated
                     }
                     if (pending != null) return@withTimeout pending
                     delay(50)
@@ -161,7 +161,7 @@ class AndroidBackgroundDownloadsTest {
             val job = withTimeout(5_000) {
                 while (true) {
                     val pending = scheduler.allPendingJobs.firstOrNull {
-                        it.service.className == "io.github.d3sox.musicplayer.DownloadService" && !it.isPeriodic
+                        it.service.className == DownloadService::class.java.name && !it.isPeriodic
                     }
                     if (pending != null) return@withTimeout pending
                     delay(50)

@@ -59,7 +59,7 @@ class AndroidMilkDropUiTest {
                     instrumentation.uiAutomation.executeShellCommand(command)).use { it.readBytes() }
                 shell("input keyevent 3")
                 compose.waitUntil(3_000) { !VisualizerPcm.enabled }
-                shell("am start --user 0 -W --activity-single-top --activity-clear-top -n io.github.d3sox.musicplayer/.MainActivity")
+                shell("am start --user 0 -W --activity-single-top --activity-clear-top -n me.d3sox.manida/.MainActivity")
                 compose.waitUntil(5_000) { VisualizerPcm.enabled }
                 compose.waitForIdle()
                 compose.onNodeWithContentDescription("MilkDrop visualization").assertIsDisplayed()
