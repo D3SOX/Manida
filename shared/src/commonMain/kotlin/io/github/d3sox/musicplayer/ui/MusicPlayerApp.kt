@@ -39,7 +39,6 @@ import io.github.d3sox.musicplayer.queue.QueueSnapshot
 
 private enum class AppPage { LIBRARY, SETTINGS, SERVER, DOWNLOADS, SAVED_QUEUES, FILE_RECOVERY, AUDIO_EFFECTS, SFTP, PAIRED_DEVICES, SEARCH }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MusicPlayerApp(controller: MusicController, onAddMusic: (() -> Unit)? = null, artworkPicker: ArtworkPicker? = null,
     playlistFiles: PlaylistFiles? = null, equalizerFiles: EqualizerFiles? = null, folderPicker: FolderPicker? = null,

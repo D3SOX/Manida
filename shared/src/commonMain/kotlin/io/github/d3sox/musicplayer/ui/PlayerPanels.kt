@@ -603,6 +603,7 @@ private fun PlayerCover(state: AppState, track: Track, modifier: Modifier, motio
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlayerControls(state: AppState, controller: MusicController, current: Track, requested: Boolean,
     modifier: Modifier, motion: PlayerMotion, visible: Boolean, artworkSwipe: PlayingArtworkSwipe,
