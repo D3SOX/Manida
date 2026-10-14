@@ -68,11 +68,15 @@ class PairedDevicesTest {
             assertEquals(null, devices.state.value.listeningPort)
             devices.createInvitation("127.0.0.1")
             val port = assertNotNull(devices.state.value.listeningPort)
-            devices.cancelInvitation()
-            assertEquals(null, devices.state.value.invitation)
-            assertEquals(null, devices.state.value.listeningPort)
-            kotlin.test.assertFailsWith<java.net.ConnectException> {
-                java.net.Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", port), 1000) }
+            java.net.Socket().use { probe ->
+                // Reserve a different client port before closing the listener to prevent TCP self-connects.
+                probe.bind(java.net.InetSocketAddress("127.0.0.1", 0))
+                devices.cancelInvitation()
+                assertEquals(null, devices.state.value.invitation)
+                assertEquals(null, devices.state.value.listeningPort)
+                kotlin.test.assertFailsWith<java.net.ConnectException> {
+                    probe.connect(java.net.InetSocketAddress("127.0.0.1", port), 1000)
+                }
             }
             Unit
         } finally { devices.closeAndJoin(); store.close(); directory.toFile().deleteRecursively() }
