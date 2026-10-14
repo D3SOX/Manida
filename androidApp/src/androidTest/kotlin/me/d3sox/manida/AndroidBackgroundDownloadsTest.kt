@@ -202,11 +202,17 @@ class AndroidBackgroundDownloadsTest {
         val originalMetered = shell("cmd netpolicy list wifi-networks").lineSequence().firstOrNull { it.startsWith("AndroidWifi;") }
             ?.substringAfter(';')?.let { if (it == "none") "undefined" else it } ?: "undefined"
         val wifiWasOn = shell("settings get global wifi_on").trim() != "0"
-        shell("svc wifi enable")
-        shell("cmd netpolicy set metered-network AndroidWifi false")
-        return {
+        val restore = {
             shell("cmd netpolicy set metered-network AndroidWifi $originalMetered")
             if (!wifiWasOn) shell("svc wifi disable")
         }
+        try {
+            shell("svc wifi enable")
+            shell("cmd netpolicy set metered-network AndroidWifi false")
+        } catch (failure: Throwable) {
+            runCatching { restore() }
+            throw failure
+        }
+        return restore
     }
 }
