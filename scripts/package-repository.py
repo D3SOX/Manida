@@ -57,7 +57,11 @@ def copy_website(output: Path, signing_key: str):
         shutil.copyfile(root / "packaging" / name, assets / name)
     shutil.copytree(root / "packaging/screenshots", assets / "screenshots", dirs_exist_ok=True)
     index = output / "index.html"
-    index.write_text(index.read_text().replace("5948F17F1611CC2B995BC6121F0D542126D514AB", signing_key.upper()))
+    placeholder = "5948F17F1611CC2B995BC6121F0D542126D514AB"
+    html = index.read_text()
+    if placeholder not in html:
+        raise ValueError("The website is missing the Arch signing-key fingerprint")
+    index.write_text(html.replace(placeholder, signing_key.upper()))
 
 
 if __name__ == "__main__":
