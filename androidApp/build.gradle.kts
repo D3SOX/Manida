@@ -21,6 +21,7 @@ android {
         testInstrumentationRunnerArguments["notAnnotation"] = "me.d3sox.manida.ColdStartupCheck"
     }
     buildFeatures { compose = true }
+    packaging.resources.merges += "META-INF/LICENSE.md"
     signingConfigs.create("development") {
         storeFile = rootProject.file("packaging/development.keystore")
         storePassword = "android"
