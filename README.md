@@ -42,7 +42,13 @@ Download an APK from [GitHub Releases](https://github.com/D3SOX/Manida/releases)
 
 Scan this QR code in F-Droid to add the repository with its signing fingerprint:
 
-[<img src="packaging/fdroid-qr.png" alt="QR code for Manida's F-Droid repository, with the Manida logo" width="280" height="280">][fdroid-repository]
+<a href="https://manida.d3sox.me/fdroid/repo?fingerprint=FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="packaging/fdroid-qr-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="packaging/fdroid-qr-light.png">
+    <img src="packaging/fdroid-qr-light.png" alt="QR code for Manida's F-Droid repository, with the Manida logo" width="280" height="280">
+  </picture>
+</a>
 
 You can also enter `https://manida.d3sox.me/fdroid/repo` in F-Droid's repository settings. Its SHA-256 signing fingerprint is:
 
