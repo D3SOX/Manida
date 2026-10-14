@@ -45,7 +45,8 @@ class AndroidNotificationPermissionTest {
                 val row = hasTestTag("track-row:${track.id}")
                 compose.onNode(row, useUnmergedTree = true).performScrollTo()
                 compose.onNode(hasContentDescription("Track options: Northern Light") and hasAnyAncestor(row), useUnmergedTree = true).performClick()
-                compose.onNodeWithText("Download").performClick()
+                compose.onNodeWithText("Download").performScrollTo().performClick()
+                compose.waitForIdle()
                 runBlocking {
                     withTimeout(5_000) {
                         while (true) {
