@@ -30,6 +30,7 @@ import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
@@ -476,6 +477,14 @@ internal fun PlayerPanels(state: AppState, controller: MusicController, sheet: A
                                 leadingContent = {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         if (upcoming) Box(Modifier.size(48.dp).semantics { contentDescription = "Reorder: ${track?.metadata?.title}" }
+                                            .pointerInput(Unit) {
+                                                // Holding the grip belongs to reordering; the row owns its context menu.
+                                                awaitEachGesture {
+                                                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                                    if (!currentEvent.buttons.isSecondaryPressed) down.consume()
+                                                    waitForUpOrCancellation()
+                                                }
+                                            }
                                             .draggableHandle(enabled = !committingDrag,
                                                 dragGestureDetector = boundary,
                                                 onDragStarted = { draggingEntry = entry.id },
