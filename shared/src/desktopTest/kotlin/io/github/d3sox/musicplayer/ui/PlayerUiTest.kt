@@ -172,7 +172,7 @@ class PlayerUiTest {
     }
 
     @Test
-    fun thePlayButtonCircleKeepsItsSizeAtTheMiniPlayerEndOfTheTransition() {
+    fun thePlayButtonCircleFillsItsControlAtTheMiniPlayerEndOfTheTransition() {
         val directory = Files.createTempDirectory("mini-play-circle-motion")
         val store = openMusicStore(directory.resolve("library.db").toString())
         val library = MusicLibrary(store)
@@ -183,7 +183,7 @@ class PlayerUiTest {
                 setContent { Box(Modifier.width(360.dp).height(740.dp)) { MusicPlayerApp(controller) } }
                 waitUntil(timeoutMillis = 3_000) { controller.state.value.libraryReady }
                 runBlocking { controller.playTrack(controller.state.value.tracks.first().id).join(); controller.pause().join() }
-                fun paintedCircleWidth(): Int {
+                fun circleAndControlWidths(): Pair<Int, Int> {
                     val pixels = onNode(hasContentDescription("Play") and hasClickAction()).captureToImage().toPixelMap()
                     val accent = pixels[pixels.width / 2, pixels.height / 4]
                     val painted = (0 until pixels.width).filter { x ->
@@ -191,9 +191,9 @@ class PlayerUiTest {
                         kotlin.math.abs(color.red - accent.red) + kotlin.math.abs(color.green - accent.green) +
                             kotlin.math.abs(color.blue - accent.blue) < .04f
                     }
-                    return painted.last() - painted.first() + 1
+                    return (painted.last() - painted.first() + 1) to pixels.width
                 }
-                val restingWidth = paintedCircleWidth()
+                val (restingWidth, restingControl) = circleAndControlWidths()
                 val mini = onNodeWithTag("mini-player").fetchSemanticsNode().boundsInRoot
                 onNodeWithTag("mini-player").performClick()
                 mainClock.advanceTimeBy(1_000)
@@ -203,9 +203,11 @@ class PlayerUiTest {
                     moveBy(androidx.compose.ui.geometry.Offset(0f, mini.top - 4f), 500)
                 }
                 mainClock.advanceTimeByFrame()
-                val transitioningWidth = paintedCircleWidth()
-                assertTrue(kotlin.math.abs(restingWidth - transitioningWidth) <= 2,
-                    "The drawn play circle must match the resting mini player before the transition finishes: $restingWidth / $transitioningWidth")
+                val (transitioningWidth, transitioningControl) = circleAndControlWidths()
+                assertTrue(transitioningWidth >= restingWidth - 2 &&
+                    kotlin.math.abs((restingControl - restingWidth) - (transitioningControl - transitioningWidth)) <= 2,
+                    "The play circle must fill its animated control without shrinking: " +
+                        "$restingWidth/$restingControl at rest, $transitioningWidth/$transitioningControl during the drag")
                 onRoot().performTouchInput { up() }
                 mainClock.autoAdvance = true
             }

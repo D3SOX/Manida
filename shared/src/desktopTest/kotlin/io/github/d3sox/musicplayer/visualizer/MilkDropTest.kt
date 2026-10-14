@@ -64,6 +64,17 @@ class MilkDropTest {
             val library = milkDropLibrary(directory)
             assertEquals(10348, library.presets.size)
             assertTrue(library.presets.all { it.file.isFile })
+            for (texture in library.textures.listFiles().orEmpty()) {
+                javax.imageio.ImageIO.createImageInputStream(texture).use { input ->
+                    val reader = javax.imageio.ImageIO.getImageReaders(input).next()
+                    try {
+                        reader.input = input
+                        assertEquals("JPEG", reader.formatName.uppercase(), "Decoder review must cover ${texture.name}")
+                        assertTrue(reader.getWidth(0) in 1..4096 && reader.getHeight(0) in 1..4096,
+                            "${texture.name} must stay within the reviewed decoder allocation limits")
+                    } finally { reader.dispose() }
+                }
+            }
             assertEquals("user's preset", library.presets.single { it.info.collection == "Custom" }.file.readText())
             assertFalse(File(directory, ".unpacking").exists())
             val marker = File(directory, ".library/.complete")
