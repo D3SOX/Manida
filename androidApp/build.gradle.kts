@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "io.github.d3sox.musicplayer"
+    namespace = "me.d3sox.manida"
     compileSdk = 37
     ndkVersion = "28.2.13676358"
     defaultConfig {
-        applicationId = "io.github.d3sox.musicplayer"
+        applicationId = "me.d3sox.manida"
         minSdk = 31
         targetSdk = 37
         versionCode = 1

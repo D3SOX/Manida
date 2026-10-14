@@ -1,6 +1,6 @@
 <h1><img src="packaging/manida.svg" alt="" width="40" height="40" align="left">Manida</h1>
 
-[![GitHub Releases](https://img.shields.io/badge/GitHub-Releases-181717?logo=github&logoColor=white&style=for-the-badge)](https://github.com/D3SOX/Manida/releases) [![F-Droid repository](https://img.shields.io/badge/F--Droid-Repository-1976D2?logo=fdroid&logoColor=white&style=for-the-badge)][fdroid-repository] [![Obtainium](https://img.shields.io/badge/Obtainium-Install-D2BCFD?logo=obtainium&logoColor=black&style=for-the-badge)][obtainium-install] [![Arch Linux repository](https://img.shields.io/badge/Arch_Linux-Repository-1793D1?logo=archlinux&logoColor=white&style=for-the-badge)](https://manida.d3sox.me)
+[![GitHub Releases](https://img.shields.io/badge/GitHub-Releases-181717?logo=github&logoColor=white&style=for-the-badge)](https://github.com/D3SOX/Manida/releases) [![F-Droid repository](https://img.shields.io/badge/F--Droid-Repository-1976D2?logo=fdroid&logoColor=white&style=for-the-badge)][fdroid-repository] [![Obtainium](https://img.shields.io/badge/Obtainium-Install-D2BCFD?logo=obtainium&logoColor=white&style=for-the-badge)][obtainium-install] [![Arch Linux repository](https://img.shields.io/badge/Arch_Linux-Repository-1793D1?logo=archlinux&logoColor=white&style=for-the-badge)](https://manida.d3sox.me)
 
 Manida is a music player for Android and Linux, built with Kotlin and Compose. It plays local files and connects to Navidrome and Subsonic-compatible servers.
 
@@ -42,6 +42,7 @@ Download an APK from [GitHub Releases](https://github.com/D3SOX/Manida/releases)
 
 Scan this QR code in F-Droid to add the repository with its signing fingerprint:
 
+<p align="center">
 <a href="https://manida.d3sox.me/fdroid/repo?fingerprint=FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="packaging/fdroid-qr-dark.png">
@@ -49,11 +50,12 @@ Scan this QR code in F-Droid to add the repository with its signing fingerprint:
     <img src="packaging/fdroid-qr-light.png" alt="QR code for Manida's F-Droid repository, with the Manida logo" width="280" height="280">
   </picture>
 </a>
+</p>
 
-You can also enter `https://manida.d3sox.me/fdroid/repo` in F-Droid's repository settings. Its SHA-256 signing fingerprint is:
+To add it manually in F-Droid, paste this into the repository field:
 
 ```text
-FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B
+https://manida.d3sox.me/fdroid/repo?fingerprint=FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B
 ```
 
 GitHub, Obtainium and this F-Droid repository distribute the same release APK and receive updates signed by the same app key. This is Manida's own repository; it is not a listing in the main f-droid.org repository.
@@ -161,8 +163,6 @@ Configure these repository secrets and variables for signed releases:
 
 GitHub Pages uses GitHub Actions as its source, with `manida.d3sox.me` as the custom domain. Its DNS `CNAME` points to `d3sox.github.io`. Each tagged release deploys both repositories after publishing the release assets. F-Droid's landing page is `/fdroid`; its signed index and APKs are under `/fdroid/repo`. The `github-pages` environment must allow release tags matching `v*`. Development builds do not require release signing secrets.
 
-Release APKs use a dedicated production signing key. Local debug and performance builds use an Android debug key. Switching from one of those builds to the first production release requires a backup, uninstall and reinstall; Android cannot install the release over an APK signed by another key.
-
 ## License and credits
 
 Manida uses [AGPL-3.0-only](LICENSE). Namida inspired the feature requirements. Manida does not include its implementation or assets.
@@ -172,4 +172,4 @@ MilkDrop rendering uses [projectM](https://github.com/projectM-visualizer/projec
 The bundled presets and textures retain their upstream authorship and notices, including the [preset pack's distribution notice](https://github.com/projectM-visualizer/presets-cream-of-the-crop/blob/0180df21f5e0bd39b9060cc5de420ed2f1f9e509/LICENSE.md). `python scripts/package-milkdrop-presets.py` reproduces the library from checksum-verified source archives. Each app unpacks the library on first use and reuses it afterward.
 
 [fdroid-repository]: https://manida.d3sox.me/fdroid/repo?fingerprint=FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B
-[obtainium-install]: https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22io.github.d3sox.musicplayer%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FD3SOX%2FManida%22%2C%22author%22%3A%22D3SOX%22%2C%22name%22%3A%22Manida%22%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5EManida%20%5B0-9%5D%2B%5B.%5D%5B0-9%5D%2B%5B.%5D%5B0-9%5D%2B%24%5C%22%7D%22%7D
+[obtainium-install]: https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22me.d3sox.manida%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FD3SOX%2FManida%22%2C%22author%22%3A%22D3SOX%22%2C%22name%22%3A%22Manida%22%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5EManida%20%5B0-9%5D%2B%5B.%5D%5B0-9%5D%2B%5B.%5D%5B0-9%5D%2B%24%5C%22%7D%22%7D

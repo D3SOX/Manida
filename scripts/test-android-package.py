@@ -13,7 +13,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 APK = ROOT / "androidApp/build/outputs/apk/release/androidApp-release-unsigned.apk"
-APP = "io.github.d3sox.musicplayer"
+APP = "me.d3sox.manida"
 SDK = Path(os.environ.get("ANDROID_HOME", "/home/nico/Android/Sdk"))
 JAVA = Path(os.environ.get("JAVA_HOME", "/usr/lib/jvm/java-21-openjdk")) / "bin"
 

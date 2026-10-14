@@ -17,7 +17,7 @@ from loguru import logger
 
 ROOT = Path(__file__).resolve().parent.parent
 REPO_URL = "https://manida.d3sox.me/fdroid/repo"
-APP_ID = "io.github.d3sox.musicplayer"
+APP_ID = "me.d3sox.manida"
 
 
 def fingerprint():

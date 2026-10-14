@@ -6,9 +6,9 @@ import kotlinx.serialization.json.Json
 
 /** Private app/session messages. They contain identifiers and controls, never audio locations. */
 object SessionPlaybackCommands {
-    const val STATUS = "io.github.d3sox.musicplayer.PLAYBACK_STATUS"
-    const val CROSSFADE = "io.github.d3sox.musicplayer.CROSSFADE"
-    const val REPEAT = "io.github.d3sox.musicplayer.REPEAT"
+    const val STATUS = "me.d3sox.manida.PLAYBACK_STATUS"
+    const val CROSSFADE = "me.d3sox.manida.CROSSFADE"
+    const val REPEAT = "me.d3sox.manida.REPEAT"
     val actions = listOf(STATUS, CROSSFADE, REPEAT)
     fun command(action: String) = SessionCommand(action, Bundle.EMPTY)
     fun encodeStatus(status: PlaybackStatus) = Bundle().apply { putString("status", Json.encodeToString(status)) }

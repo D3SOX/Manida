@@ -5,7 +5,7 @@ import androidx.media3.session.SessionCommand
 import kotlinx.serialization.json.Json
 
 object AudioEffectsCommand {
-    const val ACTION = "io.github.d3sox.musicplayer.AUDIO_EFFECTS"
+    const val ACTION = "me.d3sox.manida.AUDIO_EFFECTS"
     private const val DATA = "effects"
     val command: SessionCommand get() = SessionCommand(ACTION, Bundle.EMPTY)
 
