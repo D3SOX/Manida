@@ -65,10 +65,12 @@ class AndroidCrossfadeTest {
             engine.setCrossfadeDuration(1_000)
             engine.loadQueue(sources.mapIndexed { index, file -> PlayableTrack("tone-$index", file.toURI().toString()) })
             withTimeout(8_000) { engine.status.first { it.playing && it.entryId == "tone-0" } }
-            val started = System.nanoTime()
             val middle = withTimeout(5_000) { engine.status.first {
                 it.entryId == "tone-1" && it.playing && it.positionMs >= 250 && it.fadingOut?.playing == true
             } }
+            val outgoingPosition = requireNotNull(middle.fadingOut).positionMs
+            assertTrue("The real decoders must overlap during the last second of the outgoing song: $middle",
+                outgoingPosition in 2_000 until 3_000)
             assertNotEquals(middle.playbackId, middle.fadingOut?.playbackId)
             assertEquals(1.0, middle.volume, 0.001)
             engine.pause()
@@ -80,7 +82,6 @@ class AndroidCrossfadeTest {
             assertEquals(requireNotNull(paused.fadingOut).positionMs.toDouble(), requireNotNull(engine.status.value.fadingOut).positionMs.toDouble(), 60.0)
             engine.play()
             withTimeout(6_000) { engine.status.first { it.entryId == "tone-1" && it.ended } }
-            assertEquals(5.4, (System.nanoTime() - started) / 1_000_000_000.0, 0.4)
             assertEquals(2, captures.size)
             captures.forEachIndexed { index, capture ->
                 val samples = ByteBuffer.wrap(synchronized(capture) { capture.toByteArray() }).order(ByteOrder.LITTLE_ENDIAN)

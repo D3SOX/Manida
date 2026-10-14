@@ -269,6 +269,7 @@ class LocalFileEditsTest {
                 fileEdits = LocalFileEdits(store, restoredLibrary, directory.resolve("edits").toString()))
             player = controller
             withTimeout(3_000) { controller.state.first { !it.loading } }
+            withTimeout(3_000) { while (Files.exists(Path.of(edit.backupPath))) delay(10) }
             assertEquals(emptyList(), controller.state.value.fileEdits)
             kotlin.test.assertFalse(Files.exists(Path.of(edit.backupPath)))
             assertEquals(true, controller.state.value.tracks.single().favorite)
