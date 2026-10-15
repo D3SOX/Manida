@@ -61,6 +61,10 @@ else
     adb -s "$ANDROID_SERIAL" push .test-environment/sftp-fixture/client /data/local/tmp/manida-sftp-client
     adb -s "$ANDROID_SERIAL" push .test-environment/sftp-fixture/android-fixture.properties /data/local/tmp/manida-sftp-fixture.properties
     adb -s "$ANDROID_SERIAL" push .test-environment/paired-fixture/control-port /data/local/tmp/manida-sync-control-port
-    python3 scripts/test-android-suite.py
-    MANIDA_TEST_SERIAL="$ANDROID_SERIAL" python3 scripts/test-android-startup.py
+    shard="${MANIDA_ANDROID_SHARD:-1/1}"
+    python3 scripts/test-android-suite.py --shard "$shard"
+    # The cold-start check runs once per device, on the first shard.
+    if [[ "${shard%%/*}" == 1 ]]; then
+        MANIDA_TEST_SERIAL="$ANDROID_SERIAL" python3 scripts/test-android-startup.py
+    fi
 fi
