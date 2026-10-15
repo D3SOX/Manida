@@ -178,7 +178,7 @@ class JvmPairedDevices(private val store: MusicStore, override val library: Libr
         }
     }
 
-    private suspend fun stopListening() {
+    private suspend fun stopListening() = withContext(NonCancellable) {
         server?.close()
         server = null
         sockets.toList().forEach { runCatching { it.close() } }
