@@ -61,6 +61,7 @@ class JvmPairedDevices(private val store: MusicStore, override val library: Libr
     private val sockets = ConcurrentHashMap.newKeySet<SSLSocket>()
     private val wire = Json { encodeDefaults = true }
     private var server: SSLServerSocket? = null
+    private var acceptor: Job? = null
     private var tls: SyncTls? = null
     private var ownId: String? = null
     private var closed = false
@@ -128,14 +129,15 @@ class JvmPairedDevices(private val store: MusicStore, override val library: Libr
         server = listener
         store.put("sync:listening-port", "sync-settings", listener.localPort)
         mutableState.update { it.copy(listeningPort = listener.localPort) }
-        scope.launch {
+        acceptor = scope.launch {
             while (isActive && !listener.isClosed) {
                 val socket = try { listener.accept() as SSLSocket } catch (error: Exception) {
                     if (listener.isClosed) break else throw error
                 }
                 if (!slots.tryAcquire()) { socket.close(); continue }
                 sockets.add(socket)
-                launch {
+                // Handlers run outside the accept loop, so stopping the listener only waits for accept to return.
+                scope.launch {
                     try { socket.use { handle(it) } }
                     catch (cancelled: CancellationException) { throw cancelled }
                     catch (_: Exception) { /* Untrusted connections receive no library data. */ }
@@ -176,10 +178,13 @@ class JvmPairedDevices(private val store: MusicStore, override val library: Libr
         }
     }
 
-    private fun stopListening() {
+    private suspend fun stopListening() {
         server?.close()
         server = null
         sockets.toList().forEach { runCatching { it.close() } }
+        // A thread blocked in accept can keep the port listening briefly after close, so wait for it to exit.
+        acceptor?.join()
+        acceptor = null
         mutableState.update { it.copy(listeningPort = null) }
     }
 
