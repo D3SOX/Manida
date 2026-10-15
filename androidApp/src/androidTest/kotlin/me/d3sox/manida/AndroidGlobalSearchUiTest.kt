@@ -1,6 +1,6 @@
 package me.d3sox.manida
 
-import android.accessibilityservice.AccessibilityService
+import android.view.KeyEvent
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
@@ -49,7 +49,7 @@ class AndroidGlobalSearchUiTest {
                 compose.onNodeWithTag("search-type:PLAYLISTS").performScrollTo().performClick()
                 compose.onNodeWithContentDescription("Playlist options: Signal playlist").performClick()
                 compose.onNodeWithText("Edit playlist").assertIsDisplayed()
-                instrumentation.uiAutomation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+                instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
                 compose.waitUntil(5_000) { compose.onAllNodesWithText("Edit playlist").fetchSemanticsNodes().isEmpty() }
                 compose.onNodeWithContentDescription("Close search").performClick()
                 compose.onNodeWithTag("home-page").assertIsDisplayed()

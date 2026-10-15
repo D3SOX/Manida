@@ -37,30 +37,41 @@ class AndroidAutoEqUiTest {
         val original = runBlocking { MusicPreferences(app.store).load() }
         fun clickPickerItem(text: String, titleOnly: Boolean = false) {
             var requested = false
-            compose.waitUntil(5_000) {
-                val root = instrumentation.uiAutomation.rootInActiveWindow ?: return@waitUntil false
-                fun nodes(node: AccessibilityNodeInfo): List<AccessibilityNodeInfo> = listOf(node) +
-                    (0 until node.childCount).mapNotNull { node.getChild(it) }.flatMap(::nodes)
-                val visible = nodes(root).filter { it.isVisibleToUser }
-                val sidebarOpen = visible.any { it.text?.toString() == "Downloads" && it.viewIdResourceName == "android:id/title" && !it.isEditable }
-                if (text == "Show roots" && requested && sidebarOpen) return@waitUntil true
+            fun update(allowClick: Boolean): Boolean {
+                val root = instrumentation.uiAutomation.rootInActiveWindow ?: return false
+                val titles = root.findAccessibilityNodeInfosByViewId("android:id/title").filter { it.isVisibleToUser }
+                val sidebarOpen = titles.any { it.text?.toString() == "Downloads" && !it.isEditable }
+                if (text == "Show roots" && sidebarOpen) return true
                 if (titleOnly) {
-                    val breadcrumbs = visible.filter { it.viewIdResourceName?.endsWith(":id/breadcrumb_text") == true }
-                        .map { it.text?.toString() }
-                    val selected = if (text == "Downloads") breadcrumbs.firstOrNull() == text else breadcrumbs.lastOrNull() == text
-                    if (!sidebarOpen && selected) return@waitUntil true
-                } else if (requested && root.packageName?.toString() == app.packageName) return@waitUntil true
-                if (requested) return@waitUntil false
-                val item = visible.firstOrNull {
-                    (it.text?.toString()?.equals(text, ignoreCase = true) == true || it.contentDescription?.toString() == text) &&
+                    val breadcrumbs = root.findAccessibilityNodeInfosByViewId("${root.packageName}:id/breadcrumb_text")
+                        .filter { it.isVisibleToUser }.map { it.text?.toString() }
+                    if (!sidebarOpen && breadcrumbs.lastOrNull() == text) return true
+                } else if (requested && root.packageName?.toString() == app.packageName) return true
+                if (!allowClick) return false
+                val item = root.findAccessibilityNodeInfosByText(text).firstOrNull {
+                    it.isVisibleToUser &&
+                        (it.text?.toString()?.equals(text, ignoreCase = true) == true || it.contentDescription?.toString() == text) &&
                         (!titleOnly || it.viewIdResourceName == "android:id/title" && !it.isEditable)
-                } ?: return@waitUntil false
+                } ?: return false
                 var clickable: AccessibilityNodeInfo? = item
                 while (clickable != null && !clickable.isClickable) clickable = clickable.parent
-                val target = clickable ?: return@waitUntil false
-                requested = true
-                target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                false
+                val target = clickable ?: return false
+                // A node can become stale while the picker opens; retry rejected clicks.
+                requested = target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                return requested
+            }
+            try {
+                // Finding the control and observing its resulting window each need their own wait.
+                compose.waitUntil(5_000) { update(allowClick = true) }
+                compose.waitUntil(5_000) { update(allowClick = false) }
+            } catch (failure: ComposeTimeoutException) {
+                fun nodes(node: AccessibilityNodeInfo): List<AccessibilityNodeInfo> = listOf(node) +
+                    (0 until node.childCount).mapNotNull { node.getChild(it) }.flatMap(::nodes)
+                val tree = instrumentation.uiAutomation.rootInActiveWindow?.let(::nodes)
+                    ?.filter { !it.text.isNullOrBlank() || !it.contentDescription.isNullOrBlank() }?.joinToString("\n") {
+                        "${it.text} | ${it.contentDescription} | ${it.viewIdResourceName} | visible=${it.isVisibleToUser}"
+                    }
+                throw AssertionError("Picker '$text', click accepted=$requested:\n$tree", failure)
             }
         }
         try {
