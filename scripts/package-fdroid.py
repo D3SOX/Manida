@@ -63,6 +63,11 @@ def repository(apk: Path, output: Path, keystore: Path):
         (directory / "repo").mkdir()
         (directory / "metadata").mkdir()
         shutil.copyfile(apk, directory / "repo" / apk.name)
+        screenshots = directory / "repo" / APP_ID / "en-US" / "phoneScreenshots"
+        screenshots.mkdir(parents=True)
+        for position, name in enumerate(["home", "now-playing", "queue", "audio-effects"], start=1):
+            shutil.copyfile(ROOT / "packaging/screenshots" / f"{name}.png",
+                            screenshots / f"{position}-{name}.png")
         shutil.copyfile(ROOT / "packaging/manida.png", directory / "icon.png")
         metadata = yaml.safe_load((ROOT / ".fdroid.yml").read_text())
         for field in ["Builds", "RepoType", "Repo", "AutoUpdateMode", "UpdateCheckMode"]:

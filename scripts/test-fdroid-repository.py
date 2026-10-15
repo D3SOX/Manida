@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Verify the real signed repository and reject modified indexes and APKs."""
+import hashlib
 import importlib.util
+import json
 import os
 from pathlib import Path
 import shutil
@@ -20,6 +22,19 @@ REPO = Path(os.environ.get("MANIDA_FDROID_REPO", ROOT / ".test-environment/pages
 class FdroidRepositoryTest(unittest.TestCase):
     def test_the_release_and_its_index_are_authenticated(self):
         repository.verify_repository(REPO)
+
+    def test_the_index_includes_the_release_screenshots_in_gallery_order(self):
+        index = json.loads((REPO / "index-v2.json").read_text())
+        screenshots = index["packages"][repository.APP_ID]["metadata"]["screenshots"]["phone"]["en-US"]
+        names = ["home", "now-playing", "queue", "audio-effects"]
+        self.assertEqual(len(names), len(screenshots))
+        for name, screenshot in zip(names, screenshots):
+            with self.subTest(name=name):
+                path = REPO / screenshot["name"].lstrip("/")
+                self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), screenshot["sha256"])
+                with Image.open(path) as actual, Image.open(ROOT / "packaging/screenshots" / f"{name}.png") as expected:
+                    self.assertEqual(actual.size, expected.size)
+                    self.assertEqual(actual.convert("RGB").tobytes(), expected.convert("RGB").tobytes())
 
     def test_modified_index_and_apk_are_rejected(self):
         with tempfile.TemporaryDirectory(prefix="manida-fdroid-test-") as temporary:
