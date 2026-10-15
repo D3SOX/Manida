@@ -259,7 +259,7 @@ class LibrarySync(private val store: MusicStore, private val library: MusicLibra
         require(incoming.version == 1) { "Unsupported sync protocol" }
         require(incoming.deviceId != deviceId()) { "Cannot synchronize this device with itself" }
         val retained = store.read<SyncSnapshot>("sync:received:${incoming.deviceId}")
-        val snapshot = incoming.copy(
+        val merged = incoming.copy(
             tracks = (incoming.tracks + retained?.tracks.orEmpty()).distinctBy { it.key },
             favorites = (retained?.favorites.orEmpty() + incoming.favorites).groupBy { it.trackKey }.values.map { versions ->
                 versions.maxBy { it.revision }
@@ -277,6 +277,10 @@ class LibrarySync(private val store: MusicStore, private val library: MusicLibra
                 versions.reduce { previous, listen -> previous.copy(listenedMs = maxOf(previous.listenedMs, listen.listenedMs),
                     playedMs = maxOf(previous.playedMs, listen.playedMs), ended = previous.ended || listen.ended) }
             })
+        // Songs shared only for a playback transfer are dropped once nothing synced refers to them.
+        val references = (merged.favorites.map { it.trackKey } + merged.ratings.map { it.trackKey } + merged.listens.map { it.trackId } +
+            merged.playlists.flatMap { it.trackKeys } + merged.savedQueues.flatMap { it.trackKeys }).toSet() + incoming.tracks.map { it.key }
+        val snapshot = merged.copy(tracks = merged.tracks.filter { it.key in references })
         val tracks = library.tracks()
         val ownDeviceId = deviceId()
         val tracksById = tracks.associateBy { it.id }

@@ -589,6 +589,27 @@ class LibrarySyncTest {
     }
 
     @Test
+    fun songsSharedOnlyForAPlaybackTransferStopWaitingForAMatchAfterTheNextSync() = runBlocking {
+        val directory = Files.createTempDirectory("manida-library-sync-transfer-songs")
+        val firstStore = openMusicStore(directory.resolve("phone.db").toString())
+        val secondStore = openMusicStore(directory.resolve("desktop.db").toString())
+        try {
+            val first = MusicLibrary(firstStore)
+            val second = MusicLibrary(secondStore)
+            val queued = first.importTrack(TrackMetadata("Queued", durationMs = 180_000), TrackSource("local:queued", SourceKind.LOCAL, "/phone/queued.mp3"))
+            val favorite = first.importTrack(TrackMetadata("Favorite", durationMs = 180_000), TrackSource("local:favorite", SourceKind.LOCAL, "/phone/favorite.mp3"))
+            first.setFavorite(favorite.id, true)
+            val phoneSync = LibrarySync(firstStore, first)
+            val desktopSync = LibrarySync(secondStore, second)
+            desktopSync.merge(phoneSync.snapshot(additionalTracks = setOf(queued.id)))
+            assertEquals(setOf(queued.id, favorite.id), desktopSync.unmatched().map { it.track.key }.toSet())
+            desktopSync.merge(phoneSync.snapshot())
+            assertEquals(listOf(favorite.id), desktopSync.unmatched().map { it.track.key })
+            Unit
+        } finally { firstStore.close(); secondStore.close(); directory.toFile().deleteRecursively() }
+    }
+
+    @Test
     fun unidentifiedSongsWaitForAnExplicitMappingWhichSurvivesRestart() = runBlocking {
         val directory = Files.createTempDirectory("manida-library-sync-unmatched")
         val firstStore = openMusicStore(directory.resolve("phone.db").toString())
