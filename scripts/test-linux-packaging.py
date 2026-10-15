@@ -62,14 +62,14 @@ class LinuxPackagingTest(unittest.TestCase):
                                      "--signing-key", fingerprint], capture_output=True, text=True, timeout=60)
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
             repository = site / "arch/x86_64"
-            self.assertIn("Your music.", (site / "index.html").read_text())
+            self.assertIn("Your music, your queue", (site / "index.html").read_text())
             self.assertIn(fingerprint, (site / "index.html").read_text())
             self.assertNotIn("5948F17F1611CC2B995BC6121F0D542126D514AB", (site / "index.html").read_text())
             self.assertIn("FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B",
                           (site / "index.html").read_text())
             for screenshot in ["home", "now-playing", "queue", "audio-effects"]:
                 self.assertTrue((site / f"assets/screenshots/{screenshot}.png").is_file())
-            self.assertTrue((site / "theme.js").is_file())
+            self.assertTrue((site / "script.js").is_file())
             self.assertTrue((site / "assets/fdroid-qr-dark.png").is_file())
             self.assertFalse(any(path.is_symlink() for path in site.rglob("*")), "Pages artifacts must contain regular files")
             package = next(repository.glob("*.pkg.tar.zst"))
