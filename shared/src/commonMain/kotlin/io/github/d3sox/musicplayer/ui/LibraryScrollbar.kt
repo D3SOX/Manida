@@ -65,6 +65,10 @@ private fun BoxScope.FastScrollbar(count: Int, first: Int, visible: Int, scrolla
     val scope = rememberCoroutineScope()
     val scroll by rememberUpdatedState(scrollTo)
     val describe by rememberUpdatedState(label)
+    // Semantics rerun as soon as the label changes, before this lambda is replaced, so read the size and position
+    // from the same snapshot instead of this composition's values. Otherwise a shrinking list indexes past its end.
+    val size by rememberUpdatedState(count)
+    val position by rememberUpdatedState(first)
     var scrollJob by remember { mutableStateOf<Job?>(null) }
     var dragging by remember { mutableStateOf(false) }
     var target by remember { mutableIntStateOf(0) }
@@ -86,9 +90,9 @@ private fun BoxScope.FastScrollbar(count: Int, first: Int, visible: Int, scrolla
     Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(16.dp).onSizeChanged { height = it.height }
         .semantics {
             contentDescription = description
-            stateDescription = describe(first.coerceIn(0, count - 1))
-            progressBarRangeInfo = ProgressBarRangeInfo(first.toFloat(), 0f..(count - 1).toFloat())
-            setProgress { value -> scope.launch { scroll(value.roundToInt().coerceIn(0, count - 1)) }; true }
+            stateDescription = describe(position.coerceIn(0, size - 1))
+            progressBarRangeInfo = ProgressBarRangeInfo(position.toFloat(), 0f..(size - 1).toFloat())
+            setProgress { value -> scope.launch { scroll(value.roundToInt().coerceIn(0, size - 1)) }; true }
         }.pointerInput(count) { detectTapGestures { move(it.y) } }.pointerInput(count) {
             detectVerticalDragGestures(onDragStart = { move(it.y); dragging = true },
                 onDragEnd = { dragging = false }, onDragCancel = { dragging = false },

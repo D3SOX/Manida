@@ -45,6 +45,19 @@ class MilkDropPresetsUiTest {
         }
     }
 
+    @Test fun filteringAScrolledListToFewerPresetsKeepsTheFastScrollbarInRange() {
+        val presets = (0..199).map { io.github.d3sox.musicplayer.visualizer.MilkDropPresetInfo("Preset $it", "Collection") }
+        val settings = mutableStateOf(MilkDropSettings(automatic = false, favorites = presets.take(20).map { it.id }.toSet()))
+        runComposeUiTest {
+            setContent { MaterialTheme { MilkDropControls(presets, 0, {}, settings.value, { update -> settings.value = update(settings.value) }) } }
+            onNodeWithContentDescription("Choose MilkDrop preset").performClick()
+            onNode(hasScrollToIndexAction()).performScrollToIndex(150)
+            onNodeWithText("Favorites").performClick()
+            onNodeWithText("20 presets").assertIsDisplayed()
+            onNodeWithContentDescription("Scroll MilkDrop presets").assertExists()
+        }
+    }
+
     @Test fun thousandsOfPresetsCanBeFilteredSearchedAndSelectedWithoutChangingTheirIndex() {
         val root = File(System.getProperty("musicplayer.testRoot"), "shared/build/milkdrop-tests").apply { mkdirs() }
         val directory = Files.createTempDirectory(root.toPath(), "picker").toFile()
