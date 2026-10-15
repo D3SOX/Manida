@@ -26,6 +26,21 @@ reports = ROOT / "androidApp/build/outputs/androidTest-results/connected/debug"
 output = ROOT / ".test-environment/android-class-results"
 shutil.rmtree(output, ignore_errors=True)
 output.mkdir(parents=True)
+api = int(subprocess.run(["adb", "-s", serial, "shell", "getprop", "ro.build.version.sdk"],
+                         capture_output=True, text=True, check=True).stdout.strip())
+SUPPRESS = re.compile(r"@SdkSuppress\(minSdkVersion = (\d+)\)")
+
+
+def expected_cases(name):
+    """Count the tests a class should run on this API, so a run that silently executes nothing still fails."""
+    header, _, body = (sources / f"{name}.kt").read_text().partition("class " + name)
+    if max(map(int, SUPPRESS.findall(header)), default=0) > api:
+        return 0
+    annotated = re.findall(r"((?:@\w+(?:\([^)]*\))?\s+)+)fun ", body)
+    return sum(1 for annotations in annotated if "@Test" in annotations
+               and max(map(int, SUPPRESS.findall(annotations)), default=0) <= api)
+
+
 failed = []
 flaky = []
 executed = 0
@@ -46,7 +61,8 @@ def run(name, attempt):
     if reports.exists():
         shutil.copytree(reports, output / (name if attempt == 1 else f"{name}-attempt{attempt}"))
     print("::endgroup::", flush=True)
-    ok = result.returncode == 0 and all(case.get("classname") == "me.d3sox.manida." + name for case in cases)
+    ok = (result.returncode == 0 and (cases or expected_cases(name) == 0)
+          and all(case.get("classname") == "me.d3sox.manida." + name for case in cases))
     return cases if ok else None
 
 
