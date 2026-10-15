@@ -1,10 +1,30 @@
 name: Tests
 on:
   pull_request:
+    # Workflow-only edits get CodeQL analysis; manual runs still exercise the full suites.
+    paths:
+      - androidApp/**
+      - desktopApp/**
+      - shared/**
+      - native/**
+      - gradle/**
+      - '*.gradle.kts'
+      - gradle.properties
+      - gradlew
+      - gradlew.bat
+      - scripts/**
+      - '!scripts/package-website.py'
+      - packaging/**
+      - '!packaging/screenshots/**'
+      - '!packaging/fdroid-qr*.png'
+      - .fdroid.yml
   workflow_call:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   desktop:
     runs-on: ubuntu-24.04
