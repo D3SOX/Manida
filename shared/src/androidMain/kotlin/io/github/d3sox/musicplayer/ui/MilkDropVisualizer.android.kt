@@ -181,7 +181,8 @@ class MilkDropRenderer(private val library: MilkDropLibrary, initialSelected: In
     private var width = 1
     private var height = 1
     private var loaded = -1
-    private var failed = false
+    var failed = false
+        private set
     private val closed = AtomicBoolean(false)
     private val active = AtomicBoolean(false)
     private var changedAt = 0L
@@ -320,9 +321,16 @@ class MilkDropTextureView(context: Context, library: MilkDropLibrary, selected: 
     }
     override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
 
+    /** However the render thread ends, nothing draws on this surface anymore, so stop reading audio. */
+    private fun stopped() {
+        val ended = Thread.currentThread()
+        // A replaced surface already has a newer thread, which this one must not stop.
+        post { if (thread === ended) update { running = false } }
+    }
+
     private fun render(texture: SurfaceTexture) {
         val display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
-        if (!EGL14.eglInitialize(display, null, 0, null, 0)) return
+        if (!EGL14.eglInitialize(display, null, 0, null, 0)) { stopped(); return }
         var glContext = EGL14.EGL_NO_CONTEXT
         var surface = EGL14.EGL_NO_SURFACE
         try {
@@ -347,9 +355,12 @@ class MilkDropTextureView(context: Context, library: MilkDropLibrary, selected: 
                 } ?: break
                 if (next != size) { size = next; renderer.onSurfaceChanged(null, next.first, next.second) }
                 renderer.onDrawFrame(null)
+                // A failed renderer draws nothing, so stop instead of swapping empty frames.
+                if (renderer.failed) break
                 EGL14.eglSwapBuffers(display, surface)
             }
         } finally {
+            stopped()
             renderer.release()
             EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
             if (surface != EGL14.EGL_NO_SURFACE) EGL14.eglDestroySurface(display, surface)
