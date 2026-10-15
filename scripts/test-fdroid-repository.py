@@ -7,7 +7,7 @@ import shutil
 import tempfile
 import unittest
 
-from PIL import Image
+from PIL import Image, ImageOps
 from pyzbar.pyzbar import decode
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -38,11 +38,14 @@ class FdroidRepositoryTest(unittest.TestCase):
                 repository.verify_repository(copy)
 
     def test_the_branded_qr_pins_the_repository_key_at_readme_size(self):
-        expected = repository.REPO_URL + "?fingerprint=" + repository.fingerprint()
-        for size in [488, 280]:
-            with self.subTest(size=size):
-                image = Image.open(ROOT / "packaging/fdroid-qr.png").resize((size, size), Image.Resampling.NEAREST)
-                self.assertEqual([expected], [code.data.decode() for code in decode(image)])
+        expected = repository.REPO_DEEP_LINK + "?fingerprint=" + repository.fingerprint()
+        for name in ["fdroid-qr.png", "fdroid-qr-light.png", "fdroid-qr-dark.png"]:
+            for size in [520, 280]:
+                with self.subTest(name=name, size=size):
+                    image = Image.open(ROOT / "packaging" / name).resize((size, size), Image.Resampling.NEAREST)
+                    if name == "fdroid-qr-dark.png":
+                        image = ImageOps.invert(image)
+                    self.assertEqual([expected], [code.data.decode() for code in decode(image)])
 
 
 if __name__ == "__main__":

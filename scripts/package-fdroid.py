@@ -17,6 +17,7 @@ from loguru import logger
 
 ROOT = Path(__file__).resolve().parent.parent
 REPO_URL = "https://manida.d3sox.me/fdroid/repo"
+REPO_DEEP_LINK = "fdroidrepos://manida.d3sox.me/fdroid/repo"
 APP_ID = "me.d3sox.manida"
 
 
@@ -94,8 +95,8 @@ def repository(apk: Path, output: Path, keystore: Path):
 <title>Manida F-Droid repository</title>
 <style>body{{font:18px system-ui;line-height:1.6;max-width:48rem;margin:3rem auto;padding:0 1rem;background:#19151e;color:#f4edf9}}a{{color:#d8baff}}code{{overflow-wrap:anywhere}}</style>
 <h1>Manida for Android</h1><p>Manida is in alpha. Add this repository to F-Droid for signed releases and updates.</p>
-<p><a href="{REPO_URL}?fingerprint={fingerprint}">Add the Manida repository to F-Droid</a></p>
-<a href="{REPO_URL}?fingerprint={fingerprint}"><img src="fdroid-qr.png" width="280" height="280" alt="Scan to add Manida to F-Droid"></a>
+<p><a href="{REPO_DEEP_LINK}?fingerprint={fingerprint}">Add the Manida repository to F-Droid</a></p>
+<a href="{REPO_DEEP_LINK}?fingerprint={fingerprint}"><img src="fdroid-qr.png" width="280" height="280" alt="Scan to add Manida to F-Droid"></a>
 <p>Repository: <code>{REPO_URL}</code><br>SHA-256 fingerprint: <code>{fingerprint}</code></p>
 <p><a href="https://github.com/D3SOX/Manida#android">APK downloads and Obtainium</a> · <a href="/">Linux installation</a></p>
 </html>''')

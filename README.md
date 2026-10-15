@@ -7,7 +7,7 @@
       <img src="https://manida-badges.withered-flower-f0f2.workers.dev/github-light.svg" alt="Download Manida from GitHub Releases" width="158" height="52">
     </picture>
   </a>&nbsp;
-  <a href="https://manida.d3sox.me/fdroid/repo?fingerprint=FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B">
+  <a href="https://fdroid.link/#https://manida.d3sox.me/fdroid/repo?fingerprint=FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://manida-badges.withered-flower-f0f2.workers.dev/fdroid-dark.svg">
       <img src="https://manida-badges.withered-flower-f0f2.workers.dev/fdroid-light.svg" alt="Add Manida&#x27;s F-Droid repository" width="158" height="52">
@@ -19,7 +19,7 @@
       <img src="https://manida-badges.withered-flower-f0f2.workers.dev/obtainium-light.svg" alt="Install Manida with Obtainium" width="158" height="52">
     </picture>
   </a>&nbsp;
-  <a href="https://manida.d3sox.me">
+  <a href="#arch-linux">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://manida-badges.withered-flower-f0f2.workers.dev/archlinux-dark.svg">
       <img src="https://manida-badges.withered-flower-f0f2.workers.dev/archlinux-light.svg" alt="Add Manida&#x27;s Arch Linux repository" width="158" height="52">
@@ -76,7 +76,7 @@ Download an APK from [GitHub Releases](https://github.com/D3SOX/Manida/releases)
 Scan this QR code in F-Droid to add the repository with its signing fingerprint:
 
 <p align="center">
-<a href="https://manida.d3sox.me/fdroid/repo?fingerprint=FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B">
+<a href="https://fdroid.link/#https://manida.d3sox.me/fdroid/repo?fingerprint=FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="packaging/fdroid-qr-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="packaging/fdroid-qr-light.png">
@@ -219,5 +219,5 @@ The bundled presets and textures retain their upstream authorship and notices, i
 
 The README badges use [Simple Icons](https://simpleicons.org/) and [Roboto](https://github.com/googlefonts/roboto-classic) lettering rendered as SVG paths.
 
-[fdroid-repository]: https://manida.d3sox.me/fdroid/repo?fingerprint=FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B
+[fdroid-repository]: https://fdroid.link/#https://manida.d3sox.me/fdroid/repo?fingerprint=FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B
 [obtainium-install]: https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22me.d3sox.manida%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FD3SOX%2FManida%22%2C%22author%22%3A%22D3SOX%22%2C%22name%22%3A%22Manida%22%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5EManida%20%5B0-9%5D%2B%5B.%5D%5B0-9%5D%2B%5B.%5D%5B0-9%5D%2B%24%5C%22%7D%22%7D
