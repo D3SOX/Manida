@@ -37,16 +37,16 @@ SUPPRESS = re.compile(r"@SdkSuppress\(minSdkVersion = (\d+)\)")
 
 
 def expected_cases(name, api=float("inf")):
-    """Count the tests a class should run on this API, so a run that silently executes nothing still fails."""
+    """Find the test names that must report a result on this API, including runtime skips."""
     header, _, body = (sources / f"{name}.kt").read_text().partition("class " + name)
     if max(map(int, SUPPRESS.findall(header)), default=0) > api:
-        return 0
-    annotated = re.findall(r"((?:@\w+(?:\([^)]*\))?\s+)+)fun ", body)
-    return sum(1 for annotations in annotated if "@Test" in annotations
-               and max(map(int, SUPPRESS.findall(annotations)), default=0) <= api)
+        return set()
+    annotated = re.findall(r"((?:@\w+(?:\([^)]*\))?\s+)+)fun (\w+)\(", body)
+    return {method for annotations, method in annotated if "@Test" in annotations
+            and max(map(int, SUPPRESS.findall(annotations)), default=0) <= api}
 
 
-weights = {name: 1 + expected_cases(name) for name in classes}
+weights = {name: 1 + len(expected_cases(name)) for name in classes}
 
 
 def distribute(count):
@@ -119,9 +119,13 @@ def run(name, attempt):
              for case in ET.parse(report).getroot().findall(".//testcase")]
     completed = [case for case in cases if case.find("skipped") is None]
     expected = expected_cases(name, api)
-    if len(completed) != expected:
-        print(f"{name}: expected {expected} tests, received {len(completed)} results", flush=True)
-    ok = (process.returncode == 0 and len(completed) == expected
+    # Runtime assumptions still produce a result. Only API-suppressed skips are optional.
+    reported = [case.get("name") for case in cases
+                if case.get("name") in expected or case.find("skipped") is None]
+    complete = len(reported) == len(expected) and set(reported) == expected
+    if not complete:
+        print(f"{name}: expected {sorted(expected)}, received {reported}", flush=True)
+    ok = (process.returncode == 0 and complete
           and all(case.get("classname") == "me.d3sox.manida." + name
                   and case.find("failure") is None and case.find("error") is None for case in cases))
     return completed if ok else None

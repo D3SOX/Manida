@@ -45,7 +45,7 @@ if not retry:
     count = 1 if os.environ.get('PARTIAL') == 'true' else source.read_text().count('@Test')
     for index in range(count):
         case = ET.SubElement(suite, 'testcase', classname=name, name=f'example{index}')
-        if os.environ.get('SKIPPED') == 'true':
+        if os.environ.get('SKIPPED') == 'true' or os.environ.get('SKIPPED_INDEX') == str(index):
             ET.SubElement(case, 'skipped')
 ET.ElementTree(suite).write(reports / 'TEST-example.xml')
 """)
@@ -154,6 +154,23 @@ ET.ElementTree(suite).write(reports / 'TEST-example.xml')
         result = self.run_suite(SKIPPED="true")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("Passed 0 Android checks", result.stdout)
+
+    def test_runtime_skip_counts_as_a_reported_result_but_not_an_executed_test(self):
+        self.source("AndroidExampleTest", tests=2)
+        result = self.run_suite(SKIPPED_INDEX="0")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Passed 1 Android checks", result.stdout)
+        self.assertEqual(1, len((self.root / "invocations").read_text().splitlines()))
+
+    def test_api_suppressed_method_cannot_mask_a_missing_result(self):
+        self.source("AndroidExampleTest", tests=2)
+        path = self.root / SOURCES / "AndroidExampleTest.kt"
+        path.write_text(path.read_text().replace("@Test\nfun example0", "@SdkSuppress(minSdkVersion = 37)\n@Test\nfun example0"))
+        result = self.run_suite(SKIPPED_INDEX="0")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Passed 1 Android checks", result.stdout)
+        result = self.run_suite(SKIPPED_INDEX="0", PARTIAL="true")
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 if __name__ == "__main__":
