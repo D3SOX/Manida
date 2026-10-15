@@ -65,3 +65,28 @@ suspend fun milkDropLibrary(directory: File): MilkDropLibrary = presetPreparatio
     }.thenBy { it.name.lowercase() }),
         File(bundled, "textures"))
 }
+
+private val milkDropCodeKey = Regex("""(per_frame_init_|per_frame_|per_pixel_|(?:wave|shape)_\d+_(?:init|per_frame|per_point))(\d+)""")
+
+/**
+ * Rewrites a preset's expression code the way MilkDrop read it: without comments and with its lines joined directly.
+ * Some presets split a number or name across two lines, which projectM rejects because it keeps the line breaks.
+ * Returns null when no code spans several lines.
+ */
+fun milkDropJoinedCode(preset: String): String? {
+    val values = linkedMapOf<String, String>()
+    val other = mutableListOf<String>()
+    for (line in preset.lines()) {
+        // projectM reads a key up to the first space or equals sign and keeps its first value.
+        val delimiter = line.indexOfFirst { it == ' ' || it == '=' }
+        val key = if (delimiter > 0) line.substring(0, delimiter) else ""
+        if (milkDropCodeKey.matches(key)) values.putIfAbsent(key, line.substring(delimiter + 1))
+        else other += line
+    }
+    val code = values.keys.mapNotNull { milkDropCodeKey.matchEntire(it)?.groupValues?.get(1) }.distinct().associateWith { prefix ->
+        generateSequence(1) { it + 1 }.map { values["$prefix$it"] }.takeWhile { it != null }
+            .joinToString("") { it!!.substringBefore("//").trimEnd('\r') }
+    }
+    if (code.keys.none { values.containsKey("${it}2") }) return null
+    return (other + code.map { (prefix, text) -> "${prefix}1=$text" }).joinToString("\n")
+}

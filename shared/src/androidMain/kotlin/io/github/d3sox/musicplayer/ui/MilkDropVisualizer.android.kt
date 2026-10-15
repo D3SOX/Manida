@@ -202,7 +202,7 @@ class MilkDropRenderer(private val library: MilkDropLibrary, initialSelected: In
             val next = selected.get()
             if (loaded != next) {
                 try {
-                    ProjectMNative.load(handle, presets[next].file.path, loaded >= 0)
+                    ProjectMNative.loadPreset(handle, presets[next].file, loaded >= 0)
                     error(null)
                 } catch (failure: IllegalStateException) {
                     error("${presets[next].name} could not be loaded. Choose another preset.")

@@ -73,6 +73,12 @@ class AndroidMilkDropTest {
                                 // Beat-gated and feedback presets can stay black for this steady test tone.
                                 if (preset in visiblePresets) assertTrue("${preset.name} must render the player's audio", colored > 50)
                             }
+                            // These presets split numbers across code lines, which only MilkDrop's line joining accepts.
+                            for (name in listOf("Idiot24-7-mindbender7(superbendmix1)",
+                                "Liquid Glowsticks - ATwisted Pre Set Mix By AdamFX 2 martin - disco mix Ft Hexocollie 27")) {
+                                ProjectMNative.loadPreset(handle, library.presets.single { it.name == name }.file, true)
+                                repeat(4) { ProjectMNative.render(handle, samples, 320, 240) }
+                            }
                         } finally { ProjectMNative.destroy(handle) }
                     }
                 } finally {

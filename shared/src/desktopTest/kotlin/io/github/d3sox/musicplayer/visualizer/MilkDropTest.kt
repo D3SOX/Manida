@@ -68,6 +68,27 @@ class MilkDropTest {
         } finally { directory.deleteRecursively() }
     }
 
+    @Test fun presetsThatSplitCodeAcrossLinesLoadAsInMilkDrop() = runBlocking {
+        assertEquals("fRating=5\nper_frame_1=a=bass*.34; b=1;\nper_pixel_1=rot=0;", milkDropJoinedCode(
+            "fRating=5\nper_frame_1=a=bass*.\r\nper_frame_2=34; // comment\nper_frame_3=b=1;\nper_frame_5=ignored=1;\nper_pixel_1=rot=0;"))
+        assertNull(milkDropJoinedCode("per_frame_1=a=1;\nper_pixel_1=b=2;"))
+        ProjectMNative.initialize()
+        val directory = testDirectory("split-code")
+        try {
+            val library = milkDropLibrary(directory)
+            val handle = ProjectMNative.create(320, 240, true, library.textures.path)
+            try {
+                for (name in listOf("Idiot24-7-mindbender7(superbendmix1)",
+                    "Liquid Glowsticks - ATwisted Pre Set Mix By AdamFX 2 martin - disco mix Ft Hexocollie 27")) {
+                    val preset = library.presets.single { it.name == name }
+                    assertFailsWith<IllegalStateException> { ProjectMNative.load(handle, preset.file.path, false) }
+                    ProjectMNative.loadPreset(handle, preset.file, false)
+                    assertEquals(0, ProjectMNative.render(handle, FloatArray(2048), 320, 240))
+                }
+            } finally { ProjectMNative.destroy(handle) }
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test fun theWholeLibraryUnpacksOnceAndPreservesCustomPresetsAndRecoversInterruptedPreparation() = runBlocking {
         val directory = testDirectory("library")
         try {
