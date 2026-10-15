@@ -107,6 +107,9 @@ class FileEditingUiTest {
                 onNodeWithContentDescription("Track options: Northern Light").performClick()
                 onNodeWithText("File actions").performClick()
                 onNodeWithText("Edit tags").performClick()
+                waitUntil(timeoutMillis = 3_000) {
+                    onAllNodes(hasText("Year") and hasSetTextAction()).fetchSemanticsNodes().isNotEmpty()
+                }
                 onNode(hasText("Year") and hasSetTextAction()).performScrollTo().performTextReplacement("10000")
                 onNodeWithText("Save changes").assertIsNotEnabled()
                 onNode(hasText("Year") and hasSetTextAction()).performTextReplacement("2026")

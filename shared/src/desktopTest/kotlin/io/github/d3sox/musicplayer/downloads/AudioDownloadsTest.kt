@@ -188,11 +188,13 @@ class AudioDownloadsTest {
             var library = MusicLibrary(store)
             var downloads = AudioDownloads(store, library, client, directory.resolve("audio").toString())
             val ids = mutableMapOf<String, String>()
-            for (id in listOf("a-replayed", "b-old")) {
+            // markUsed must make a-replayed newer than b-old, independent of download timing.
+            for ((index, id) in listOf("a-replayed", "b-old").withIndex()) {
                 val song = ServerSong(id, TrackMetadata(id), "flac", 4)
                 val track = library.importTrack(song.metadata, TrackSource(id, SourceKind.SERVER, id))
                 ids[id] = track.id
-                downloads.download(track.id, song)
+                val record = downloads.download(track.id, song)
+                store.put("download:${track.id}", "downloads", record.copy(lastUsedAt = index.toLong()))
             }
             downloads.markUsed(ids.getValue("a-replayed"))
             val newest = ServerSong("c-new", TrackMetadata("c-new"), "flac", 4)
