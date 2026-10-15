@@ -21,6 +21,9 @@ import io.github.d3sox.musicplayer.library.MusicLibrary
 import io.github.d3sox.musicplayer.library.TrackMetadata
 import io.github.d3sox.musicplayer.library.TrackSource
 import io.github.d3sox.musicplayer.library.SourceKind
+import io.github.d3sox.musicplayer.library.LocalFileEdit
+import io.github.d3sox.musicplayer.library.LocalFileEdits
+import io.github.d3sox.musicplayer.library.MusicFileEdits
 import io.github.d3sox.musicplayer.storage.openMusicStore
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.images.ArtworkFactory
@@ -35,6 +38,42 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
 
 class ArtworkLibraryTest {
+    @Test
+    fun artworkChangesDuringARefreshAreNotReplacedByItsOlderSnapshot() = runBlocking {
+        val directory = Files.createTempDirectory("refresh-artwork-change")
+        val store = openMusicStore(directory.resolve("library.db").toString())
+        val library = MusicLibrary(store)
+        val covers = ArtworkLibrary(directory.resolve("artwork").toString())
+        val track = library.importTrack(TrackMetadata("Changing cover"), TrackSource("cover", SourceKind.LOCAL, "/music/song.flac"))
+        val marker = LocalFileEdit("ready", track.id, "", "", "", "", "", 0)
+        var changeDuringRefresh: (suspend () -> Unit)? = null
+        val edits = object : MusicFileEdits by LocalFileEdits(store, library, directory.resolve("edits").toString()) {
+            override suspend fun history(): List<LocalFileEdit> {
+                val change = changeDuringRefresh
+                changeDuringRefresh = null
+                change?.invoke()
+                return listOf(marker)
+            }
+        }
+        val controller = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"), artwork = covers, fileEdits = edits)
+        try {
+            withTimeout(3_000) { controller.state.first { it.fileEdits == listOf(marker) } }
+            val bytes = ByteArrayOutputStream().also { ImageIO.write(BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB), "png", it) }.toByteArray()
+            changeDuringRefresh = {
+                covers.save(track.id, bytes)
+                withTimeout(3_000) { controller.state.first { it.artwork[track.id] != null } }
+            }
+            controller.refresh()
+            assertEquals(covers.path(track.id), controller.state.value.artwork[track.id])
+            changeDuringRefresh = {
+                covers.remove(track.id)
+                withTimeout(3_000) { controller.state.first { track.id !in it.artwork } }
+            }
+            controller.refresh()
+            assertEquals(null, controller.state.value.artwork[track.id])
+        } finally { controller.closeAndJoin(); store.close(); directory.toFile().deleteRecursively() }
+    }
+
     @Test
     fun artworkArrivingDuringLibraryUseAppearsWithoutWaitingForAnotherRefresh() = runBlocking {
         val directory = Files.createTempDirectory("progressive-library-cover")
