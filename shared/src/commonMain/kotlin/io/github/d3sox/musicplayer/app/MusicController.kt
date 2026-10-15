@@ -22,6 +22,7 @@ import io.github.d3sox.musicplayer.queue.QueueSnapshot
 import io.github.d3sox.musicplayer.queue.SavedQueue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.NonCancellable
@@ -126,6 +127,7 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
     private val mutableNotices = MutableSharedFlow<ActionNotice>(extraBufferCapacity = 16,
         onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST)
     private val operations = Mutex()
+    private val artworkUpdates = Mutex()
     private val transport = Mutex()
     private data class TransportIntent(val revision: Long = 0, val play: Boolean = false)
     private val transportIntent = MutableStateFlow(TransportIntent())
@@ -262,9 +264,11 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
                 }
             }
         })
-        artwork?.let { covers -> scope.launch {
+        artwork?.let { covers -> scope.launch(start = CoroutineStart.UNDISPATCHED) {
             covers.changes.collect { (id, path) ->
-                mutableState.update { it.copy(artwork = if (path == null) it.artwork - id else it.artwork + (id to path)) }
+                artworkUpdates.withLock {
+                    mutableState.update { it.copy(artwork = if (path == null) it.artwork - id else it.artwork + (id to path)) }
+                }
             }
         } }
         scope.launch { queue.observeSaved().collect { operations.withLock {
@@ -434,14 +438,16 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
         val savedQueues = queue.saved()
         val profile = navidrome?.profile()
         val collections = playlists?.all().orEmpty()
-        val covers = artwork?.paths(tracks.map { it.id } + collections.map { "playlist:${it.id}" }).orEmpty()
         val editHistory = (fileEdits?.history().orEmpty() + serverFiles?.history().orEmpty()).sortedBy { it.createdAt }
         val listens = listeningHistory?.all().orEmpty()
         val sftp = serverFiles?.configuration()
         val uploads = serverFiles?.pendingUploads().orEmpty()
-        mutableState.update { it.copy(savedQueues = savedQueues, loading = loading, server = profile,
-            playlists = collections, artwork = covers, fileEdits = editHistory, listens = listens,
-            sftp = sftp, serverUploads = uploads) }
+        artworkUpdates.withLock {
+            val covers = artwork?.paths(tracks.map { it.id } + collections.map { "playlist:${it.id}" }).orEmpty()
+            mutableState.update { it.copy(savedQueues = savedQueues, loading = loading, server = profile,
+                playlists = collections, artwork = covers, fileEdits = editHistory, listens = listens,
+                sftp = sftp, serverUploads = uploads) }
+        }
     }
     suspend fun serverMusicDirectories() = requireNotNull(serverFiles) { "Server file editing is unavailable" }.libraries()
     suspend fun connectServerFiles(profile: SftpProfile, libraryId: Long, authentication: SftpAuthentication) {
