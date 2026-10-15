@@ -99,6 +99,18 @@ Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_load(JNIEnv* env, job
     } catch (const std::exception& error) { fail(env, error); }
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_loadData(JNIEnv* env, jobject, jlong handle, jbyteArray preset, jboolean smooth) {
+    try {
+        auto& visualizer = instance(handle);
+        std::string data(static_cast<size_t>(env->GetArrayLength(preset)), '\0');
+        env->GetByteArrayRegion(preset, 0, static_cast<jsize>(data.size()), reinterpret_cast<jbyte*>(data.data()));
+        visualizer.error.clear();
+        projectm_load_preset_data(visualizer.engine, data.c_str(), smooth);
+        if (!visualizer.error.empty()) throw std::runtime_error(visualizer.error);
+    } catch (const std::exception& error) { fail(env, error); }
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_render(JNIEnv* env, jobject, jlong handle, jfloatArray pcm, jint width, jint height, jboolean animate) {
     try {

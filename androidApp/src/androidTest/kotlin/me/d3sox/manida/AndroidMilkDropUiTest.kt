@@ -51,7 +51,7 @@ class AndroidMilkDropUiTest {
                 compose.onNodeWithContentDescription("Change presets automatically").performClick()
                 compose.onNodeWithText("Unlock preset").assertExists()
                 runBlocking { app.controller.setQueueRepeat(io.github.d3sox.musicplayer.playback.RepeatMode.ONE).join(); app.controller.togglePlayback().join() }
-                compose.onNodeWithText("Next preset").performClick()
+                compose.onNodeWithContentDescription("Next preset").performClick()
                 val presets = runBlocking { milkDropLibrary(File(app.filesDir, "milkdrop")) }.presets
                 compose.onNodeWithText(presets[1].name).assertExists()
                 compose.onNodeWithContentDescription("Choose MilkDrop preset").performClick()
@@ -94,5 +94,64 @@ class AndroidMilkDropUiTest {
                 compose.waitUntil(15_000) { !VisualizerPcm.enabled }
             }
         } finally { runBlocking { app.controller.pause().join() }; file.delete() }
+    }
+
+    @Test fun theVisualizerCanAnimateBehindTheNowPlayingScreenOnlyWhileItIsVisible() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val app = instrumentation.targetContext.applicationContext as MusicApplication
+        val file = File(app.filesDir, "milkdrop-background.wav")
+        instrumentation.context.assets.open("fixture.wav").use { input -> file.outputStream().use { input.copyTo(it) } }
+        val preset = runBlocking { milkDropLibrary(File(app.filesDir, "milkdrop")) }.presets
+            .single { it.name == "Flexi + Rovastar - postcard from Fractopia" }
+        val track = runBlocking {
+            app.controller.updatePreferences { it.copy(precomputeWaveforms = false, milkDrop = io.github.d3sox.musicplayer.visualizer.MilkDropSettings(
+                selectedPresetId = preset.info.id, automatic = false, background = true, backgroundDim = 0f)) }.join()
+            app.controller.library.importTrack(TrackMetadata("MilkDrop background", artist = "Manida", durationMs = 2000),
+                TrackSource("milkdrop:background", SourceKind.LOCAL, file.toURI().toString())).also { app.controller.reload().join() }
+        }
+        fun shell(command: String) = android.os.ParcelFileDescriptor.AutoCloseInputStream(
+            instrumentation.uiAutomation.executeShellCommand(command)).use { it.readBytes() }
+        try {
+            ActivityScenario.launch(MainActivity::class.java).use {
+                compose.waitUntil(5_000) { app.controller.state.value.libraryReady }
+                runBlocking {
+                    app.controller.playTrack(track.id, listOf(track.id)).join()
+                    app.controller.setQueueRepeat(io.github.d3sox.musicplayer.playback.RepeatMode.ONE).join()
+                }
+                compose.onNodeWithTag("mini-player").performClick()
+                compose.waitUntil(60_000) { VisualizerPcm.enabled }
+                // The left margin beside the cover shows only the background.
+                val bounds = compose.onNodeWithTag("now-playing").fetchSemanticsNode().boundsInRoot
+                fun patch(): android.graphics.Bitmap {
+                    val screenshot = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+                    return android.graphics.Bitmap.createBitmap(screenshot, bounds.left.toInt() + 4,
+                        (bounds.top + bounds.height / 2).toInt(), 12, 120).also { screenshot.recycle() }
+                }
+                Thread.sleep(2_000)
+                val first = patch()
+                Thread.sleep(1_000)
+                val second = patch()
+                assertFalse("The background must animate while music plays", first.sameAs(second))
+                first.recycle(); second.recycle()
+                runBlocking { app.controller.updatePreferences { it.copy(milkDrop = it.milkDrop.copy(backgroundDim = 1f)) }.join() }
+                compose.waitForIdle()
+                Thread.sleep(500)
+                patch().let { dimmed ->
+                    val pixels = IntArray(dimmed.width * dimmed.height).also { dimmed.getPixels(it, 0, dimmed.width, 0, 0, dimmed.width, dimmed.height) }
+                    assertEquals("Full dimming must hide the background", 1, pixels.distinct().size)
+                    dimmed.recycle()
+                }
+                shell("input keyevent 3")
+                compose.waitUntil(15_000) { !VisualizerPcm.enabled }
+                shell("am start --user 0 -W --activity-single-top --activity-clear-top -n me.d3sox.manida/.MainActivity")
+                compose.waitUntil(15_000) { VisualizerPcm.enabled }
+                compose.onNodeWithContentDescription("Collapse").performClick()
+                compose.waitUntil(15_000) { !VisualizerPcm.enabled }
+            }
+        } finally {
+            runBlocking { app.controller.pause().join(); app.controller.updatePreferences { it.copy(
+                milkDrop = io.github.d3sox.musicplayer.visualizer.MilkDropSettings()) }.join() }
+            file.delete()
+        }
     }
 }

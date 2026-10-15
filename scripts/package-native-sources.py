@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ship the exact, verified source archives used by the projectM build."""
+"""Ship the exact, verified source archives used by the projectM build, with Manida's patch to projectM."""
 import argparse
 import hashlib
 from pathlib import Path
@@ -26,6 +26,7 @@ def package(output):
                 destination.unlink()
                 raise RuntimeError(f"Native source checksum mismatch for {name}")
         print("Verified " + destination.name)
+    shutil.copyfile(ROOT / "native/projectm-crossfade.cmake", output / "projectm-crossfade.cmake")
     mpv = source_archive()
     shutil.copyfile(mpv, output / mpv.name)
     print("Verified " + mpv.name)

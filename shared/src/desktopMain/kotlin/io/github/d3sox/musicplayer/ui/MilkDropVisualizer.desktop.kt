@@ -74,7 +74,7 @@ internal actual fun MilkDropVisualizer(state: AppState, controller: MusicControl
                     val preview = next != current && next in pool.get()
                     if (preview) {
                         try {
-                            ProjectMNative.load(handle, presets[next].file.path, current >= 0)
+                            ProjectMNative.loadPreset(handle, presets[next].file, current >= 0)
                             scope.launch { error = null }
                         } catch (failure: IllegalStateException) {
                             scope.launch { error = "${presets[next].name} could not be loaded. Choose another preset." }
@@ -116,3 +116,9 @@ internal actual fun MilkDropVisualizer(state: AppState, controller: MusicControl
         }
     }, confirmButton = { TextButton(onClick = close) { Text("Close visualizer") } })
 }
+
+// The desktop visualizer draws in its own native window, so it can't sit behind Compose content.
+internal actual val milkDropBackgroundSupported = false
+
+@Composable
+internal actual fun MilkDropBackground(state: AppState, controller: MusicController, modifier: Modifier) = Unit

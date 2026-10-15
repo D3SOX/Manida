@@ -5,6 +5,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.selectable
@@ -21,9 +22,16 @@ import io.github.d3sox.musicplayer.visualizer.MilkDropPresetInfo
 import io.github.d3sox.musicplayer.visualizer.MilkDropSettings
 import io.github.d3sox.musicplayer.visualizer.milkDropPlaybackIndices
 import io.github.d3sox.musicplayer.visualizer.milkDropNextPreset
+import io.github.d3sox.musicplayer.visualizer.milkDropRandomPreset
 import io.github.d3sox.musicplayer.app.AppState
 import io.github.d3sox.musicplayer.app.MusicController
 import io.github.d3sox.musicplayer.resources.Res
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 
 @Composable
@@ -31,6 +39,12 @@ internal fun MilkDropButton(open: () -> Unit) = AppIconButton(AppIcon.WAVEFORM, 
 
 @Composable
 internal expect fun MilkDropVisualizer(state: AppState, controller: MusicController, close: () -> Unit)
+
+/** Whether this platform can draw the visualizer behind the now playing screen. */
+internal expect val milkDropBackgroundSupported: Boolean
+
+@Composable
+internal expect fun MilkDropBackground(state: AppState, controller: MusicController, modifier: Modifier)
 
 @Composable
 internal fun MilkDropControls(presets: List<MilkDropPresetInfo>, selected: Int, select: (Int) -> Unit,
@@ -58,8 +72,14 @@ internal fun MilkDropControls(presets: List<MilkDropPresetInfo>, selected: Int, 
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { milkDropNextPreset(eligible, selected, -1)?.let(select) }, enabled = eligible.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("Previous preset") }
-                OutlinedButton(onClick = { milkDropNextPreset(eligible, selected)?.let(select) }, enabled = eligible.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("Next preset") }
+                listOf<Triple<String, String, () -> Int?>>(
+                    Triple("Previous", "Previous preset") { milkDropNextPreset(eligible, selected, -1) },
+                    Triple("Random", "Random preset") { milkDropRandomPreset(eligible, selected) },
+                    Triple("Next", "Next preset") { milkDropNextPreset(eligible, selected) },
+                ).forEach { (label, description, target) ->
+                    OutlinedButton(onClick = { target()?.let(select) }, enabled = eligible.isNotEmpty(),
+                        modifier = Modifier.weight(1f).semantics { contentDescription = description }) { Text(label, maxLines = 1) }
+                }
             }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -99,7 +119,22 @@ private fun MilkDropPresetPicker(presets: List<MilkDropPresetInfo>, selected: In
         } }
     }
     val list = rememberLazyListState()
-    LaunchedEffect(query, collection, category) { list.scrollToItem(0) }
+    var opened by remember { mutableStateOf(false) }
+    LaunchedEffect(query, collection, category) {
+        val position = matches.indexOf(selected)
+        if (opened || position < 0) { list.scrollToItem(0); opened = true; return@LaunchedEffect }
+        opened = true
+        // Center the current preset when the picker opens; later filter changes start from the top. Android's dialog
+        // window can resize just after its first layout, so briefly center again whenever the list's height changes.
+        withTimeoutOrNull(1_000) {
+            snapshotFlow { list.layoutInfo.viewportSize.height }.filter { it > 0 }.distinctUntilChanged().collectLatest { height ->
+                list.scrollToItem(position)
+                val item = snapshotFlow { list.layoutInfo.visibleItemsInfo.firstOrNull { it.index == position } }.filterNotNull().first()
+                // Near the end the list can't put the item at the top, so center it from where it actually is.
+                list.scrollBy(item.offset + item.size / 2f - list.layoutInfo.viewportStartOffset - height / 2f)
+            }
+        }
+    }
     AlertDialog(onDismissRequest = close, title = { Text("MilkDrop presets") }, text = {
         Column(Modifier.fillMaxWidth().heightIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), label = { Text("Search presets") }, singleLine = true)
