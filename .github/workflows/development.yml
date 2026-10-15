@@ -87,11 +87,12 @@ jobs:
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
         run: MANIDA_TEST_APP="$(find "$GITHUB_WORKSPACE/.test-environment/development" -name '*.AppImage' -print -quit)" python3 scripts/test-linux-player.py LinuxPlayerTest.test_packaged_player_registers_desktop_media_controls
-      - run: python3 scripts/package-native-sources.py --output .test-environment/development
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: development-linux
-          path: .test-environment/development/
+          path: |
+            .test-environment/development/*.AppImage
+            .test-environment/development/*.pkg.tar.zst
           if-no-files-found: error
   publish:
     needs: [android, linux]
@@ -113,7 +114,7 @@ jobs:
           cd development
           printf 'Development build from commit %s. Android installs as Manida dev. Linux packages replace Manida.\n' "$GITHUB_SHA" > notes.txt
           tag="development-$GITHUB_RUN_ID"
-          assets=(./*.apk ./*.tar.gz ./*.pkg.tar.zst ./*.AppImage ./PKGBUILD)
+          assets=(./*.apk ./*.pkg.tar.zst ./*.AppImage)
           if draft=$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null); then
             if [[ "$draft" == false ]]; then
               # A completed rerun must still match the published artifacts.
