@@ -45,6 +45,17 @@ class MilkDropPresetsUiTest {
         }
     }
 
+    @Test fun thePickerOpensCenteredOnTheCurrentPreset() {
+        val presets = (0..199).map { io.github.d3sox.musicplayer.visualizer.MilkDropPresetInfo("Preset $it", "Collection") }
+        runComposeUiTest {
+            setContent { MaterialTheme { MilkDropControls(presets, 150, {}, MilkDropSettings(automatic = false), {}) } }
+            onNodeWithContentDescription("Choose MilkDrop preset").performClick()
+            val list = onNode(hasScrollToIndexAction()).getBoundsInRoot()
+            val item = onNode(hasText("Preset 150") and hasAnyAncestor(hasScrollToIndexAction())).assertIsDisplayed().getBoundsInRoot()
+            assertEquals(((list.top + list.bottom) / 2).value, ((item.top + item.bottom) / 2).value, 2f)
+        }
+    }
+
     @Test fun thousandsOfPresetsCanBeFilteredSearchedAndSelectedWithoutChangingTheirIndex() {
         val root = File(System.getProperty("musicplayer.testRoot"), "shared/build/milkdrop-tests").apply { mkdirs() }
         val directory = Files.createTempDirectory(root.toPath(), "picker").toFile()

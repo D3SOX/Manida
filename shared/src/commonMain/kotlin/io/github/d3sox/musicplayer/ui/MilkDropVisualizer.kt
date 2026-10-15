@@ -5,6 +5,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.selectable
@@ -24,6 +25,12 @@ import io.github.d3sox.musicplayer.visualizer.milkDropNextPreset
 import io.github.d3sox.musicplayer.app.AppState
 import io.github.d3sox.musicplayer.app.MusicController
 import io.github.d3sox.musicplayer.resources.Res
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 
 @Composable
@@ -99,7 +106,21 @@ private fun MilkDropPresetPicker(presets: List<MilkDropPresetInfo>, selected: In
         } }
     }
     val list = rememberLazyListState()
-    LaunchedEffect(query, collection, category) { list.scrollToItem(0) }
+    var opened by remember { mutableStateOf(false) }
+    LaunchedEffect(query, collection, category) {
+        val position = matches.indexOf(selected)
+        if (opened || position < 0) { list.scrollToItem(0); opened = true; return@LaunchedEffect }
+        opened = true
+        // Center the current preset when the picker opens; later filter changes start from the top. Android's dialog
+        // window can resize just after its first layout, so briefly center again whenever the list's height changes.
+        withTimeoutOrNull(1_000) {
+            snapshotFlow { list.layoutInfo.viewportSize.height }.filter { it > 0 }.distinctUntilChanged().collectLatest { height ->
+                list.scrollToItem(position)
+                val item = snapshotFlow { list.layoutInfo.visibleItemsInfo.firstOrNull { it.index == position } }.filterNotNull().first()
+                list.scrollBy((item.size - height) / 2f)
+            }
+        }
+    }
     AlertDialog(onDismissRequest = close, title = { Text("MilkDrop presets") }, text = {
         Column(Modifier.fillMaxWidth().heightIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), label = { Text("Search presets") }, singleLine = true)
