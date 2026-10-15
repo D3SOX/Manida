@@ -28,8 +28,8 @@
   });
   apply();
 
-  const copyIcon = '<svg class="copy-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg>';
-  const checkIcon = '<svg class="check-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m7 12 3 3 7-7"/></svg>';
+  const copyIcon = '<svg class="icon copy-icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#content_copy"/></svg>';
+  const checkIcon = '<svg class="icon check-icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#check"/></svg>';
   const status = document.createElement("span");
   status.className = "sr-only";
   status.setAttribute("role", "status");
