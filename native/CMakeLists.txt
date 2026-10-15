@@ -7,7 +7,7 @@ set(CMAKE_BUILD_RPATH "$ORIGIN")
 set(CMAKE_INSTALL_RPATH "$ORIGIN")
 include(FetchContent)
 
-# projectM 4.1.8 and its exact evaluator revision. Both archives are verified.
+# projectM 4.1.8 and its exact evaluator revision. Both archives are verified, and projectm-crossfade.cmake patches projectM.
 set(ENABLE_SYSTEM_PROJECTM_EVAL OFF CACHE BOOL "" FORCE)
 set(ENABLE_PLAYLIST OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
@@ -20,7 +20,8 @@ FetchContent_Declare(projectm_eval
 FetchContent_MakeAvailable(projectm_eval)
 FetchContent_Declare(projectm
     URL https://codeload.github.com/projectM-visualizer/projectm/tar.gz/4967dc003e5206d7df3ff447287f7609c47d2343
-    URL_HASH SHA256=c9df02438e379191773bd1f019ce2391a1d645d00bfb559c183a801fb3f46e63)
+    URL_HASH SHA256=c9df02438e379191773bd1f019ce2391a1d645d00bfb559c183a801fb3f46e63
+    PATCH_COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/projectm-crossfade.cmake)
 function(add_projectm)
     # This release reads the outer project's version when generating its C API header.
     set(CMAKE_PROJECT_VERSION 4.1.8)
