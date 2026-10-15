@@ -28,7 +28,10 @@ jobs:
       name: github-pages
       url: ${{ steps.pages.outputs.page_url }}
     steps:
+      # Releases call this from their tag, so always deploy the current landing page instead of the tagged one.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
       # GitHub Pages replaces the whole site on each deployment, so keep the newest release's repositories.
       - name: Download the release repositories
         env:
@@ -44,9 +47,11 @@ jobs:
           mkdir site
           tar -xzf "$RUNNER_TEMP/manida-repositories.tar.gz" -C site
           test -f site/arch/x86_64/manida.db && test -d site/fdroid/repo
-      - run: python3 scripts/package-website.py --output site --signing-key "$MANIDA_ARCH_SIGNING_FINGERPRINT"
-        env:
-          MANIDA_ARCH_SIGNING_FINGERPRINT: ${{ vars.MANIDA_ARCH_SIGNING_FINGERPRINT }}
+      # Show the fingerprint of the key shipped with these repositories, which stays correct across key rotations.
+      - run: |
+          set -euo pipefail
+          fingerprint=$(gpg --batch --show-keys --with-colons site/manida.asc | awk -F: '$1 == "fpr" { print $10; exit }')
+          python3 scripts/package-website.py --output site --signing-key "$fingerprint"
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site
