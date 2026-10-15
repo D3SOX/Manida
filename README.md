@@ -1,6 +1,31 @@
 <h1><img src="packaging/manida.svg" alt="" width="40" height="40" align="left">Manida</h1>
 
-[![GitHub Releases](https://img.shields.io/badge/GitHub-Releases-181717?logo=github&logoColor=white&style=for-the-badge)](https://github.com/D3SOX/Manida/releases) [![F-Droid repository](https://img.shields.io/badge/F--Droid-Repository-1976D2?logo=fdroid&logoColor=white&style=for-the-badge)][fdroid-repository] [![Obtainium](https://img.shields.io/badge/Obtainium-Install-D2BCFD?logo=obtainium&logoColor=white&style=for-the-badge)][obtainium-install] [![Arch Linux repository](https://img.shields.io/badge/Arch_Linux-Repository-1793D1?logo=archlinux&logoColor=white&style=for-the-badge)](https://manida.d3sox.me)
+<p>
+  <a href="https://github.com/D3SOX/Manida/releases">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://manida-badges.withered-flower-f0f2.workers.dev/github-dark.svg">
+      <img src="https://manida-badges.withered-flower-f0f2.workers.dev/github-light.svg" alt="Download Manida from GitHub Releases" width="158" height="52">
+    </picture>
+  </a>&nbsp;
+  <a href="https://manida.d3sox.me/fdroid/repo?fingerprint=FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://manida-badges.withered-flower-f0f2.workers.dev/fdroid-dark.svg">
+      <img src="https://manida-badges.withered-flower-f0f2.workers.dev/fdroid-light.svg" alt="Add Manida&#x27;s F-Droid repository" width="158" height="52">
+    </picture>
+  </a>&nbsp;
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22me.d3sox.manida%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FD3SOX%2FManida%22%2C%22author%22%3A%22D3SOX%22%2C%22name%22%3A%22Manida%22%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5EManida%20%5B0-9%5D%2B%5B.%5D%5B0-9%5D%2B%5B.%5D%5B0-9%5D%2B%24%5C%22%7D%22%7D">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://manida-badges.withered-flower-f0f2.workers.dev/obtainium-dark.svg">
+      <img src="https://manida-badges.withered-flower-f0f2.workers.dev/obtainium-light.svg" alt="Install Manida with Obtainium" width="158" height="52">
+    </picture>
+  </a>&nbsp;
+  <a href="https://manida.d3sox.me">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://manida-badges.withered-flower-f0f2.workers.dev/archlinux-dark.svg">
+      <img src="https://manida-badges.withered-flower-f0f2.workers.dev/archlinux-light.svg" alt="Add Manida&#x27;s Arch Linux repository" width="158" height="52">
+    </picture>
+  </a>
+</p>
 
 Manida is a music player for Android and Linux, built with Kotlin and Compose. It plays local files and connects to Navidrome and Subsonic-compatible servers.
 
@@ -173,6 +198,17 @@ Configure these repository secrets and variables for signed releases:
 
 GitHub Pages uses GitHub Actions as its source, with `manida.d3sox.me` as the custom domain. Its DNS `CNAME` points to `d3sox.github.io`. Each deployment replaces the whole site, so the website workflow always includes the repositories from the newest release. F-Droid's landing page is `/fdroid`; its signed index and APKs are under `/fdroid/repo`. The `github-pages` environment must allow the `master` branch for website changes and release tags matching `v*`. Development builds do not require release signing secrets.
 
+### README badges
+
+The SVGs in `badges/public` are hosted by the `manida-badges` Cloudflare Worker. The README selects the light or dark variant to match the reader's theme. To publish badge changes, sign in to Cloudflare with Wrangler and run:
+
+```sh
+cd badges
+bun install --frozen-lockfile
+bun run check
+bun run deploy
+```
+
 ## License and credits
 
 Manida uses [AGPL-3.0-only](LICENSE). Namida inspired the feature requirements. Manida does not include its implementation or assets.
@@ -180,6 +216,8 @@ Manida uses [AGPL-3.0-only](LICENSE). Namida inspired the feature requirements. 
 MilkDrop rendering uses [projectM](https://github.com/projectM-visualizer/projectm/tree/4967dc003e5206d7df3ff447287f7609c47d2343), under LGPL-2.1-or-later. The desktop window follows the approach used by [Spotifast](https://github.com/crmne/spotifast). Third-party license notices ship with the native libraries. Release assets include the exact projectM, evaluator and mpv source archives used by the build.
 
 The bundled presets and textures retain their upstream authorship and notices, including the [preset pack's distribution notice](https://github.com/projectM-visualizer/presets-cream-of-the-crop/blob/0180df21f5e0bd39b9060cc5de420ed2f1f9e509/LICENSE.md). `python scripts/package-milkdrop-presets.py` reproduces the library from checksum-verified source archives. Each app unpacks the library on first use and reuses it afterward.
+
+The README badges use [Simple Icons](https://simpleicons.org/) and [Roboto](https://github.com/googlefonts/roboto-classic) lettering rendered as SVG paths.
 
 [fdroid-repository]: https://manida.d3sox.me/fdroid/repo?fingerprint=FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B
 [obtainium-install]: https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22me.d3sox.manida%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FD3SOX%2FManida%22%2C%22author%22%3A%22D3SOX%22%2C%22name%22%3A%22Manida%22%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5EManida%20%5B0-9%5D%2B%5B.%5D%5B0-9%5D%2B%5B.%5D%5B0-9%5D%2B%24%5C%22%7D%22%7D

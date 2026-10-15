@@ -11,3 +11,5 @@ local.properties
 **/.cxx/
 __pycache__/
 *.pyc
+node_modules/
+.wrangler/
