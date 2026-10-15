@@ -8,8 +8,74 @@ on:
     - cron: '23 5 * * 1'
 permissions:
   contents: read
+concurrency:
+  group: codeql-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.scope.outputs.matrix }}
+      analyze: ${{ steps.scope.outputs.analyze }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Select languages affected by this change
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          def languages_for(paths):
+              languages = set()
+              for path in paths:
+                  suffix = Path(path).suffix
+                  build = path.startswith('gradle/') or path.endswith(('.gradle', '.gradle.kts')) or path in {
+                      'gradle.properties', 'gradlew', 'gradlew.bat'}
+                  if build or suffix in {'.kt', '.kts', '.java', '.gradle'}:
+                      languages.add('java-kotlin')
+                  if build or path.startswith('native/') or suffix in {'.c', '.cpp', '.h', '.hpp', '.cmake'} or Path(path).name == 'CMakeLists.txt' or path in {
+                      'scripts/build-visualizer.py', 'scripts/build_mpv.py'}:
+                      languages.add('c-cpp')
+                  if suffix == '.py' or path == 'scripts/requirements.txt':
+                      languages.add('python')
+                  if suffix in {'.js', '.mjs', '.cjs', '.jsx', '.ts', '.tsx'}:
+                      languages.add('javascript-typescript')
+                  if path.startswith('.github/workflows/'):
+                      languages.add('actions')
+                  if path.startswith('.github/codeql/'):
+                      return all_languages
+              return languages
+
+          all_languages = {'java-kotlin', 'c-cpp', 'python', 'javascript-typescript', 'actions'}
+          event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          if os.environ['EVENT_NAME'] == 'pull_request':
+              base, head = event['pull_request']['base']['sha'], event['pull_request']['head']['sha']
+              revisions = [f'{base}...{head}']
+          elif os.environ['EVENT_NAME'] == 'push' and event.get('before', '').strip('0'):
+              revisions = [event['before'], event['after']]
+          else:
+              revisions = []
+          if revisions:
+              paths = subprocess.check_output(['git', 'diff', '--name-only', '-z', '--no-renames', *revisions]).decode().split('\0')
+              languages = languages_for(paths)
+          else:
+              languages = all_languages
+          matrix = {'include': [{'language': language, 'build-mode': 'manual' if language in {'java-kotlin', 'c-cpp'} else 'none'}
+                                for language in sorted(languages)]}
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('matrix=' + json.dumps(matrix) + '\n')
+              output.write('analyze=' + str(bool(languages)).lower() + '\n')
+          PY
   analyze:
+    needs: changes
+    if: needs.changes.outputs.analyze == 'true'
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-24.04
     permissions:
@@ -17,18 +83,7 @@ jobs:
       security-events: write
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - language: java-kotlin
-            build-mode: manual
-          - language: c-cpp
-            build-mode: manual
-          - language: python
-            build-mode: none
-          - language: javascript-typescript
-            build-mode: none
-          - language: actions
-            build-mode: none
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - if: matrix.build-mode == 'manual'

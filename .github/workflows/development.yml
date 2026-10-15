@@ -2,6 +2,22 @@ name: Development builds
 on:
   push:
     branches: [master]
+    paths:
+      - LICENSE
+      - androidApp/**
+      - desktopApp/**
+      - shared/**
+      - native/**
+      - gradle/**
+      - '*.gradle.kts'
+      - gradle.properties
+      - gradlew
+      - gradlew.bat
+      - scripts/**
+      - '!scripts/package-website.py'
+      - packaging/**
+      - '!packaging/screenshots/**'
+      - '!packaging/fdroid-qr*.png'
   workflow_dispatch:
 permissions:
   contents: read

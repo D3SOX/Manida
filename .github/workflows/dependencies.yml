@@ -2,6 +2,14 @@ name: Dependency graph
 on:
   push:
     branches: [master]
+    paths:
+      - '**/*.gradle.kts'
+      - '**/*.gradle'
+      - '**/gradle.lockfile'
+      - gradle/**
+      - gradle.properties
+      - gradlew
+      - gradlew.bat
   workflow_dispatch:
 permissions:
   contents: read

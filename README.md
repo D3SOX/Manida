@@ -144,6 +144,8 @@ The first native build downloads checksum-verified projectM 4.1.8 and its evalua
 
 The acceptance suite uses disposable Navidrome, gonic, SFTP and scrobbling fixtures. CI runs desktop tests and Android instrumentation on API 31 and API 36 with 16 KB memory pages. Release checks also install the optimized APK and open MilkDrop. The fixture helpers under `scripts/` can start the same services locally. Use an emulator for instrumentation tests, which clear the app's test data.
 
+Pull requests run the app suites when app, build, fixture or app-packaging inputs change, including edits to the test workflow itself. Website-only PRs check JavaScript syntax and site packaging instead. CodeQL scans the languages affected by a change; scheduled and manual security scans cover every language. Release and manual acceptance runs always run both app suites.
+
 ```sh
 ./gradlew :shared:desktopTest
 ./gradlew :androidApp:connectedDebugAndroidTest
@@ -153,7 +155,7 @@ Desktop UI tests need a display, such as `xvfb-run`, and the audio-monitor test 
 
 ## Release setup
 
-`development.yml` builds a development prerelease on pushes to `master` or a manual workflow run. Each development run uses its own `development-<run ID>` tag. Assets upload to a draft before publication, so development releases work with GitHub release immutability. `release.yml` publishes tagged alpha releases after acceptance tests pass. It attaches the signed Arch and F-Droid repositories as `manida-repositories.tar.gz` and then runs `website.yml`. `website.yml` also runs on pushes to `master` that change the landing page. It deploys the page together with the repositories from the newest release, so a website change doesn't need a new release. A release tag such as `v0.1.0` must match both platform versions. Update Android's `versionCode` for each Android release.
+`development.yml` builds a development prerelease when app or build inputs change on `master`, or on a manual workflow run. Each development run uses its own `development-<run ID>` tag. Assets upload to a draft before publication, so development releases work with GitHub release immutability. Dependency submission runs when Gradle manifests or configuration change. `release.yml` publishes tagged alpha releases after acceptance tests pass. It attaches the signed Arch and F-Droid repositories as `manida-repositories.tar.gz` and then runs `website.yml`. `website.yml` also runs on pushes to `master` that change the landing page. It deploys the page together with the repositories from the newest release, so a website change doesn't need a new release. A release tag such as `v0.1.0` must match both platform versions. Update Android's `versionCode` for each Android release.
 
 Configure these repository secrets and variables for signed releases:
 
