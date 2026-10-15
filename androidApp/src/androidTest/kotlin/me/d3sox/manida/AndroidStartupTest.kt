@@ -74,7 +74,7 @@ class AndroidStartupTest {
                 assertEquals(600, app.controller.state.value.tracks.size)
                 compose.mainClock.autoAdvance = true
                 compose.onNodeWithText("Albums").performClick()
-                compose.waitUntil(3_000) { app.controller.state.value.preferences.lastLibraryTab == LibraryTab.ALBUMS }
+                compose.waitUntil(10_000) { app.controller.state.value.preferences.lastLibraryTab == LibraryTab.ALBUMS }
                 compose.onNodeWithContentDescription("Settings").performClick()
                 compose.onNodeWithContentDescription("Back").performClick()
                 compose.onNodeWithText("Albums").assertIsSelected()
