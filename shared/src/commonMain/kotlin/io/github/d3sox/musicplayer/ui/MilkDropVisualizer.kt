@@ -40,6 +40,12 @@ internal fun MilkDropButton(open: () -> Unit) = AppIconButton(AppIcon.WAVEFORM, 
 @Composable
 internal expect fun MilkDropVisualizer(state: AppState, controller: MusicController, close: () -> Unit)
 
+/** Whether this platform can draw the visualizer behind the now playing screen. */
+internal expect val milkDropBackgroundSupported: Boolean
+
+@Composable
+internal expect fun MilkDropBackground(state: AppState, controller: MusicController, modifier: Modifier)
+
 @Composable
 internal fun MilkDropControls(presets: List<MilkDropPresetInfo>, selected: Int, select: (Int) -> Unit,
     settings: MilkDropSettings, change: ((MilkDropSettings) -> MilkDropSettings) -> Unit) {

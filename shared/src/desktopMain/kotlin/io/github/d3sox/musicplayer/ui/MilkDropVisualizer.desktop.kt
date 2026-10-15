@@ -116,3 +116,9 @@ internal actual fun MilkDropVisualizer(state: AppState, controller: MusicControl
         }
     }, confirmButton = { TextButton(onClick = close) { Text("Close visualizer") } })
 }
+
+// The desktop visualizer draws in its own native window, so it can't sit behind Compose content.
+internal actual val milkDropBackgroundSupported = false
+
+@Composable
+internal actual fun MilkDropBackground(state: AppState, controller: MusicController, modifier: Modifier) = Unit

@@ -305,6 +305,10 @@ internal fun PlayerPanels(state: AppState, controller: MusicController, sheet: A
                     // The cover moves above the controls, but its glow belongs behind all player content.
                     Box(Modifier.fillMaxSize().offset { IntOffset(0, -offset.roundToInt()) }) {
                         PlayerMotionGlow(motion, state.artwork[current.id], expansion, queueProgress)
+                        // The full visualizer reads the same audio, so the background stops while it's open.
+                        if (state.preferences.milkDrop.background && milkDropBackgroundSupported && !showingMilkDrop &&
+                            expansion > 0f && queueProgress < 1f)
+                            MilkDropBackground(state, controller, Modifier.fillMaxSize().graphicsLayer { alpha = expansion * (1 - queueProgress) })
                     }
                     Column(Modifier.fillMaxSize().testTag("now-playing").graphicsLayer {
                         translationY = (-offset).coerceAtLeast(0f)

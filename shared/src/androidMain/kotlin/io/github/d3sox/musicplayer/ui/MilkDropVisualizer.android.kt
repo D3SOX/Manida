@@ -1,13 +1,21 @@
 package io.github.d3sox.musicplayer.ui
 
 import android.content.Context
+import android.graphics.SurfaceTexture
+import android.opengl.EGL14
+import android.opengl.EGLExt
 import android.opengl.GLSurfaceView
+import android.view.TextureView
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.viewinterop.AndroidView
@@ -216,4 +224,134 @@ class MilkDropRenderer(private val library: MilkDropLibrary, initialSelected: In
     fun stopRendering() { closed.set(true) }
     fun resumeRendering() { active.set(true) }
     fun pauseRendering() { active.set(false) }
+}
+
+internal actual val milkDropBackgroundSupported = true
+
+@Composable
+internal actual fun MilkDropBackground(state: AppState, controller: MusicController, modifier: Modifier) {
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current
+    var library by remember { mutableStateOf<MilkDropLibrary?>(null) }
+    LaunchedEffect(Unit) {
+        library = runCatching { withContext(Dispatchers.IO) { milkDropLibrary(File(context.filesDir, "milkdrop")) } }.getOrNull()
+    }
+    val settings = state.preferences.milkDrop
+    val choices = remember(library) { library?.presets.orEmpty().map { it.info } }
+    val eligible = remember(choices, settings.favorites, settings.favoritesOnly) { milkDropPlaybackIndices(choices, settings) }
+    val selected = choices.indexOfFirst { it.id == settings.selectedPresetId }.takeIf { it in eligible }
+        ?: eligible.firstOrNull() ?: -1
+    val view = remember(context, library) {
+        library?.let { MilkDropTextureView(context, it, selected, settings.automatic, eligible) { index ->
+            choices.getOrNull(index)?.let { preset ->
+                if (controller.state.value.preferences.milkDrop.selectedPresetId != preset.id)
+                    controller.updatePreferences { it.copy(milkDrop = it.milkDrop.copy(selectedPresetId = preset.id)) }
+            }
+        } }
+    }
+    LaunchedEffect(view, selected, settings.automatic, eligible) {
+        view?.renderer?.selected?.set(selected)
+        view?.renderer?.automatic?.set(settings.automatic)
+        view?.renderer?.eligible?.set(eligible)
+        view?.redraw()
+    }
+    LaunchedEffect(view, state.playback.playing) { view?.setPlaying(state.playback.playing) }
+    DisposableEffect(view, lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) { Lifecycle.Event.ON_RESUME -> view?.setResumed(true); Lifecycle.Event.ON_PAUSE -> view?.setResumed(false); else -> Unit }
+        }
+        lifecycle.lifecycle.addObserver(observer)
+        view?.setResumed(lifecycle.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+        onDispose { lifecycle.lifecycle.removeObserver(observer); view?.setResumed(false) }
+    }
+    if (view == null || eligible.isEmpty()) return
+    Box(modifier.clearAndSetSemantics {}) {
+        AndroidView({ view }, Modifier.fillMaxSize().then(if (settings.backgroundBlur > 0f)
+            Modifier.blur((settings.backgroundBlur * 32).dp, BlurredEdgeTreatment.Rectangle) else Modifier))
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface.copy(alpha = settings.backgroundDim)))
+    }
+}
+
+/**
+ * Draws MilkDrop into the view hierarchy, unlike [GLSurfaceView]'s separate surface, so Compose can fade, move and blur
+ * it with the now playing screen. It renders only while resumed and playing, plus one frame after a preset change.
+ */
+class MilkDropTextureView(context: Context, library: MilkDropLibrary, selected: Int, automatic: Boolean, eligible: List<Int>,
+    changed: (Int) -> Unit) : TextureView(context), TextureView.SurfaceTextureListener {
+    val renderer = MilkDropRenderer(library, selected, automatic, eligible,
+        { ContextCompat.getMainExecutor(context).execute { changed(it) } }, {})
+    private val lock = Object()
+    private var surfaceWidth = 1
+    private var surfaceHeight = 1
+    private var running = false
+    private var resumed = false
+    private var playing = false
+    private var redraw = true
+    private var thread: Thread? = null
+    private var subscription: AutoCloseable? = null
+    init { surfaceTextureListener = this }
+
+    fun setResumed(value: Boolean) { update { resumed = value } }
+    fun setPlaying(value: Boolean) { renderer.playing.set(value); update { playing = value } }
+    fun redraw() { update { redraw = true } }
+
+    private fun update(change: () -> Unit) {
+        val listening = synchronized(lock) {
+            change()
+            if (resumed) renderer.resumeRendering() else renderer.pauseRendering()
+            lock.notifyAll()
+            running && resumed && playing
+        }
+        if (listening && subscription == null) subscription = VisualizerPcm.subscribe()
+        else if (!listening) { subscription?.close(); subscription = null }
+    }
+
+    override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
+        update { running = true; surfaceWidth = width; surfaceHeight = height; redraw = true }
+        thread = Thread({ render(texture) }, "MilkDrop background").apply { start() }
+    }
+    override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) {
+        update { surfaceWidth = width; surfaceHeight = height; redraw = true }
+    }
+    override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
+        update { running = false }
+        thread?.join(); thread = null
+        return true
+    }
+    override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
+
+    private fun render(texture: SurfaceTexture) {
+        val display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
+        if (!EGL14.eglInitialize(display, null, 0, null, 0)) return
+        val configs = arrayOfNulls<android.opengl.EGLConfig>(1)
+        val count = IntArray(1)
+        EGL14.eglChooseConfig(display, intArrayOf(EGL14.EGL_RENDERABLE_TYPE, EGLExt.EGL_OPENGL_ES3_BIT_KHR,
+            EGL14.EGL_SURFACE_TYPE, EGL14.EGL_WINDOW_BIT, EGL14.EGL_RED_SIZE, 8, EGL14.EGL_GREEN_SIZE, 8,
+            EGL14.EGL_BLUE_SIZE, 8, EGL14.EGL_ALPHA_SIZE, 8, EGL14.EGL_NONE), 0, configs, 0, 1, count, 0)
+        if (count[0] == 0) return
+        val glContext = EGL14.eglCreateContext(display, configs[0], EGL14.EGL_NO_CONTEXT,
+            intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 3, EGL14.EGL_NONE), 0)
+        val surface = EGL14.eglCreateWindowSurface(display, configs[0], texture, intArrayOf(EGL14.EGL_NONE), 0)
+        try {
+            if (glContext == EGL14.EGL_NO_CONTEXT || surface == EGL14.EGL_NO_SURFACE ||
+                !EGL14.eglMakeCurrent(display, surface, surface, glContext)) return
+            renderer.onSurfaceCreated(null, null)
+            var size = 0 to 0
+            while (true) {
+                val next = synchronized(lock) {
+                    while (running && !(resumed && (playing || redraw))) lock.wait()
+                    redraw = false
+                    if (running) surfaceWidth to surfaceHeight else null
+                } ?: break
+                if (next != size) { size = next; renderer.onSurfaceChanged(null, next.first, next.second) }
+                renderer.onDrawFrame(null)
+                EGL14.eglSwapBuffers(display, surface)
+            }
+        } finally {
+            renderer.release()
+            EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
+            if (surface != EGL14.EGL_NO_SURFACE) EGL14.eglDestroySurface(display, surface)
+            if (glContext != EGL14.EGL_NO_CONTEXT) EGL14.eglDestroyContext(display, glContext)
+        }
+    }
 }

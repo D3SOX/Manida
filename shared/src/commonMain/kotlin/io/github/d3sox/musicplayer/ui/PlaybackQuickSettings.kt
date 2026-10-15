@@ -36,6 +36,19 @@ internal fun PlaybackQuickSettings(state: AppState, controller: MusicController,
             }
             SettingsToggle("Gapless playback", AppIcon.MUSIC, "Play adjacent tracks without a break when crossfade is off.",
                 state.preferences.gaplessPlayback) { enabled -> controller.updatePreferences { it.copy(gaplessPlayback = enabled) } }
+            if (milkDropBackgroundSupported) {
+                val milkDrop = state.preferences.milkDrop
+                fun visualizer(update: (io.github.d3sox.musicplayer.visualizer.MilkDropSettings) -> io.github.d3sox.musicplayer.visualizer.MilkDropSettings) =
+                    controller.updatePreferences { it.copy(milkDrop = update(it.milkDrop)) }
+                SettingsToggle("Visualizer background", AppIcon.WAVEFORM, "Show the MilkDrop visualizer behind the now playing screen.",
+                    milkDrop.background) { enabled -> visualizer { it.copy(background = enabled) } }
+                if (milkDrop.background) {
+                    SettingsSlider("Dim background", AppIcon.DARK_THEME, milkDrop.backgroundDim, 0f..1f, 19,
+                        { "${(it * 100).roundToInt()}%" }) { dim -> visualizer { it.copy(backgroundDim = dim) } }
+                    SettingsSlider("Blur background", AppIcon.THEME, milkDrop.backgroundBlur, 0f..1f, 19,
+                        { "${(it * 100).roundToInt()}%" }) { blur -> visualizer { it.copy(backgroundBlur = blur) } }
+                }
+            }
             Text("Sleep timer", style = MaterialTheme.typography.titleSmall)
             if (deadline != null) Text("Playback stops in ${playbackTime(remaining)}", style = MaterialTheme.typography.bodyMedium)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
