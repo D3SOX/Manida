@@ -90,7 +90,7 @@ details > summary { min-height: 48px; padding: 12px 0; font-weight: 600; color: 
 .arch-instructions { margin-top: 24px; }
 details p { font-size: 14px; color: var(--on-surface-variant); }
 .code-block { position: relative; margin: 16px 0; background: var(--surface); border-radius: 20px; }
-pre { color: var(--on-surface); margin: 0; padding: 56px 20px 20px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.8; }
+pre { color: var(--on-surface); margin: 0; padding: 20px 56px 20px 20px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.8; }
 code { font-family: ui-monospace, "Noto Sans Mono", monospace; }
 .syntax-command, .syntax-operator { color: var(--syntax-command); }
 .syntax-option { color: var(--syntax-option); }
