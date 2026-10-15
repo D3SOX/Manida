@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a signed pacman repository ready for GitHub Pages."""
+"""Create a signed pacman repository for the GitHub Pages site."""
 import argparse
 import os
 from pathlib import Path
@@ -44,24 +44,7 @@ def repository(release: Path, output: Path, signing_key: str):
         raise ValueError("The release signing key is unavailable")
     (output / "manida.asc").write_bytes(exported.stdout)
     (output / ".nojekyll").touch()
-    copy_website(output, signing_key)
     print(f"Created signed repository at {output}")
-
-
-def copy_website(output: Path, signing_key: str):
-    root = Path(__file__).resolve().parent.parent
-    shutil.copytree(root / "website", output, dirs_exist_ok=True)
-    assets = output / "assets"
-    assets.mkdir(exist_ok=True)
-    for name in ["manida.svg", "fdroid-qr-dark.png", "fdroid-qr-light.png"]:
-        shutil.copyfile(root / "packaging" / name, assets / name)
-    shutil.copytree(root / "packaging/screenshots", assets / "screenshots", dirs_exist_ok=True)
-    index = output / "index.html"
-    placeholder = "5948F17F1611CC2B995BC6121F0D542126D514AB"
-    html = index.read_text()
-    if placeholder not in html:
-        raise ValueError("The website is missing the Arch signing-key fingerprint")
-    index.write_text(html.replace(placeholder, signing_key.upper()))
 
 
 if __name__ == "__main__":

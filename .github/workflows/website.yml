@@ -1,0 +1,55 @@
+name: Website
+on:
+  push:
+    branches: [master]
+    paths:
+      - website/**
+      - packaging/manida.svg
+      - packaging/fdroid-qr-*.png
+      - packaging/screenshots/**
+      - scripts/package-website.py
+      - .github/workflows/website.yml
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # GitHub Pages replaces the whole site on each deployment, so keep the newest release's repositories.
+      - name: Download the release repositories
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag=$(gh release list --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')
+          [[ -n "$tag" ]] || { echo 'Publish a release before deploying the website' >&2; exit 1; }
+          gh release download "$tag" --pattern manida-repositories.tar.gz --dir "$RUNNER_TEMP"
+          mkdir site
+          tar -xzf "$RUNNER_TEMP/manida-repositories.tar.gz" -C site
+          test -f site/arch/x86_64/manida.db && test -d site/fdroid/repo
+      - run: python3 scripts/package-website.py --output site --signing-key "$MANIDA_ARCH_SIGNING_FINGERPRINT"
+        env:
+          MANIDA_ARCH_SIGNING_FINGERPRINT: ${{ vars.MANIDA_ARCH_SIGNING_FINGERPRINT }}
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        id: pages

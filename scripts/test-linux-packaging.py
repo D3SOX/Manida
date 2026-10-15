@@ -12,9 +12,9 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 IMAGE = ROOT / "desktopApp/build/compose/binaries/main/app/manida"
-spec = importlib.util.spec_from_file_location("repository", ROOT / "scripts/package-repository.py")
-repository_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(repository_module)
+spec = importlib.util.spec_from_file_location("website", ROOT / "scripts/package-website.py")
+website_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(website_module)
 
 
 class LinuxPackagingTest(unittest.TestCase):
@@ -26,9 +26,9 @@ class LinuxPackagingTest(unittest.TestCase):
             shutil.copytree(ROOT / "packaging", source / "packaging")
             index = source / "website/index.html"
             index.write_text(index.read_text().replace("5948F17F1611CC2B995BC6121F0D542126D514AB", "stale-key"))
-            with patch.object(repository_module, "__file__", str(source / "scripts/package-repository.py")):
+            with patch.object(website_module, "__file__", str(source / "scripts/package-website.py")):
                 with self.assertRaisesRegex(ValueError, "Arch signing-key fingerprint"):
-                    repository_module.copy_website(directory / "site", "A" * 40)
+                    website_module.copy_website(directory / "site", "A" * 40)
 
     def test_arch_repository_signatures_are_verified_when_installing_from_the_repository(self):
         with tempfile.TemporaryDirectory(prefix="manida-signed-repository-") as temporary, contextlib.ExitStack() as cleanup:
@@ -56,6 +56,10 @@ class LinuxPackagingTest(unittest.TestCase):
                  "--output", str(site), "--signing-key", fingerprint],
                 env=environment, capture_output=True, text=True, timeout=60,
             )
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            self.assertFalse((site / "index.html").exists(), "The website is deployed separately from the repositories")
+            result = subprocess.run(["python", str(ROOT / "scripts/package-website.py"), "--output", str(site),
+                                     "--signing-key", fingerprint], capture_output=True, text=True, timeout=60)
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
             repository = site / "arch/x86_64"
             self.assertIn("Your music.", (site / "index.html").read_text())

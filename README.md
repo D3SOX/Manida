@@ -153,7 +153,7 @@ Desktop UI tests need a display, such as `xvfb-run`, and the audio-monitor test 
 
 ## Release setup
 
-`development.yml` builds a rolling development prerelease on pushes to `master` or a manual workflow run. `release.yml` publishes tagged alpha releases after acceptance tests pass and deploys the signed Arch and F-Droid repositories to GitHub Pages. A release tag such as `v0.1.0` must match both platform versions. Update Android's `versionCode` for each Android release.
+`development.yml` builds a rolling development prerelease on pushes to `master` or a manual workflow run. `release.yml` publishes tagged alpha releases after acceptance tests pass. It attaches the signed Arch and F-Droid repositories as `manida-repositories.tar.gz` and then runs `website.yml`. `website.yml` also runs on pushes to `master` that change the landing page. It deploys the page together with the repositories from the newest release, so a website change doesn't need a new release. A release tag such as `v0.1.0` must match both platform versions. Update Android's `versionCode` for each Android release.
 
 Configure these repository secrets and variables for signed releases:
 
@@ -169,7 +169,7 @@ Configure these repository secrets and variables for signed releases:
 | `MANIDA_FDROID_KEYSTORE_BASE64` | Secret | Base64-encoded F-Droid repository keystore, alias `manida-fdroid` |
 | `MANIDA_FDROID_KEYSTORE_PASSWORD` | Secret | F-Droid repository keystore and key password |
 
-GitHub Pages uses GitHub Actions as its source, with `manida.d3sox.me` as the custom domain. Its DNS `CNAME` points to `d3sox.github.io`. Each tagged release deploys both repositories after publishing the release assets. F-Droid's landing page is `/fdroid`; its signed index and APKs are under `/fdroid/repo`. The `github-pages` environment must allow release tags matching `v*`. Development builds do not require release signing secrets.
+GitHub Pages uses GitHub Actions as its source, with `manida.d3sox.me` as the custom domain. Its DNS `CNAME` points to `d3sox.github.io`. Each deployment replaces the whole site, so the website workflow always includes the repositories from the newest release. F-Droid's landing page is `/fdroid`; its signed index and APKs are under `/fdroid/repo`. The `github-pages` environment must allow release tags matching `v*`. Development builds do not require release signing secrets.
 
 ## License and credits
 
