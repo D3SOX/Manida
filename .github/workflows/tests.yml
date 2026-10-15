@@ -29,15 +29,18 @@ jobs:
             shared/build/test-results/desktopTest
             shared/hs_err_pid*.log
   android:
+    name: android (${{ matrix.device.api }}, shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        include:
+        device:
           - api: 31
             target: google_apis
           - api: 36
             target: google_apis_ps16k
+        # Each shard runs a quarter of the instrumentation classes on its own emulator.
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
@@ -48,6 +51,7 @@ jobs:
         with:
           log-accepted-android-sdk-licenses: false
       - run: sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg mpv libsecret-tools openssh-server cmake ninja-build libsdl2-dev libgl1-mesa-dev pulseaudio-utils
       - name: Build test artifacts before starting the emulator
         run: >-
@@ -61,17 +65,17 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
-          api-level: ${{ matrix.api }}
-          target: ${{ matrix.target }}
+          api-level: ${{ matrix.device.api }}
+          target: ${{ matrix.device.target }}
           arch: x86_64
           disable-linux-hw-accel: false
           profile: pixel_2
           emulator-options: -no-window -gpu swangle -noaudio -no-boot-anim -camera-back virtualscene -camera-front emulated
-          script: bash scripts/ci-tests.sh android
+          script: MANIDA_ANDROID_SHARD=${{ matrix.shard }}/4 bash scripts/ci-tests.sh android
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: android-${{ matrix.api }}-test-results
+          name: android-${{ matrix.device.api }}-shard-${{ matrix.shard }}-test-results
           path: |
             .test-environment/android-class-results
             .test-environment/pairing.log

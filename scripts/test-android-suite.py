@@ -11,7 +11,12 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parent.parent
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--classes", nargs="*")
-selected = parser.parse_args().classes
+parser.add_argument("--shard", default="1/1", help="Run every Nth class, as INDEX/COUNT, so CI can split the suite")
+arguments = parser.parse_args()
+selected = arguments.classes
+shard = re.fullmatch(r"([1-9][0-9]*)/([1-9][0-9]*)", arguments.shard)
+if shard is None or int(shard[1]) > int(shard[2]):
+    raise SystemExit("Use a shard such as 2/4")
 serial = os.environ["ANDROID_SERIAL"]
 if not re.fullmatch(r"emulator-[0-9]{4}", serial):
     raise SystemExit("Run this suite on an owned emulator")
@@ -22,6 +27,7 @@ if selected:
     if not set(selected) <= set(classes):
         raise SystemExit("Unknown test class")
     classes = selected
+classes = classes[int(shard[1]) - 1::int(shard[2])]
 reports = ROOT / "androidApp/build/outputs/androidTest-results/connected/debug"
 output = ROOT / ".test-environment/android-class-results"
 shutil.rmtree(output, ignore_errors=True)
