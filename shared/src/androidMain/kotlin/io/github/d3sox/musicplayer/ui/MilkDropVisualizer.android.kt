@@ -18,29 +18,51 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.d3sox.musicplayer.visualizer.*
+import io.github.d3sox.musicplayer.app.AppState
+import io.github.d3sox.musicplayer.app.MusicController
 import kotlinx.coroutines.*
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 @Composable
-internal actual fun MilkDropVisualizer(close: () -> Unit) {
+internal actual fun MilkDropVisualizer(state: AppState, controller: MusicController, close: () -> Unit) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
     var library by remember { mutableStateOf<MilkDropLibrary?>(null) }
     val presets = library?.presets.orEmpty()
     val choices = remember(library) { presets.map { it.info } }
-    var selected by remember { mutableIntStateOf(0) }
-    var automatic by remember { mutableStateOf(true) }
+    val settings = state.preferences.milkDrop
+    val eligible = remember(choices, settings.favorites, settings.favoritesOnly) { milkDropPlaybackIndices(choices, settings) }
+    val selected = choices.indexOfFirst { it.id == settings.selectedPresetId }.takeIf { it in eligible }
+        ?: eligible.firstOrNull() ?: -1
+    fun change(update: (MilkDropSettings) -> MilkDropSettings) {
+        controller.updatePreferences { it.copy(milkDrop = update(it.milkDrop)) }
+    }
     var error by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         try { library = withContext(Dispatchers.IO) { milkDropLibrary(File(context.filesDir, "milkdrop")) } }
         catch (failure: Exception) { error = failure.message ?: "Could not open the presets" }
     }
     val surface = remember(context, library) {
-        library?.let { MilkDropSurface(context, it, { selected = it }, { error = it }) }
+        library?.let { MilkDropSurface(context, it, selected, settings.automatic, eligible, { index ->
+            choices.getOrNull(index)?.let { preset ->
+                if (controller.state.value.preferences.milkDrop.selectedPresetId != preset.id)
+                    change { it.copy(selectedPresetId = preset.id) }
+            }
+        }, { error = it }) }
+    }
+    LaunchedEffect(surface, selected, settings.automatic, eligible) {
+        surface?.renderer?.selected?.set(selected)
+        surface?.renderer?.automatic?.set(settings.automatic)
+        surface?.renderer?.eligible?.set(eligible)
+        surface?.requestRender()
+    }
+    LaunchedEffect(surface, state.playback.playing, eligible.isNotEmpty()) {
+        surface?.setPlaying(state.playback.playing && eligible.isNotEmpty())
     }
     DisposableEffect(surface, lifecycle) {
         var disposed = false
@@ -65,8 +87,8 @@ internal actual fun MilkDropVisualizer(close: () -> Unit) {
             Column {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     TextButton(onClick = close) { Text("Close visualizer") }
-                    TextButton(onClick = { automatic = !automatic; surface?.renderer?.automatic?.set(automatic) }) {
-                        Text(if (automatic) "Lock preset" else "Unlock preset")
+                    TextButton(onClick = { change { it.copy(automatic = !it.automatic) } }) {
+                        Text(if (settings.automatic) "Lock preset" else "Unlock preset")
                     }
                 }
                 Box(Modifier.fillMaxWidth().weight(1f)) {
@@ -82,16 +104,22 @@ internal actual fun MilkDropVisualizer(close: () -> Unit) {
                         Text(message, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onErrorContainer)
                     } }
                 }
-                MilkDropControls(choices, selected, { selected = it; surface?.renderer?.selected?.set(it) },
-                    automatic, { automatic = it; surface?.renderer?.automatic?.set(it) })
+                MilkDropControls(choices, selected, { index ->
+                    surface?.renderer?.selected?.set(index); surface?.requestRender()
+                    change { it.copy(selectedPresetId = choices[index].id) }
+                }, settings, ::change)
             }
         }
     }
 }
 
-class MilkDropSurface(context: Context, library: MilkDropLibrary, selected: (Int) -> Unit, error: (String?) -> Unit) : GLSurfaceView(context) {
+class MilkDropSurface(context: Context, library: MilkDropLibrary, initialSelected: Int, initialAutomatic: Boolean,
+    eligible: List<Int>, selected: (Int) -> Unit, error: (String?) -> Unit) : GLSurfaceView(context) {
     private var subscription: AutoCloseable? = null
-    val renderer = MilkDropRenderer(library,
+    private var resumed = false
+    private var attached = false
+    private var playing = false
+    val renderer = MilkDropRenderer(library, initialSelected, initialAutomatic, eligible,
         { ContextCompat.getMainExecutor(context).execute { selected(it) } },
         { ContextCompat.getMainExecutor(context).execute { error(it) } })
     init {
@@ -101,24 +129,46 @@ class MilkDropSurface(context: Context, library: MilkDropLibrary, selected: (Int
     }
     fun release() { renderer.stopRendering(); pauseRendering() }
     fun resumeRendering() {
-        if (subscription == null) subscription = VisualizerPcm.subscribe()
+        resumed = true
+        if (!attached) return
+        updateAudio()
         renderer.resumeRendering(); onResume()
+        requestRender()
+    }
+    fun setPlaying(value: Boolean) { playing = value; renderer.playing.set(value); updateAudio() }
+    private fun updateAudio() {
+        if (resumed && attached && playing && subscription == null) subscription = VisualizerPcm.subscribe()
+        else if (!resumed || !attached || !playing) { subscription?.close(); subscription = null }
+        renderMode = if (resumed && attached && playing) RENDERMODE_CONTINUOUSLY else RENDERMODE_WHEN_DIRTY
     }
     fun pauseRendering() {
-        // Detachment can precede Compose's disposal callback. Stop tapping audio before waiting for GL.
-        subscription?.close(); subscription = null
+        resumed = false
+        suspendRendering()
+    }
+    private fun suspendRendering() {
+        // Stop tapping audio before waiting for GL, including temporary view detachment.
+        updateAudio()
         renderer.pauseRendering(); queueEvent { renderer.release() }; onPause()
     }
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        attached = true
+        if (resumed) resumeRendering()
+    }
     override fun onDetachedFromWindow() {
-        pauseRendering()
+        attached = false
+        suspendRendering()
         super.onDetachedFromWindow()
     }
 }
 
-class MilkDropRenderer(private val library: MilkDropLibrary, private val changed: (Int) -> Unit, private val error: (String?) -> Unit) : GLSurfaceView.Renderer {
+class MilkDropRenderer(private val library: MilkDropLibrary, initialSelected: Int, initialAutomatic: Boolean,
+    initialEligible: List<Int>, private val changed: (Int) -> Unit, private val error: (String?) -> Unit) : GLSurfaceView.Renderer {
     private val presets = library.presets
-    val selected = AtomicInteger(0)
-    val automatic = AtomicBoolean(true)
+    val selected = AtomicInteger(initialSelected)
+    val automatic = AtomicBoolean(initialAutomatic)
+    val eligible = AtomicReference(initialEligible)
+    val playing = AtomicBoolean(false)
     private var handle = 0L
     private var width = 1
     private var height = 1
@@ -138,13 +188,17 @@ class MilkDropRenderer(private val library: MilkDropLibrary, private val changed
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) { this.width = width; this.height = height }
     override fun onDrawFrame(gl: GL10?) {
         if (failed || closed.get() || !active.get()) return
+        if (selected.get() !in eligible.get()) return
         try {
             val wait = 33_333_333L - (System.nanoTime() - drawnAt)
             if (wait > 0) Thread.sleep(wait / 1_000_000, (wait % 1_000_000).toInt())
+            val previousFrame = drawnAt
             drawnAt = System.nanoTime()
             if (handle == 0L) handle = ProjectMNative.create(width, height, false, library.textures.path)
-            if (loaded >= 0 && automatic.get() && System.nanoTime() - changedAt >= 20_000_000_000L)
-                selected.updateAndGet { (it + 1) % presets.size }
+            // Pausing stops continuous rendering, so a long gap between frames also restarts the preset timer.
+            if (!playing.get() || drawnAt - previousFrame > 1_000_000_000L) changedAt = drawnAt
+            if (loaded >= 0 && playing.get() && automatic.get() && System.nanoTime() - changedAt >= 20_000_000_000L)
+                selected.updateAndGet { milkDropNextPreset(eligible.get(), it) ?: -1 }
             val next = selected.get()
             if (loaded != next) {
                 try {

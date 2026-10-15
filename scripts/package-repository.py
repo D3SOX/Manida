@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Create a signed pacman repository ready for GitHub Pages."""
 import argparse
-import html
 import os
 from pathlib import Path
 import re
@@ -45,38 +44,24 @@ def repository(release: Path, output: Path, signing_key: str):
         raise ValueError("The release signing key is unavailable")
     (output / "manida.asc").write_bytes(exported.stdout)
     (output / ".nojekyll").touch()
-    links = "".join(f'<li><a href="arch/x86_64/{html.escape(p.name)}">{html.escape(p.name)}</a></li>' for p in copies)
-    (output / "index.html").write_text(f'''<!doctype html>
-<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Manida for Arch Linux</title>
-<style>body{{font:18px system-ui;line-height:1.6;max-width:48rem;margin:3rem auto;padding:0 1rem;background:#19151e;color:#f4edf9}}a{{color:#d8baff}}pre{{overflow:auto;padding:1rem;background:#29232f;border-radius:1rem}}code{{font-size:.9em}}</style>
-<h1>Manida for Arch Linux</h1>
-<p>Manida is in alpha. Local music and Navidrome/Subsonic in one library. Download the portable app or Android APK from
-<a href="https://github.com/D3SOX/Manida/releases">GitHub releases</a>.</p>
-<h2>Install with pacman</h2>
-<p>Download the release signing key in a terminal and check its fingerprint:</p>
-<pre>wget -O manida.asc https://manida.d3sox.me/manida.asc
-gpg --show-keys --fingerprint manida.asc</pre>
-<pre>{signing_key.upper()}</pre>
-<p>Import and trust this key:</p>
-<pre>sudo pacman-key --add manida.asc
-sudo pacman-key --lsign-key {signing_key.upper()}</pre>
-<p>Add the repository with this terminal command:</p>
-<pre>sudo tee -a /etc/pacman.conf &gt;/dev/null &lt;&lt;'REPO'
-
-[manida]
-SigLevel = Required DatabaseRequired
-Server = https://manida.d3sox.me/arch/$arch
-REPO</pre>
-<pre>sudo pacman -Syu manida</pre>
-<p>Packages and the repository database are signed with the key above. Manida uses mpv for playback
-and your desktop’s Secret Service for credentials. The portable app needs mpv, libsecret, GLib tools and font libraries installed.</p>
-<h2>Packages</h2><ul>{links}</ul>
-<h2>Android</h2><p><a href="/fdroid/">Add Manida to F-Droid</a> or download the APK from
-<a href="https://github.com/D3SOX/Manida/releases">GitHub releases</a>.</p>
-<p>Licensed under AGPL-3.0-only. <a href="https://github.com/D3SOX/Manida">Source code</a>.</p>
-</html>''')
+    copy_website(output, signing_key)
     print(f"Created signed repository at {output}")
+
+
+def copy_website(output: Path, signing_key: str):
+    root = Path(__file__).resolve().parent.parent
+    shutil.copytree(root / "website", output, dirs_exist_ok=True)
+    assets = output / "assets"
+    assets.mkdir(exist_ok=True)
+    for name in ["manida.svg", "fdroid-qr-dark.png", "fdroid-qr-light.png"]:
+        shutil.copyfile(root / "packaging" / name, assets / name)
+    shutil.copytree(root / "packaging/screenshots", assets / "screenshots", dirs_exist_ok=True)
+    index = output / "index.html"
+    placeholder = "5948F17F1611CC2B995BC6121F0D542126D514AB"
+    html = index.read_text()
+    if placeholder not in html:
+        raise ValueError("The website is missing the Arch signing-key fingerprint")
+    index.write_text(html.replace(placeholder, signing_key.upper()))
 
 
 if __name__ == "__main__":

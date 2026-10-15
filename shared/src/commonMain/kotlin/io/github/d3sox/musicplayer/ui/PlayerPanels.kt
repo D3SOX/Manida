@@ -96,7 +96,7 @@ private fun queueEntries(rows: List<QueueRow>, queue: QueueSnapshot): List<Queue
 
 @Composable
 internal fun PlayerPanels(state: AppState, controller: MusicController, sheet: AnchoredDraggableState<PlayerPanel>, navigationHeight: androidx.compose.ui.unit.Dp = 80.dp,
-    onPairedDevices: () -> Unit = {}, savedQueues: () -> Unit) {
+    onPairedDevices: () -> Unit = {}, onAudioEffects: () -> Unit = {}, savedQueues: () -> Unit) {
     val current = state.tracks.firstOrNull { it.id == (state.playback.trackId ?: state.queue.currentTrackId) } ?: return
     val requested = state.playback.playWhenReady && !state.playback.ended && state.playback.error == null
     val scope = rememberCoroutineScope()
@@ -118,11 +118,14 @@ internal fun PlayerPanels(state: AppState, controller: MusicController, sheet: A
     var choosingOutput by remember { mutableStateOf(false) }
     // Opening the preset keyboard can move the player controls between portrait and landscape layouts.
     var showingMilkDrop by remember { mutableStateOf(false) }
+    var showingPlaybackSettings by remember { mutableStateOf(false) }
     val queueScroll = rememberLazyListState()
     var queueTop by remember { mutableFloatStateOf(0f) }
     var draggingEntry by remember { mutableStateOf<String?>(null) }
     var committingDrag by remember { mutableStateOf(false) }
-    val previousTrackLimit = if (state.preferences.showPreviousQueueTracks) state.preferences.previousQueueTrackLimit else 0
+    var expandedHistory by remember { mutableStateOf(false) }
+    val previousTrackLimit = if (!state.preferences.showPreviousQueueTracks) 0
+        else if (expandedHistory) Int.MAX_VALUE else state.preferences.previousQueueTrackLimit
     var rows by remember { mutableStateOf(queueRows(state.queue, previousTrackLimit)) }
     val displayedEntries = remember(rows, state.queue) { queueEntries(rows, state.queue) }
     val catalog = remember(state.tracks) { state.tracks.associateBy { it.id } }
@@ -327,12 +330,12 @@ internal fun PlayerPanels(state: AppState, controller: MusicController, sheet: A
                             if (maxWidth > maxHeight) Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                                 PlayerCover(state, current, Modifier.weight(1f).fillMaxHeight(), motion)
-                                PlayerControls(state, controller, current, requested, Modifier.weight(1f), motion, controlsVisible, artworkSwipe, onOutput = { choosingOutput = true }, onVisualizer = { showingMilkDrop = true }, onRepeatCount = { repeatCount = (state.queue.repeatPlays ?: 2).toString(); showRepeatCount = true }, onQueue = { show(PlayerPanel.QUEUE) })
+                                PlayerControls(state, controller, current, requested, Modifier.weight(1f), motion, controlsVisible, artworkSwipe, onOutput = { choosingOutput = true }, onVisualizer = { showingMilkDrop = true }, onPlaybackSettings = { showingPlaybackSettings = true }, onRepeatCount = { repeatCount = (state.queue.repeatPlays ?: 2).toString(); showRepeatCount = true }, onQueue = { show(PlayerPanel.QUEUE) })
                             } else Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(24.dp)) {
                                 PlayerCover(state, current, Modifier.weight(1f).fillMaxWidth(), motion)
                                 PlayerControls(state, controller, current, requested,
-                                    Modifier.fillMaxWidth().heightIn(max = controlsMaxHeight), motion, controlsVisible, artworkSwipe, onOutput = { choosingOutput = true }, onVisualizer = { showingMilkDrop = true }, onRepeatCount = { repeatCount = (state.queue.repeatPlays ?: 2).toString(); showRepeatCount = true }, onQueue = { show(PlayerPanel.QUEUE) })
+                                    Modifier.fillMaxWidth().heightIn(max = controlsMaxHeight), motion, controlsVisible, artworkSwipe, onOutput = { choosingOutput = true }, onVisualizer = { showingMilkDrop = true }, onPlaybackSettings = { showingPlaybackSettings = true }, onRepeatCount = { repeatCount = (state.queue.repeatPlays ?: 2).toString(); showRepeatCount = true }, onQueue = { show(PlayerPanel.QUEUE) })
                             }
                         }
 
@@ -428,6 +431,11 @@ internal fun PlayerPanels(state: AppState, controller: MusicController, sheet: A
                                 if (row.label.isEmpty()) Spacer(Modifier.fillMaxWidth().height(1.dp).testTag(row.key))
                                 else Row(Modifier.fillMaxWidth().testTag(row.key).padding(horizontal = 24.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Text(row.label, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                                    if (row.key == "queue:previous" && (expandedHistory || state.queue.currentIndex > state.preferences.previousQueueTrackLimit)) {
+                                        TextButton(onClick = { expandedHistory = !expandedHistory }) {
+                                            Text(if (expandedHistory) "Show less" else "Show all ${state.queue.currentIndex}")
+                                        }
+                                    }
                                     if (row.section == QueueSection.MANUAL) ManualQueueTime(controller)
 
                                 }
@@ -546,7 +554,9 @@ internal fun PlayerPanels(state: AppState, controller: MusicController, sheet: A
             } }, dismissButton = { TextButton(onClick = { queueJump = null }) { Text("Cancel") } })
     }
     if (choosingOutput) AudioOutputPicker(controller, { choosingOutput = false }, onPairedDevices)
-    if (showingMilkDrop) MilkDropVisualizer { showingMilkDrop = false }
+    if (showingMilkDrop) MilkDropVisualizer(state, controller) { showingMilkDrop = false }
+    if (showingPlaybackSettings) PlaybackQuickSettings(state, controller,
+        audioEffects = { showingPlaybackSettings = false; onAudioEffects() }, close = { showingPlaybackSettings = false })
     clearingQueue?.let { selection -> AlertDialog(onDismissRequest = { clearingQueue = null },
         icon = { Icon(selection.icon().vector, null) }, title = { Text("Clear ${selection.label().lowercase()}?") },
         text = { Text("${when (selection) {
@@ -607,7 +617,7 @@ private fun PlayerCover(state: AppState, track: Track, modifier: Modifier, motio
 @Composable
 private fun PlayerControls(state: AppState, controller: MusicController, current: Track, requested: Boolean,
     modifier: Modifier, motion: PlayerMotion, visible: Boolean, artworkSwipe: PlayingArtworkSwipe,
-    onRepeatCount: () -> Unit, onQueue: () -> Unit, onOutput: () -> Unit, onVisualizer: () -> Unit) {
+    onRepeatCount: () -> Unit, onQueue: () -> Unit, onOutput: () -> Unit, onVisualizer: () -> Unit, onPlaybackSettings: () -> Unit) {
     var seeking by remember(state.playback.entryId) { mutableStateOf<Float?>(null) }
     var seekRequest by remember(state.playback.entryId) { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
@@ -696,7 +706,10 @@ private fun PlayerControls(state: AppState, controller: MusicController, current
                     AppIconButton(AppIcon.DEVICES, "Audio output", onClick = onOutput)
                     MilkDropButton(onVisualizer)
                 }
-                AppIconButton(AppIcon.QUEUE, "Queue", onClick = onQueue)
+                Row {
+                    AppIconButton(AppIcon.SETTINGS, "Playback settings", onClick = onPlaybackSettings)
+                    AppIconButton(AppIcon.QUEUE, "Queue", onClick = onQueue)
+                }
             }
             Box(Modifier.fillMaxWidth().padding(horizontal = 96.dp), contentAlignment = Alignment.Center) {
                 if (state.preferences.showAudioInfo) state.playback.audioInfo?.let { info ->

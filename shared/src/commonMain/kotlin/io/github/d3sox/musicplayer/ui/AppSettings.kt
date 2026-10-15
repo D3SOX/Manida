@@ -163,6 +163,9 @@ internal fun AppSettings(state: AppState, controller: MusicController, server: (
                 { value -> when (val seconds = value.roundToInt()) { 0 -> "Off"; 1 -> "1 second"; else -> "$seconds seconds" } }) {
                 controller.updatePreferences { preferences -> preferences.copy(crossfadeDurationMs = it.roundToInt() * 1_000L) }
             }
+            SettingsToggle("Gapless playback", AppIcon.MUSIC, "Play adjacent tracks without a break when crossfade is off.", settings.gaplessPlayback) {
+                enabled -> controller.updatePreferences { it.copy(gaplessPlayback = enabled) }
+            }
             SettingsToggle("Show previous tracks in queue", AppIcon.HISTORY, "Display songs before the current track", settings.showPreviousQueueTracks) {
                 enabled -> controller.updatePreferences { it.copy(showPreviousQueueTracks = enabled) }
             }
@@ -173,7 +176,7 @@ internal fun AppSettings(state: AppState, controller: MusicController, server: (
                 enabled -> controller.updatePreferences { it.copy(confirmNextUpInterruption = enabled) }
             }
             if (settings.showPreviousQueueTracks) {
-                SettingsSlider("Previous track limit", AppIcon.REPEAT_COUNT, settings.previousQueueTrackLimit.toFloat(), 1f..100f,
+                SettingsSlider("Previous track limit", AppIcon.REPEAT_COUNT, settings.previousQueueTrackLimit.toFloat(), 1f..100f, 98,
                     format = { it.roundToInt().toString() }) { value ->
                     controller.updatePreferences { it.copy(previousQueueTrackLimit = value.roundToInt()) }
                 }
@@ -389,8 +392,7 @@ internal fun SettingsSlider(label: String, icon: AppIcon, selected: Float, range
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(label, Modifier.weight(1f)); Text(format(value), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Slider(value, { value = it }, valueRange = range, steps = steps, colors = appSliderColors(), onValueChangeFinished = { change(value) },
-                modifier = Modifier.fillMaxWidth().semantics { contentDescription = label })
+            PreciseSlider(label, value, range, steps, change = { value = it }, finish = { change(value) })
         }
     }
 }

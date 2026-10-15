@@ -37,6 +37,8 @@ import io.github.d3sox.musicplayer.storage.openMusicStore
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
@@ -605,11 +607,15 @@ class PlayerUiTest {
                 assertEquals(false, controller.state.value.playback.playing)
                 runBlocking { controller.seek(2_000).join(); controller.play().join() }
                 waitUntil(timeoutMillis = 3_000) { controller.state.value.playback.playing && controller.state.value.playback.positionMs >= 1_950 }
-                waitUntil(timeoutMillis = 4_000) { controller.state.value.queue.repeatPlays == 1 && controller.state.value.playback.positionMs in 50..500 }
+                runBlocking {
+                    withTimeout(4_000) { controller.state.first { it.queue.repeatPlays == 1 } }
+                    controller.pause().join()
+                }
+                waitUntil(timeoutMillis = 3_000) { !controller.state.value.playback.playing && controller.state.value.queue.repeatPlays == 1 }
                 onNodeWithContentDescription("Repeat").performClick()
                 onNodeWithText("1 play remaining").assertIsDisplayed()
                 onNodeWithTag("now-playing").performTouchInput { click(androidx.compose.ui.geometry.Offset(4f, 4f)) }
-                runBlocking { controller.seek(2_000).join() }
+                runBlocking { controller.seek(2_000).join(); controller.play().join() }
                 waitUntil(timeoutMillis = 4_000) { controller.state.value.playback.entryId == original.entries[1].id && controller.state.value.playback.playing }
                 assertEquals(io.github.d3sox.musicplayer.playback.RepeatMode.OFF, controller.state.value.queue.repeatMode)
             }

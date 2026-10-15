@@ -29,6 +29,7 @@ class CrossfadePlaybackEngine(private val factory: () -> PlaybackEngine) : Playb
     private var preparedEntry: String? = null
     private var selectedEntry: String? = null
     private var crossfadeMs = 0L
+    private var gapless = true
     private var masterVolume = 1.0
     private var speed = 1.0
     private var pitch = 1.0
@@ -78,7 +79,23 @@ class CrossfadePlaybackEngine(private val factory: () -> PlaybackEngine) : Playb
             cancelFade()
             crossfadeMs = milliseconds
             val index = currentIndex()
-            if (index >= 0) active.updateQueue(if (milliseconds == 0L) tracks else listOf(tracks[index]))
+            if (index >= 0) active.updateQueue(if (nativeQueue()) tracks else listOf(tracks[index]))
+            applyRepeat()
+        }
+    }
+
+    private fun nativeQueue() = crossfadeMs == 0L && gapless
+
+    override fun setGaplessPlayback(enabled: Boolean) = command {
+        if (gapless != enabled) {
+            gapless = enabled
+            if (crossfadeMs > 0) return@command
+            cancelFade()
+            val index = currentIndex()
+            if (index >= 0) {
+                selectedEntry = tracks[index].entryId
+                active.updateQueue(if (nativeQueue()) tracks else listOf(tracks[index]))
+            }
             applyRepeat()
         }
     }
@@ -96,8 +113,8 @@ class CrossfadePlaybackEngine(private val factory: () -> PlaybackEngine) : Playb
             preparedEntry = null
             standby?.pause()
             applyRepeat()
-            active.loadQueue(if (crossfadeMs == 0L) tracks else listOf(tracks[startIndex]),
-                if (crossfadeMs == 0L) startIndex else 0, positionMs, play)
+            active.loadQueue(if (nativeQueue()) tracks else listOf(tracks[startIndex]),
+                if (nativeQueue()) startIndex else 0, positionMs, play)
         }
     }
 
@@ -105,7 +122,7 @@ class CrossfadePlaybackEngine(private val factory: () -> PlaybackEngine) : Playb
         this.tracks = tracks.toList()
         if (outgoing != null && tracks.none { it.entryId == outgoing?.status?.value?.entryId }) cancelFade()
         val index = currentIndex()
-        if (index >= 0) active.updateQueue(if (crossfadeMs == 0L) tracks else listOf(tracks[index]))
+        if (index >= 0) active.updateQueue(if (nativeQueue()) tracks else listOf(tracks[index]))
         else active.updateQueue(emptyList())
         if (preparedEntry != nextTrack()?.entryId) { standby?.pause(); preparedEntry = null }
         applyRepeat()
@@ -171,7 +188,7 @@ class CrossfadePlaybackEngine(private val factory: () -> PlaybackEngine) : Playb
     }
 
     private suspend fun applyRepeat() {
-        val nativeMode = if (crossfadeMs > 0 && repeatMode == RepeatMode.ALL) {
+        val nativeMode = if (!nativeQueue() && repeatMode == RepeatMode.ALL) {
             if (tracks.size > 1) RepeatMode.OFF else RepeatMode.ONE
         } else repeatMode
         active.setRepeat(nativeMode, repeatPlays)
@@ -239,6 +256,9 @@ class CrossfadePlaybackEngine(private val factory: () -> PlaybackEngine) : Playb
                     preparedEntry = null
                 }
             }
+        }
+        if (!gapless && crossfadeMs == 0L && current.ended && current.entryId == selectedEntry && requestedPlaying.value) {
+            nextTrack()?.let { next -> selectedEntry = next.entryId; active.load(next) }
         }
         val playback = active.status.value
         val tail = outgoing?.status?.value?.takeIf { !it.ended }

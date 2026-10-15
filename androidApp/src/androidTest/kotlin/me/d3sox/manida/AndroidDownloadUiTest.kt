@@ -1,7 +1,7 @@
 package me.d3sox.manida
 
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.d3sox.musicplayer.downloads.DownloadStatus
 import io.github.d3sox.musicplayer.library.SourceKind

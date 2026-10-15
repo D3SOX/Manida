@@ -44,12 +44,14 @@ class HomeUiTest {
                 repeat(HomeSectionId.entries.lastIndex) {
                     onNodeWithContentDescription("Move Recently added up").performScrollTo().performClick()
                 }
+                onNodeWithContentDescription("Show Recent listens").performScrollTo().performClick()
                 onNodeWithText("Save order").performClick()
                 waitUntil(timeoutMillis = 5_000) { initial.state.value.preferences.homeSections.first() == HomeSectionId.ADDED }
                 val added = onNodeWithTag("home-section:Recently added").fetchSemanticsNode().boundsInRoot.top
                 val mixesTop = onNodeWithTag("home-section:Mixes").fetchSemanticsNode().boundsInRoot.top
                 assertTrue(added < mixesTop)
                 assertEquals(listOf(HomeSectionId.ADDED, HomeSectionId.RECENT, HomeSectionId.MIXES), initial.state.value.preferences.homeSections.take(3))
+                onNodeWithTag("home-section:Recent listens").assertDoesNotExist()
             }
             runBlocking { controller.closeAndJoin() }; store.close(); store = openMusicStore(database)
             library = MusicLibrary(store)
@@ -59,6 +61,8 @@ class HomeUiTest {
                 setContent { MusicPlayerApp(restored) }
                 waitUntil(timeoutMillis = 5_000) { restored.state.value.libraryReady }
                 assertEquals(HomeSectionId.ADDED, restored.state.value.preferences.homeSections.first())
+                assertEquals(setOf(HomeSectionId.RECENT), restored.state.value.preferences.disabledHomeSections)
+                onNodeWithTag("home-section:Recent listens").assertDoesNotExist()
                 assertTrue(onNodeWithTag("home-section:Recently added").fetchSemanticsNode().boundsInRoot.top < onNodeWithTag("home-section:Mixes").fetchSemanticsNode().boundsInRoot.top)
             }
         } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }

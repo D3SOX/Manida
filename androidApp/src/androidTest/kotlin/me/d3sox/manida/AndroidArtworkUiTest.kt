@@ -77,6 +77,7 @@ class AndroidArtworkUiTest {
     @Test
     fun aDeviceFlacCoverIsImportedAndDisplayedByTheNativePlayer() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.awaitMediaStoreIdle()
         val app = instrumentation.targetContext.applicationContext as MusicApplication
         val original = runBlocking { MusicPreferences(app.store).load() }
         val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE

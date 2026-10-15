@@ -13,6 +13,45 @@ class CrossfadeQueueTest {
     private val audio = Path.of(System.getProperty("musicplayer.testRoot"), ".test-environment", "music", "Fixture Artist",
         "Fixture Album", "01 Northern Light.flac").toString()
 
+    @Test fun disablingGaplessKeepsTheCurrentPositionAndAdvancesRepeatedQueueEntries() = runBlocking {
+        val engine = CrossfadePlaybackEngine { MpvPlaybackEngine("null") }
+        try {
+            val tracks = (1..3).map { PlayableTrack("same-song", audio, entryId = "entry-$it") }
+            engine.loadQueue(tracks, positionMs = 2_400, play = false)
+            val initial = withTimeout(3_000) { engine.status.first { it.positionMs >= 2_350 && it.entryId == "entry-1" } }
+            engine.setGaplessPlayback(false)
+            kotlinx.coroutines.delay(200)
+            assertEquals(initial.playbackId, engine.status.value.playbackId)
+            assertEquals(initial.positionMs, engine.status.value.positionMs)
+            engine.play()
+            withTimeout(4_000) { engine.status.first { it.entryId == "entry-2" && it.playing } }
+            engine.setGaplessPlayback(true)
+            withTimeout(5_000) { engine.status.first { it.entryId == "entry-3" && it.playing } }
+            Unit
+        } finally { engine.close() }
+    }
+
+    @Test fun disablingGaplessAfterNativeAdvancementStillPlaysTheNextQueueEntry() = runBlocking {
+        val engine = CrossfadePlaybackEngine { MpvPlaybackEngine("null") }
+        try {
+            val tracks = (1..3).map { PlayableTrack("same-song", audio, entryId = "entry-$it") }
+            engine.loadQueue(tracks, positionMs = 2_400)
+            withTimeout(4_000) { engine.status.first { it.entryId == "entry-2" && it.playing } }
+            engine.pause()
+            withTimeout(3_000) { engine.status.first { it.entryId == "entry-2" && !it.playing } }
+            engine.seek(2_400)
+            val paused = withTimeout(3_000) { engine.status.first { it.positionMs in 2_350..2_450 && !it.playing } }
+            engine.setGaplessPlayback(false)
+            engine.setAudioEffects(AudioEffects())
+            assertEquals(paused.playbackId, engine.status.value.playbackId)
+            assertEquals("entry-2", engine.status.value.entryId)
+            assertEquals(paused.positionMs, engine.status.value.positionMs)
+            engine.play()
+            withTimeout(3_000) { engine.status.first { it.entryId == "entry-3" && it.playing } }
+            Unit
+        } finally { engine.close() }
+    }
+
     @Test
     fun aLongCrossfadeWithAShortIncomingSongDoesNotLeaveAnEndedSongOverAnAudibleOutgoingTrack() = runBlocking {
         val directory = Files.createTempDirectory("manida-short-crossfade")

@@ -176,6 +176,9 @@ class AndroidPlaybackEngine(context: Context, service: Class<out Service>) : Pla
         require(milliseconds in 0..12_000)
         command { sendCustomCommand(SessionPlaybackCommands.command(SessionPlaybackCommands.CROSSFADE), Bundle().apply { putLong("durationMs", milliseconds) }) }
     }
+    override fun setGaplessPlayback(enabled: Boolean) = command {
+        sendCustomCommand(SessionPlaybackCommands.command(SessionPlaybackCommands.GAPLESS), Bundle().apply { putBoolean("enabled", enabled) })
+    }
     override suspend fun setAudioEffects(effects: AudioEffects) {
         effects.validate()
         withTimeout(10_000) {

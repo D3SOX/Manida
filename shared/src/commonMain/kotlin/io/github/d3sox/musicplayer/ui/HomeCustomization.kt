@@ -20,6 +20,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 @Composable
 internal fun HomeCustomization(initial: List<HomeSectionId>, controller: MusicController, dismiss: () -> Unit) {
     var sections by remember { mutableStateOf(initial) }
+    var disabled by remember { mutableStateOf(controller.state.value.preferences.disabledHomeSections) }
     val scroll = rememberLazyListState()
     fun move(from: Int, to: Int) {
         if (from in sections.indices && to in sections.indices) sections = sections.toMutableList().apply { add(to, removeAt(from)) }
@@ -29,16 +30,23 @@ internal fun HomeCustomization(initial: List<HomeSectionId>, controller: MusicCo
     }
     SettingsScreen(dismiss, title = { Text("Customize Home") }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Drag sections into your preferred order. Sections appear when they have music to show.",
+            Text("Choose the sections to show and drag them into your preferred order.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             LazyColumn(Modifier.weight(1f).testTag("home-section-order"), state = scroll,
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(sections, key = { it.name }) { section ->
                     ReorderableItem(reorderable, section.name) { _ ->
                         Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer) {
-                            Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column {
+                            Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(section.icon().vector, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
                                 Text(section.label, Modifier.weight(1f).padding(horizontal = 12.dp))
+                                Switch(section !in disabled, { enabled ->
+                                    disabled = if (enabled) disabled - section else disabled + section
+                                }, Modifier.semantics { contentDescription = "Show ${section.label}" })
+                            }
+                            Row(Modifier.fillMaxWidth().padding(end = 4.dp), horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically) {
                                 AppIconButton(AppIcon.UP, "Move ${section.label} up", enabled = sections.first() != section) {
                                     move(sections.indexOf(section), sections.indexOf(section) - 1)
                                 }
@@ -50,13 +58,16 @@ internal fun HomeCustomization(initial: List<HomeSectionId>, controller: MusicCo
                                     Icon(AppIcon.DRAG.vector, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
+                            }
                         }
                     }
                 }
             }
         }
-    }, actions = { TextButton(onClick = { sections = HomeSectionId.entries }) { Text("Reset") } },
-        confirmButton = { PageAction("Save order", onClick = { controller.updatePreferences { it.copy(homeSections = sections) }; dismiss() }) },
+    }, actions = { TextButton(onClick = { sections = HomeSectionId.entries; disabled = emptySet() }) { Text("Reset") } },
+        confirmButton = { PageAction("Save order", onClick = {
+            controller.updatePreferences { it.copy(homeSections = sections, disabledHomeSections = disabled) }; dismiss()
+        }) },
         dismissButton = { PageAction("Cancel", AppIcon.CLOSE, secondary = true, onClick = dismiss) })
 }
 

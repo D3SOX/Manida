@@ -2,16 +2,34 @@
 """Verify the portable archive and real pacman installation without host changes."""
 import os
 import contextlib
+import importlib.util
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 IMAGE = ROOT / "desktopApp/build/compose/binaries/main/app/manida"
+spec = importlib.util.spec_from_file_location("repository", ROOT / "scripts/package-repository.py")
+repository_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(repository_module)
 
 
 class LinuxPackagingTest(unittest.TestCase):
+    def test_website_packaging_rejects_a_missing_arch_fingerprint(self):
+        with tempfile.TemporaryDirectory(prefix="manida-website-") as temporary:
+            directory = Path(temporary)
+            source = directory / "source"
+            shutil.copytree(ROOT / "website", source / "website")
+            shutil.copytree(ROOT / "packaging", source / "packaging")
+            index = source / "website/index.html"
+            index.write_text(index.read_text().replace("5948F17F1611CC2B995BC6121F0D542126D514AB", "stale-key"))
+            with patch.object(repository_module, "__file__", str(source / "scripts/package-repository.py")):
+                with self.assertRaisesRegex(ValueError, "Arch signing-key fingerprint"):
+                    repository_module.copy_website(directory / "site", "A" * 40)
+
     def test_arch_repository_signatures_are_verified_when_installing_from_the_repository(self):
         with tempfile.TemporaryDirectory(prefix="manida-signed-repository-") as temporary, contextlib.ExitStack() as cleanup:
             directory = Path(temporary)
@@ -40,6 +58,15 @@ class LinuxPackagingTest(unittest.TestCase):
             )
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
             repository = site / "arch/x86_64"
+            self.assertIn("Your music.", (site / "index.html").read_text())
+            self.assertIn(fingerprint, (site / "index.html").read_text())
+            self.assertNotIn("5948F17F1611CC2B995BC6121F0D542126D514AB", (site / "index.html").read_text())
+            self.assertIn("FDEBFCB9DD790730FE607ACB8340588A839C44D9EA5BA6671AB3FAB83952F94B",
+                          (site / "index.html").read_text())
+            for screenshot in ["home", "now-playing", "queue", "audio-effects"]:
+                self.assertTrue((site / f"assets/screenshots/{screenshot}.png").is_file())
+            self.assertTrue((site / "theme.js").is_file())
+            self.assertTrue((site / "assets/fdroid-qr-dark.png").is_file())
             self.assertFalse(any(path.is_symlink() for path in site.rglob("*")), "Pages artifacts must contain regular files")
             package = next(repository.glob("*.pkg.tar.zst"))
             for path in [package, repository / "manida.db"]:

@@ -85,7 +85,13 @@ class AndroidAutoEqUiTest {
                 assertEquals(-3.0, effects.preampDb, 0.001)
                 assertEquals(EqualizerKind.LOW_SHELF, effects.bands.single().kind)
                 assertEquals(effects, runBlocking { MusicPreferences(app.store).load() }.audioEffects)
-                compose.onNodeWithContentDescription("Use saved profile: $name").performScrollTo().performClick()
+                runBlocking { controller.updatePreferences { it.copy(audioEffects = io.github.d3sox.musicplayer.playback.AudioEffects()) }.join() }
+                compose.waitUntil(5_000) {
+                    compose.onAllNodesWithText(name, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+                }
+                compose.onNode(hasScrollToIndexAction() and hasAnyDescendant(hasText("Search headphones")))
+                    .performScrollToNode(hasContentDescription("Use saved profile: $name"))
+                compose.onNodeWithContentDescription("Use saved profile: $name").assertIsEnabled().performClick()
                 compose.waitUntil(5_000) { controller.state.value.playback.audioEffects == effects }
                 assertEquals(1, runBlocking { requireNotNull(controller.equalizerProfiles).saved() }.size)
             }

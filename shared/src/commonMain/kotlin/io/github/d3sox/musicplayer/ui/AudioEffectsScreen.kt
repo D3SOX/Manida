@@ -118,7 +118,6 @@ private fun EffectSlider(label: String, value: Double, range: ClosedFloatingPoin
             Text(visibleLabel, Modifier.weight(1f))
             Text("${draft.roundToInt()} dB", style = MaterialTheme.typography.labelLarge)
         }
-        Slider(draft, { draft = it }, Modifier.semantics { contentDescription = label }, enabled = enabled,
-            valueRange = range, steps = steps, colors = appSliderColors(), onValueChangeFinished = { change(draft.toDouble()) })
+        PreciseSlider(label, draft, range, steps, enabled, change = { draft = it }, finish = { change(draft.toDouble()) })
     }
 }

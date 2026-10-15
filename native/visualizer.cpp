@@ -100,7 +100,7 @@ Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_load(JNIEnv* env, job
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_render(JNIEnv* env, jobject, jlong handle, jfloatArray pcm, jint width, jint height) {
+Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_render(JNIEnv* env, jobject, jlong handle, jfloatArray pcm, jint width, jint height, jboolean animate) {
     try {
         auto& visualizer = instance(handle);
         int commands = 0;
@@ -122,7 +122,7 @@ Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_render(JNIEnv* env, j
         }
         SDL_GL_GetDrawableSize(visualizer.window, &width, &height);
 #endif
-        if (width <= 0 || height <= 0 || commands & 4) return commands;
+        if (width <= 0 || height <= 0 || commands & 4 || !animate) return commands;
         if (width != visualizer.width || height != visualizer.height) {
             projectm_set_window_size(visualizer.engine, width, height);
             visualizer.width = width; visualizer.height = height;

@@ -2,6 +2,7 @@ package io.github.d3sox.musicplayer.ui
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.AddCircleOutline
@@ -110,6 +111,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 
 internal enum class AppIcon(val vector: ImageVector) {
+    MINUS(Icons.Rounded.Remove),
     VOLUME(Icons.Rounded.VolumeUp),
     MUTE(Icons.Rounded.VolumeOff),
     CODE(Icons.Rounded.Code),

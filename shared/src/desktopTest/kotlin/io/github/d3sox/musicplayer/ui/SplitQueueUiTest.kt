@@ -17,6 +17,40 @@ import androidx.compose.ui.geometry.Offset
 
 @OptIn(ExperimentalTestApi::class)
 class SplitQueueUiTest {
+    @Test fun expandingPreviousTracksOnlyChangesTheirVisibility() {
+        val directory = Files.createTempDirectory("queue-history-visibility")
+        val store = openMusicStore(directory.resolve("music.db").toString())
+        val library = MusicLibrary(store)
+        val audio = Path.of(System.getProperty("musicplayer.testRoot"), "androidApp/src/androidTest/assets/fixture.flac").toString()
+        val tracks = runBlocking { (0..9).map { library.importTrack(TrackMetadata("History song $it"),
+            TrackSource("history:$it", SourceKind.LOCAL, audio)) } }
+        val controller = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"),
+            preferences = io.github.d3sox.musicplayer.settings.MusicPreferences(store))
+        try {
+            runComposeUiTest {
+                setContent { MusicPlayerApp(controller) }
+                waitUntil(timeoutMillis = 5_000) { controller.state.value.libraryReady }
+                runBlocking {
+                    controller.updatePreferences { it.copy(previousQueueTrackLimit = 2) }.join()
+                    controller.playTrack(tracks[8].id, tracks.map { it.id }, 8).join(); controller.pause().join()
+                    controller.saveQueue("Full history").join()
+                }
+                val before = controller.state.value.queue
+                onNodeWithTag("mini-player").performClick(); onNodeWithContentDescription("Queue").performClick()
+                onNode(hasScrollToIndexAction()).performScrollToIndex(0)
+                onNodeWithTag("queue-entry:${before.entries[0].id}").assertDoesNotExist()
+                onNodeWithText("Show all 8").performClick()
+                onNode(hasScrollToIndexAction()).performScrollToIndex(0)
+                onNodeWithTag("queue-entry:${before.entries[0].id}").assertIsDisplayed()
+                onNodeWithText("Show less").performClick()
+                onNodeWithTag("queue-entry:${before.entries[0].id}").assertDoesNotExist()
+                assertEquals(before.entries, controller.state.value.queue.entries)
+                assertEquals(before.currentEntryId, controller.state.value.queue.currentEntryId)
+                assertEquals(before.entries, controller.state.value.savedQueues.single().snapshot.entries)
+            }
+        } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
+
     @Test fun aRepeatedQueueSongMovesItsOwnCoverToTheMenuAndBack() {
         val directory = Files.createTempDirectory("queue-cover-menu")
         val store = openMusicStore(directory.resolve("music.db").toString())

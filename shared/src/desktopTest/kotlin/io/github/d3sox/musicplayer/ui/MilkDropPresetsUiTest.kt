@@ -2,6 +2,8 @@ package io.github.d3sox.musicplayer.ui
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import io.github.d3sox.musicplayer.visualizer.MilkDropSettings
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.v2.runComposeUiTest
 import io.github.d3sox.musicplayer.visualizer.milkDropLibrary
@@ -13,14 +15,48 @@ import kotlin.test.assertEquals
 
 @OptIn(ExperimentalTestApi::class)
 class MilkDropPresetsUiTest {
+    @Test fun favoritePresetsCanBeBrowsedAndPlaybackSkipsAllOtherPresets() {
+        val presets = (0..7).map { io.github.d3sox.musicplayer.visualizer.MilkDropPresetInfo("Preset $it", "Collection") }
+        val selected = mutableIntStateOf(0)
+        val settings = mutableStateOf(MilkDropSettings(automatic = false))
+        runComposeUiTest {
+            setContent { MaterialTheme { MilkDropControls(presets, selected.intValue, { selected.intValue = it },
+                settings.value, { update -> settings.value = update(settings.value) }) } }
+            onNodeWithContentDescription("Favorite current preset: Preset 0").performClick()
+            onNodeWithText("Next preset").performClick()
+            onNodeWithContentDescription("Favorite current preset: Preset 1").performClick()
+            onNodeWithContentDescription("Only play favorite presets").performClick()
+            onNodeWithText("Next preset").performClick()
+            assertEquals(0, selected.intValue)
+            onNodeWithText("Previous preset").performClick()
+            assertEquals(1, selected.intValue)
+            onNodeWithContentDescription("Choose MilkDrop preset").performClick()
+            onNodeWithText("Favorites").performClick()
+            onNodeWithText("2 presets").assertIsDisplayed()
+            onNodeWithText("Preset 2").assertDoesNotExist()
+            onNodeWithText("Close").performClick()
+            onNodeWithContentDescription("Choose MilkDrop preset").performClick()
+            onNodeWithText("Favorites").assertIsSelected()
+            onNodeWithContentDescription("Unfavorite preset: Preset 0").performClick()
+            onNodeWithContentDescription("Unfavorite preset: Preset 1").performClick()
+            onNodeWithText("0 presets").assertIsDisplayed()
+            onNodeWithText("Close").performClick()
+            onNodeWithText("Next preset").assertIsNotEnabled()
+        }
+    }
+
     @Test fun thousandsOfPresetsCanBeFilteredSearchedAndSelectedWithoutChangingTheirIndex() {
         val root = File(System.getProperty("musicplayer.testRoot"), "shared/build/milkdrop-tests").apply { mkdirs() }
         val directory = Files.createTempDirectory(root.toPath(), "picker").toFile()
         try {
             val presets = runBlocking { milkDropLibrary(directory) }.presets.map { it.info }
             val selected = mutableIntStateOf(0)
+            val settings = mutableStateOf(MilkDropSettings(automatic = false))
             runComposeUiTest {
-                setContent { MaterialTheme { MilkDropControls(presets, selected.intValue, { selected.intValue = it }, false, {}) } }
+                setContent { MaterialTheme {
+                    MilkDropControls(presets, selected.intValue, { selected.intValue = it }, settings.value,
+                        { update -> settings.value = update(settings.value) })
+                } }
                 onNodeWithContentDescription("Choose MilkDrop preset").performClick()
                 onNodeWithText("Original MilkDrop").performClick()
                 onNodeWithText("552 presets").assertIsDisplayed()
@@ -29,6 +65,7 @@ class MilkDropPresetsUiTest {
                 onNodeWithText("Flexi + Rovastar - postcard from Fractopia").performClick()
                 assertEquals(presets.indexOfFirst { it.name == "Flexi + Rovastar - postcard from Fractopia" }, selected.intValue)
                 onNodeWithContentDescription("Choose MilkDrop preset").performClick()
+                onNodeWithText("Original MilkDrop").assertIsSelected()
                 onNodeWithText("Cream of the Crop").performClick()
                 onNodeWithText("9795 presets").assertIsDisplayed()
                 onNodeWithText("All categories").performClick()

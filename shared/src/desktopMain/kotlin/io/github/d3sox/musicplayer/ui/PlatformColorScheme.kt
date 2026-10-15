@@ -14,6 +14,9 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 @Composable
+internal actual fun platformSystemBars(dark: Boolean) = Unit
+
+@Composable
 internal actual fun platformColorScheme(dark: Boolean): ColorScheme? {
     val accent by produceState<Color?>(null) {
         while (currentCoroutineContext().isActive) {
