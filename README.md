@@ -153,7 +153,7 @@ Desktop UI tests need a display, such as `xvfb-run`, and the audio-monitor test 
 
 ## Release setup
 
-`development.yml` builds a rolling development prerelease on pushes to `master` or a manual workflow run. `release.yml` publishes tagged alpha releases after acceptance tests pass. It attaches the signed Arch and F-Droid repositories as `manida-repositories.tar.gz` and then runs `website.yml`. `website.yml` also runs on pushes to `master` that change the landing page. It deploys the page together with the repositories from the newest release, so a website change doesn't need a new release. A release tag such as `v0.1.0` must match both platform versions. Update Android's `versionCode` for each Android release.
+`development.yml` builds a development prerelease on pushes to `master` or a manual workflow run. Each development run uses its own `development-<run ID>` tag. Assets upload to a draft before publication, so development releases work with GitHub release immutability. `release.yml` publishes tagged alpha releases after acceptance tests pass. It attaches the signed Arch and F-Droid repositories as `manida-repositories.tar.gz` and then runs `website.yml`. `website.yml` also runs on pushes to `master` that change the landing page. It deploys the page together with the repositories from the newest release, so a website change doesn't need a new release. A release tag such as `v0.1.0` must match both platform versions. Update Android's `versionCode` for each Android release.
 
 Configure these repository secrets and variables for signed releases:
 

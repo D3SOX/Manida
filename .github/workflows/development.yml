@@ -53,12 +53,12 @@ jobs:
         run: |
           version=$(sed -n 's/.*packageVersion = "\([^"]*\)".*/\1/p' desktopApp/build.gradle.kts)
           docker compose -f scripts/compose.yaml run --rm -T -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \
-            -e "MANIDA_BUILD_UID=$(id -u)" -e "MANIDA_VERSION=$version" -e GITHUB_RUN_NUMBER \
+            -e "MANIDA_BUILD_UID=$(id -u)" -e "MANIDA_VERSION=$version" -e GITHUB_RUN_NUMBER -e GITHUB_RUN_ID \
             arch \
             bash -euc 'pacman -Syu --noconfirm base-devel python
               useradd --uid "$MANIDA_BUILD_UID" --create-home builder
               runuser -u builder -- python3 scripts/package-linux.py --image desktopApp/build/compose/binaries/main/app/manida \
-                --output .test-environment/development --version "$MANIDA_VERSION" --pkgrel "0.$GITHUB_RUN_NUMBER" --release-tag development'
+                --output .test-environment/development --version "$MANIDA_VERSION" --pkgrel "0.$GITHUB_RUN_NUMBER" --release-tag "development-$GITHUB_RUN_ID"'
       - name: Create the AppImage
         env:
           GH_TOKEN: ${{ github.token }}
@@ -96,13 +96,17 @@ jobs:
           set -euo pipefail
           cd development
           printf 'Development build from commit %s. Android installs as Manida dev. Linux packages replace Manida.\n' "$GITHUB_SHA" > notes.txt
-          if gh release view development >/dev/null 2>&1; then
-            gh release edit development --prerelease --title 'Manida development' --notes-file notes.txt
-            gh api --method PATCH "repos/$GH_REPO/git/refs/tags/development" -f sha="$GITHUB_SHA" -F force=true
-            gh release view development --json assets --jq '.assets[].name' | while IFS= read -r asset; do
-              case "$asset" in *.apk|*.tar.gz|*.pkg.tar.zst|*.AppImage|SHA256SUMS|PKGBUILD) gh release delete-asset development "$asset" --yes ;; esac
-            done
+          tag="development-$GITHUB_RUN_ID"
+          assets=(./*.apk ./*.tar.gz ./*.pkg.tar.zst ./*.AppImage ./PKGBUILD)
+          if draft=$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [[ "$draft" == false ]]; then
+              # A completed rerun must still match the published artifacts.
+              for asset in "${assets[@]}"; do gh release verify-asset "$tag" "$asset"; done
+              exit 0
+            fi
           else
-            gh release create development --prerelease --target "$GITHUB_SHA" --title 'Manida development' --notes-file notes.txt
+            gh release create "$tag" --draft --prerelease --target "$GITHUB_SHA" \
+              --title "Manida development ${GITHUB_SHA:0:12}" --notes-file notes.txt
           fi
-          gh release upload development --clobber ./*.apk ./*.tar.gz ./*.pkg.tar.zst ./*.AppImage ./PKGBUILD
+          gh release upload "$tag" --clobber "${assets[@]}"
+          gh release edit "$tag" --draft=false
