@@ -27,6 +27,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: node --check website/theme.js
       - name: Check website packaging
         run: python3 scripts/package-website.py --output "$RUNNER_TEMP/site" --signing-key 5948F17F1611CC2B995BC6121F0D542126D514AB

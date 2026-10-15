@@ -144,7 +144,7 @@ The first native build downloads checksum-verified projectM 4.1.8 and its evalua
 
 The acceptance suite uses disposable Navidrome, gonic, SFTP and scrobbling fixtures. CI runs desktop tests and Android instrumentation on API 31 and API 36 with 16 KB memory pages. Release checks also install the optimized APK and open MilkDrop. The fixture helpers under `scripts/` can start the same services locally. Use an emulator for instrumentation tests, which clear the app's test data.
 
-Pull requests run the app suites when app, build, fixture or app-packaging inputs change. Website-only PRs check JavaScript syntax and site packaging instead. CodeQL scans the languages affected by a change; scheduled and manual security scans cover every language. Workflow-only edits receive Actions analysis, and manual test runs can validate changes to the test setup. Release and manual acceptance runs always run both app suites.
+Pull requests run the app suites when app, build, fixture or app-packaging inputs change, including edits to the test workflow itself. Website-only PRs check JavaScript syntax and site packaging instead. CodeQL scans the languages affected by a change; scheduled and manual security scans cover every language. Release and manual acceptance runs always run both app suites.
 
 ```sh
 ./gradlew :shared:desktopTest

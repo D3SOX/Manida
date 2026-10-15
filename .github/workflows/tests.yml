@@ -1,8 +1,8 @@
 name: Tests
 on:
   pull_request:
-    # Workflow-only edits get CodeQL analysis; manual runs still exercise the full suites.
     paths:
+      - .github/workflows/tests.yml
       - androidApp/**
       - desktopApp/**
       - shared/**
