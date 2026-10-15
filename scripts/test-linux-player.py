@@ -60,7 +60,7 @@ public class VisualizerProbe {
             float[] pcm = new float[2048];
             for (int i = 0; i < pcm.length; i++) pcm[i] = (float)Math.sin((i / 2) * 0.1) * 0.7f;
             for (int frame = 0; frame < 12; frame++) {
-                nativeApi.render(handle, pcm, 320, 240);
+                nativeApi.render(handle, pcm, 320, 240, true);
                 Thread.sleep(33);
             }
             byte[] pixels = nativeApi.pixels(handle);

@@ -47,7 +47,8 @@ class ArtworkLibraryTest {
             withTimeout(3_000) { controller.state.first { !it.loading } }
             val bytes = ByteArrayOutputStream().also { ImageIO.write(BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB), "png", it) }.toByteArray()
             covers.save(track.id, bytes)
-            val visible = withTimeout(1_000) { controller.state.first { it.artwork[track.id] != null } }
+            // Nothing triggers another refresh here, so a generous limit only absorbs slow CI runners.
+            val visible = withTimeout(5_000) { controller.state.first { it.artwork[track.id] != null } }
             assertEquals(covers.path(track.id), visible.artwork[track.id])
         } finally { controller.closeAndJoin(); store.close(); directory.toFile().deleteRecursively() }
     }

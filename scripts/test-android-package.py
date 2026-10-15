@@ -57,7 +57,7 @@ class AndroidPackageTest(unittest.TestCase):
                 package = adb("shell", "dumpsys", "package", APP)
                 self.assertIn("versionName=0.1.0", package)
                 self.assertRegex(package, r"(?m)^\s*flags=\[ (?![^\n]*DEBUGGABLE)")
-                adb("shell", "am", "start", "--user", "0", "-n", APP + "/.MainActivity")
+                adb("shell", "am", "start", "-W", "--user", "0", "-n", APP + "/.MainActivity")
                 def tree():
                     adb("shell", "uiautomator", "dump", "/data/local/tmp/manida-package-ui.xml")
                     return ET.fromstring(adb("shell", "cat", "/data/local/tmp/manida-package-ui.xml"))
@@ -82,7 +82,8 @@ class AndroidPackageTest(unittest.TestCase):
                             adb("shell", "input", "swipe", str(width//2), str(height*3//4),
                                 str(width//2), str(height//3), "300")
                         time.sleep(0.2)
-                    self.fail("Could not select " + label + ": " + ET.tostring(root, encoding="unicode"))
+                    crashes = adb("logcat", "-d", "-b", "crash")
+                    self.fail("Could not select " + label + ": " + ET.tostring(root, encoding="unicode") + "\nCrash log:\n" + crashes)
                 click("Settings")
                 click("About Manida")
                 click("View license")
@@ -123,7 +124,7 @@ class AndroidPackageTest(unittest.TestCase):
                 adb("shell", "pm", "grant", APP, permission)
                 if api >= 33: adb("shell", "pm", "grant", APP, "android.permission.POST_NOTIFICATIONS")
                 for _ in range(3): adb("shell", "input", "keyevent", "4")
-                adb("shell", "am", "start", "--user", "0", "-n", APP + "/.MainActivity")
+                adb("shell", "am", "start", "-W", "--user", "0", "-n", APP + "/.MainActivity")
                 click("Settings"); click("Local music"); click("Scan music")
                 time.sleep(1)
                 for _ in range(2): adb("shell", "input", "keyevent", "4")
