@@ -6,12 +6,18 @@ import io.github.d3sox.musicplayer.storage.openMusicStore
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.async
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withTimeout
+import java.net.InetSocketAddress
+import java.net.ServerSocket
 import java.nio.file.Files
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class PairedDevicesTest {
     private fun vault() = object : CredentialVault {
@@ -19,6 +25,44 @@ class PairedDevicesTest {
         override suspend fun save(key: String, secret: String) { secrets[key] = secret }
         override suspend fun read(key: String) = secrets[key]
         override suspend fun delete(key: String) { secrets.remove(key) }
+    }
+
+    @Test
+    fun removingTheLastPeerDuringSnapshotPreventsALateOutgoingConnection() = runBlocking {
+        val directory = Files.createTempDirectory("manida-revoked-snapshot-sync")
+        val store = openMusicStore(directory.resolve("library.db").toString())
+        val library = MusicLibrary(store)
+        val song = library.importTrack(TrackMetadata("Night walk"), TrackSource("local:night", SourceKind.LOCAL, "night.flac"))
+        library.setFavorite(song.id, true)
+        val snapshotStarted = CompletableDeferred<Unit>()
+        val finishSnapshot = CountDownLatch(1)
+        val sync = LibrarySync(store, library, audioContentId = {
+            snapshotStarted.complete(Unit)
+            check(finishSnapshot.await(10, TimeUnit.SECONDS)) { "Snapshot was not released" }
+            null
+        })
+        val devices = JvmPairedDevices(store, sync, vault(), "Linux desktop")
+        val remote = ServerSocket().apply { bind(InetSocketAddress("127.0.0.1", 0)); soTimeout = 2_000 }
+        try {
+            val peer = SyncPeer("11111111-1111-4111-8111-111111111111", "Remote device", "127.0.0.1", remote.localPort, "0".repeat(64))
+            store.put("sync:peer:${peer.deviceId}", "sync-peers", peer)
+            devices.start()
+            val result = async { runCatching { devices.synchronize(peer.deviceId) } }
+            withTimeout(5_000) { snapshotStarted.await() }
+            devices.forget(peer.deviceId)
+            assertEquals(null, devices.state.value.listeningPort)
+            val connected = async(Dispatchers.IO) {
+                try { remote.accept().use { }; true }
+                catch (_: java.net.SocketTimeoutException) { false }
+            }
+            finishSnapshot.countDown()
+            assertTrue(withTimeout(5_000) { result.await() }.isFailure)
+            assertEquals(false, connected.await(), "A sync must not open a connection after its listener was stopped")
+            assertEquals(emptyList(), devices.state.value.peers)
+        } finally {
+            finishSnapshot.countDown()
+            remote.close(); devices.closeAndJoin(); store.close(); directory.toFile().deleteRecursively()
+        }
     }
 
     @Test

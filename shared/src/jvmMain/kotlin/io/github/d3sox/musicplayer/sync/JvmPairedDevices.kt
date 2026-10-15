@@ -185,6 +185,8 @@ class JvmPairedDevices(private val store: MusicStore, override val library: Libr
         // A thread blocked in accept can keep the port listening briefly after close, so wait for it to exit.
         acceptor?.join()
         acceptor = null
+        // Accept may have returned another socket after the first close pass.
+        sockets.toList().forEach { runCatching { it.close() } }
         mutableState.update { it.copy(listeningPort = null) }
     }
 
@@ -318,8 +320,10 @@ class JvmPairedDevices(private val store: MusicStore, override val library: Libr
         } finally { mutableState.update { it.copy(busy = false) } }
     }
     private suspend fun connect(host: String, port: Int, pin: String, block: suspend (SSLSocket) -> Unit) {
-        val socket = requireNotNull(tls).context { it == pin }.socketFactory.createSocket() as SSLSocket
-        sockets.add(socket)
+        val socket = lifecycle.withLock {
+            check(!closed && server != null) { "Device sync is not listening" }
+            (requireNotNull(tls).context { it == pin }.socketFactory.createSocket() as SSLSocket).also { sockets.add(it) }
+        }
         try {
             socket.use {
                 it.enabledProtocols = it.supportedProtocols.filter { protocol -> protocol == "TLSv1.3" || protocol == "TLSv1.2" }.toTypedArray()
