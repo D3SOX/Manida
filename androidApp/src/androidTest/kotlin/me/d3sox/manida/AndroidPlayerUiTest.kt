@@ -7,6 +7,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.d3sox.musicplayer.library.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,15 +65,27 @@ class AndroidPlayerUiTest {
                 compose.onNodeWithText("Set repeat count").performClick()
                 compose.waitUntil(5_000) { controller.state.value.queue.repeatPlays == 2 }
                 assertEquals(original.entries, controller.state.value.queue.entries)
-                runBlocking { controller.seek(2_000).join(); controller.play().join() }
-                compose.waitUntil(5_000) { controller.state.value.playback.playing && controller.state.value.playback.positionMs >= 1_950 }
-                compose.waitUntil(5_000) { controller.state.value.queue.repeatPlays == 1 && controller.state.value.playback.positionMs in 50..500 }
+                runBlocking {
+                    controller.seek(2_000).join()
+                    controller.play().join()
+                    // Observe the transition without waiting for Compose to become idle, then freeze it for UI assertions.
+                    withTimeout(5_000) { controller.state.first { it.queue.repeatPlays == 1 } }
+                    controller.pause().join()
+                }
+                compose.waitUntil(5_000) { !controller.state.value.playback.playing && controller.state.value.queue.repeatPlays == 1 }
+                assertEquals(original.currentEntryId, controller.state.value.queue.currentEntryId)
+                assertEquals(original.entries, controller.state.value.queue.entries)
                 compose.onNodeWithContentDescription("Repeat").performClick()
                 compose.onNodeWithText("1 play remaining").assertIsDisplayed()
                 InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
-                runBlocking { controller.seek(2_000).join() }
-                compose.waitUntil(5_000) { controller.state.value.playback.entryId == original.entries[1].id && controller.state.value.playback.playing }
-                assertEquals(RepeatMode.OFF to null, controller.state.value.queue.repeatMode to controller.state.value.queue.repeatPlays)
+                val continued = runBlocking {
+                    controller.seek(2_000).join()
+                    controller.play().join()
+                    withTimeout(5_000) {
+                        controller.state.first { it.playback.entryId == original.entries[1].id && it.playback.playing }
+                    }
+                }
+                assertEquals(RepeatMode.OFF to null, continued.queue.repeatMode to continued.queue.repeatPlays)
             }
         } finally {
             runBlocking { app.controller.setQueueRepeat(RepeatMode.OFF).join(); app.controller.pause().join() }

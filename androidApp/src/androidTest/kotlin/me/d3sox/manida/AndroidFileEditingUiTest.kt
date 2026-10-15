@@ -12,6 +12,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
+import org.junit.Before
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -21,6 +22,11 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 class AndroidFileEditingUiTest {
     @get:Rule val compose = createEmptyComposeRule()
+
+    @Before
+    fun awaitPreviousDataClear() {
+        InstrumentationRegistry.getInstrumentation().awaitMediaStoreIdle()
+    }
 
     @Test
     fun theTrackMenuConfirmsDeletionAndRestoresTheActualDeviceFile() {

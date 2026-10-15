@@ -117,9 +117,14 @@ def run(name, attempt):
         raise SystemExit(f"{name} timed out after {arguments.class_timeout} seconds; aborting shard")
     cases = [case for report in reports.glob("TEST-*.xml")
              for case in ET.parse(report).getroot().findall(".//testcase")]
-    ok = (process.returncode == 0 and (cases or expected_cases(name, api) == 0)
-          and all(case.get("classname") == "me.d3sox.manida." + name for case in cases))
-    return cases if ok else None
+    completed = [case for case in cases if case.find("skipped") is None]
+    expected = expected_cases(name, api)
+    if len(completed) != expected:
+        print(f"{name}: expected {expected} tests, received {len(completed)} results", flush=True)
+    ok = (process.returncode == 0 and len(completed) == expected
+          and all(case.get("classname") == "me.d3sox.manida." + name
+                  and case.find("failure") is None and case.find("error") is None for case in cases))
+    return completed if ok else None
 
 
 retry = []
@@ -139,6 +144,6 @@ for name in retry:
     flaky.append(name)
     print(f"::warning title=Flaky Android test::{name} failed once and passed on retry", flush=True)
     executed += len(cases)
-if failed or executed < len(classes):
+if failed:
     raise SystemExit(f"Android suite failed: {failed}; passed on retry: {flaky}; {executed} cases across {len(classes)} classes")
 print(f"Passed {executed} Android checks across {len(classes)} classes; passed on retry: {flaky or 'none'}")

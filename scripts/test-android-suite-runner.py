@@ -41,7 +41,12 @@ attempt = Path('invocations').read_text().splitlines().count(name)
 retry = os.environ.get('RETRY') == 'true' and attempt == 1
 suite = ET.Element('testsuite')
 if not retry:
-    ET.SubElement(suite, 'testcase', classname=name, name='example')
+    source = Path('androidApp/src/androidTest/kotlin/me/d3sox/manida') / (name.split('.')[-1] + '.kt')
+    count = 1 if os.environ.get('PARTIAL') == 'true' else source.read_text().count('@Test')
+    for index in range(count):
+        case = ET.SubElement(suite, 'testcase', classname=name, name=f'example{index}')
+        if os.environ.get('SKIPPED') == 'true':
+            ET.SubElement(case, 'skipped')
 ET.ElementTree(suite).write(reports / 'TEST-example.xml')
 """)
         self.environment = dict(os.environ, ANDROID_SERIAL="emulator-5554",
@@ -84,6 +89,8 @@ ET.ElementTree(suite).write(reports / 'TEST-example.xml')
         shutil.copytree(ROOT / SOURCES, self.root / SOURCES, dirs_exist_ok=True)
         expected = {"me.d3sox.manida." + path.stem for path in (ROOT / SOURCES).glob("Android*Test.kt")
                     if "@ColdStartupCheck" not in path.read_text()}
+        for name in expected:
+            self.source(name.split(".")[-1])
         matrix = self.matrix()
         self.assertEqual(matrix, self.matrix(), "Planning must be deterministic")
         for shard in matrix:
@@ -135,6 +142,18 @@ ET.ElementTree(suite).write(reports / 'TEST-example.xml')
         output = self.root / ".test-environment/android-class-results"
         self.assertTrue((output / "AndroidExampleTest/TEST-example.xml").is_file())
         self.assertTrue((output / "AndroidExampleTest-attempt2/TEST-example.xml").is_file())
+
+    def test_partial_report_is_not_accepted_as_a_passing_class(self):
+        self.source("AndroidExampleTest", tests=2)
+        result = self.run_suite(PARTIAL="true")
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(2, len((self.root / "invocations").read_text().splitlines()))
+
+    def test_api_suppressed_class_is_not_a_failure_or_an_executed_test(self):
+        self.source("AndroidExampleTest", annotation="@SdkSuppress(minSdkVersion = 37)")
+        result = self.run_suite(SKIPPED="true")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Passed 0 Android checks", result.stdout)
 
 
 if __name__ == "__main__":

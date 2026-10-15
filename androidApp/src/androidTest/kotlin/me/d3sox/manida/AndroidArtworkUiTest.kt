@@ -16,6 +16,8 @@ import io.github.d3sox.musicplayer.settings.ColorMode
 import io.github.d3sox.musicplayer.settings.ThemeMode
 import io.github.d3sox.musicplayer.settings.MusicPreferences
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -99,9 +101,13 @@ class AndroidArtworkUiTest {
                 app.controller.updatePreferences { it.copy(themeMode = ThemeMode.LIGHT, colors = ColorMode.ARTWORK) }.join()
             }
             ActivityScenario.launch(MainActivity::class.java).use {
-                runBlocking { app.controller.playTrack(app.controller.state.value.songAt(uri.toString())!!.id, listOf(app.controller.state.value.songAt(uri.toString())!!.id), 0).join() }
-                compose.waitUntil(5_000) { app.controller.state.value.playback.playing }
-                runBlocking { app.controller.togglePlayback().join() }
+                runBlocking {
+                    val track = requireNotNull(app.controller.state.value.songAt(uri.toString()))
+                    app.controller.playTrack(track.id, listOf(track.id), 0).join()
+                    // A three-second fixture can finish while Compose is settling on a busy emulator.
+                    withTimeout(5_000) { app.controller.state.first { it.playback.playing } }
+                    app.controller.pause().join()
+                }
                 compose.onNodeWithTag("mini-player").performClick()
                 compose.waitUntil(5_000) {
                     compose.onAllNodesWithContentDescription("Album artwork: Northern Light").fetchSemanticsNodes().isNotEmpty()

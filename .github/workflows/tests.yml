@@ -109,6 +109,8 @@ jobs:
           arch: x86_64
           disable-linux-hw-accel: false
           profile: pixel_2
+          # API 36 can kill androidx.test.services under the device profile's default memory limit.
+          ram-size: 4096M
           emulator-options: -no-window -gpu swangle -noaudio -no-boot-anim -camera-back virtualscene -camera-front emulated
           script: MANIDA_ANDROID_SHARD=${{ matrix.shard.index }}/${{ matrix.shard.total }} bash scripts/ci-tests.sh android
       - if: always()
