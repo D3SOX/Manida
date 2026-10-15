@@ -72,16 +72,22 @@ def run(name, attempt):
     return cases if ok else None
 
 
+retry = []
 for name in classes:
     cases = run(name, 1)
     if cases is None:
-        # Hosted emulators share two slow cores with Gradle, so retry once; a second failure is a real failure.
-        cases = run(name, 2)
-        if cases is None:
-            failed.append(name)
-            continue
-        flaky.append(name)
-        print(f"::warning title=Flaky Android test::{name} failed once and passed on retry", flush=True)
+        retry.append(name)
+    else:
+        executed += len(cases)
+# Hosted emulators share two slow cores with Gradle and keep settling for minutes after boot, so retry failures
+# once after the other classes have run; a second failure is a real failure.
+for name in retry:
+    cases = run(name, 2)
+    if cases is None:
+        failed.append(name)
+        continue
+    flaky.append(name)
+    print(f"::warning title=Flaky Android test::{name} failed once and passed on retry", flush=True)
     executed += len(cases)
 if failed or executed < len(classes):
     raise SystemExit(f"Android suite failed: {failed}; passed on retry: {flaky}; {executed} cases across {len(classes)} classes")
