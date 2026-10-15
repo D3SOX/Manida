@@ -60,6 +60,15 @@ class MilkDropPresetsUiTest {
         }
     }
 
+    @Test fun thePickerShowsTheLastPresetWhenItIsCurrent() {
+        val presets = (0..199).map { io.github.d3sox.musicplayer.visualizer.MilkDropPresetInfo("Preset $it", "Collection") }
+        runComposeUiTest {
+            setContent { MaterialTheme { MilkDropControls(presets, 199, {}, MilkDropSettings(automatic = false), {}) } }
+            onNodeWithContentDescription("Choose MilkDrop preset").performClick()
+            onNode(hasText("Preset 199") and hasAnyAncestor(hasScrollToIndexAction())).assertIsDisplayed()
+        }
+    }
+
     @Test fun thousandsOfPresetsCanBeFilteredSearchedAndSelectedWithoutChangingTheirIndex() {
         val root = File(System.getProperty("musicplayer.testRoot"), "shared/build/milkdrop-tests").apply { mkdirs() }
         val directory = Files.createTempDirectory(root.toPath(), "picker").toFile()

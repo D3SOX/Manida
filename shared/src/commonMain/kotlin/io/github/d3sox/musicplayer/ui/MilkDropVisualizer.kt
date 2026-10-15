@@ -130,7 +130,8 @@ private fun MilkDropPresetPicker(presets: List<MilkDropPresetInfo>, selected: In
             snapshotFlow { list.layoutInfo.viewportSize.height }.filter { it > 0 }.distinctUntilChanged().collectLatest { height ->
                 list.scrollToItem(position)
                 val item = snapshotFlow { list.layoutInfo.visibleItemsInfo.firstOrNull { it.index == position } }.filterNotNull().first()
-                list.scrollBy((item.size - height) / 2f)
+                // Near the end the list can't put the item at the top, so center it from where it actually is.
+                list.scrollBy(item.offset + item.size / 2f - list.layoutInfo.viewportStartOffset - height / 2f)
             }
         }
     }
