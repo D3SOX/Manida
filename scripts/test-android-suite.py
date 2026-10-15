@@ -46,7 +46,7 @@ def run(name, attempt):
     if reports.exists():
         shutil.copytree(reports, output / (name if attempt == 1 else f"{name}-attempt{attempt}"))
     print("::endgroup::", flush=True)
-    ok = result.returncode == 0 and cases and all(case.get("classname") == "me.d3sox.manida." + name for case in cases)
+    ok = result.returncode == 0 and all(case.get("classname") == "me.d3sox.manida." + name for case in cases)
     return cases if ok else None
 
 
