@@ -3,6 +3,7 @@ on:
   push:
     branches: [master]
     paths:
+      - LICENSE
       - androidApp/**
       - desktopApp/**
       - shared/**
