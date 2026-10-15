@@ -64,7 +64,9 @@ class AndroidAdaptiveNavigationUiTest {
             compose.onNodeWithText("Pairing invitation").assertTextContains("invalid code")
             compose.onNodeWithText("Enter pairing code").assertIsDisplayed()
             compose.onNodeWithText("Cancel").performClick()
-            compose.onNodeWithText("Enter code").assertIsDisplayed()
+            compose.onNodeWithText("Enter pairing code").assertDoesNotExist()
+            // The closing keyboard can reflow the page on small screens, so bring the button back into view first.
+            compose.onNodeWithText("Enter code").performScrollTo().assertIsDisplayed()
         }
     }
 }
