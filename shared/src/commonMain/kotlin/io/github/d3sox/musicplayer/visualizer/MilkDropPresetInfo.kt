@@ -20,3 +20,7 @@ fun milkDropNextPreset(indices: List<Int>, selected: Int, direction: Int = 1): I
     if (current < 0) return if (direction < 0) indices.last() else indices.first()
     return indices[((current + direction) % indices.size + indices.size) % indices.size]
 }
+
+/** Picks another eligible preset at random, or the only one when there's no other. */
+fun milkDropRandomPreset(indices: List<Int>, selected: Int, random: kotlin.random.Random = kotlin.random.Random): Int? =
+    indices.filter { it != selected }.randomOrNull(random) ?: indices.firstOrNull()

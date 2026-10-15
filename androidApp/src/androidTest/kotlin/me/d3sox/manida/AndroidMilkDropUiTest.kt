@@ -51,7 +51,7 @@ class AndroidMilkDropUiTest {
                 compose.onNodeWithContentDescription("Change presets automatically").performClick()
                 compose.onNodeWithText("Unlock preset").assertExists()
                 runBlocking { app.controller.setQueueRepeat(io.github.d3sox.musicplayer.playback.RepeatMode.ONE).join(); app.controller.togglePlayback().join() }
-                compose.onNodeWithText("Next preset").performClick()
+                compose.onNodeWithContentDescription("Next preset").performClick()
                 val presets = runBlocking { milkDropLibrary(File(app.filesDir, "milkdrop")) }.presets
                 compose.onNodeWithText(presets[1].name).assertExists()
                 compose.onNodeWithContentDescription("Choose MilkDrop preset").performClick()

@@ -22,6 +22,7 @@ import io.github.d3sox.musicplayer.visualizer.MilkDropPresetInfo
 import io.github.d3sox.musicplayer.visualizer.MilkDropSettings
 import io.github.d3sox.musicplayer.visualizer.milkDropPlaybackIndices
 import io.github.d3sox.musicplayer.visualizer.milkDropNextPreset
+import io.github.d3sox.musicplayer.visualizer.milkDropRandomPreset
 import io.github.d3sox.musicplayer.app.AppState
 import io.github.d3sox.musicplayer.app.MusicController
 import io.github.d3sox.musicplayer.resources.Res
@@ -65,8 +66,14 @@ internal fun MilkDropControls(presets: List<MilkDropPresetInfo>, selected: Int, 
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { milkDropNextPreset(eligible, selected, -1)?.let(select) }, enabled = eligible.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("Previous preset") }
-                OutlinedButton(onClick = { milkDropNextPreset(eligible, selected)?.let(select) }, enabled = eligible.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("Next preset") }
+                listOf<Triple<String, String, () -> Int?>>(
+                    Triple("Previous", "Previous preset") { milkDropNextPreset(eligible, selected, -1) },
+                    Triple("Random", "Random preset") { milkDropRandomPreset(eligible, selected) },
+                    Triple("Next", "Next preset") { milkDropNextPreset(eligible, selected) },
+                ).forEach { (label, description, target) ->
+                    OutlinedButton(onClick = { target()?.let(select) }, enabled = eligible.isNotEmpty(),
+                        modifier = Modifier.weight(1f).semantics { contentDescription = description }) { Text(label, maxLines = 1) }
+                }
             }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

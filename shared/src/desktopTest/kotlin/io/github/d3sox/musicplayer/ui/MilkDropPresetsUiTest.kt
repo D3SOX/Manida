@@ -23,12 +23,16 @@ class MilkDropPresetsUiTest {
             setContent { MaterialTheme { MilkDropControls(presets, selected.intValue, { selected.intValue = it },
                 settings.value, { update -> settings.value = update(settings.value) }) } }
             onNodeWithContentDescription("Favorite current preset: Preset 0").performClick()
-            onNodeWithText("Next preset").performClick()
+            onNodeWithContentDescription("Next preset").performClick()
             onNodeWithContentDescription("Favorite current preset: Preset 1").performClick()
             onNodeWithContentDescription("Only play favorite presets").performClick()
-            onNodeWithText("Next preset").performClick()
+            onNodeWithContentDescription("Next preset").performClick()
             assertEquals(0, selected.intValue)
-            onNodeWithText("Previous preset").performClick()
+            onNodeWithContentDescription("Previous preset").performClick()
+            assertEquals(1, selected.intValue)
+            // Random only picks another favorite, so with two favorites it alternates between them.
+            repeat(3) { onNodeWithContentDescription("Random preset").performClick(); assertEquals(it % 2, selected.intValue) }
+            onNodeWithContentDescription("Random preset").performClick()
             assertEquals(1, selected.intValue)
             onNodeWithContentDescription("Choose MilkDrop preset").performClick()
             onNodeWithText("Favorites").performClick()
@@ -41,7 +45,7 @@ class MilkDropPresetsUiTest {
             onNodeWithContentDescription("Unfavorite preset: Preset 1").performClick()
             onNodeWithText("0 presets").assertIsDisplayed()
             onNodeWithText("Close").performClick()
-            onNodeWithText("Next preset").assertIsNotEnabled()
+            onNodeWithContentDescription("Next preset").assertIsNotEnabled()
         }
     }
 
