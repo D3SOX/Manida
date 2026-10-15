@@ -48,6 +48,7 @@ class AndroidM3uPlaylistsUiTest {
                 fun nodes(node: AccessibilityNodeInfo): List<AccessibilityNodeInfo> = listOf(node) +
                     (0 until node.childCount).mapNotNull { node.getChild(it) }.flatMap(::nodes)
                 val visible = nodes(root).filter { it.isVisibleToUser }
+                if (waitOnNotRespondingDialog(visible)) return@waitUntil false
                 val sidebarOpen = visible.any { it.text?.toString() == "Downloads" && it.viewIdResourceName == "android:id/title" && !it.isEditable }
                 if (text == "Show roots" && requested && sidebarOpen) return@waitUntil true
                 if (titleOnly) {
