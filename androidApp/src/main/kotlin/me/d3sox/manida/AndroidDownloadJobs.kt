@@ -14,6 +14,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.UUID
+
+internal const val DOWNLOAD_SCHEDULE_ID = "schedule-id"
 
 class AndroidDownloadJobs(context: Context, private val preferences: MusicPreferences, private val playlists: Playlists,
     private val onUserDownload: () -> Unit) {
@@ -38,7 +41,10 @@ class AndroidDownloadJobs(context: Context, private val preferences: MusicPrefer
                     .setRequiresStorageNotLow(true)
                     .setPersisted(true)
                     .setPeriodic(15 * 60_000L)
-                    .setExtras(PersistableBundle().apply { putBoolean("refresh-playlists", true) })
+                    .setExtras(PersistableBundle().apply {
+                        putBoolean("refresh-playlists", true)
+                        putString(DOWNLOAD_SCHEDULE_ID, UUID.randomUUID().toString())
+                    })
                     .build()
                 if (scheduler.getPendingJob(PLAYLIST_JOB)?.requiredNetwork != periodic.requiredNetwork)
                     scheduler.schedule(periodic)
@@ -48,6 +54,9 @@ class AndroidDownloadJobs(context: Context, private val preferences: MusicPrefer
                 .setRequiresStorageNotLow(true)
                 .setPersisted(true)
                 .setBackoffCriteria(30_000, JobInfo.BACKOFF_POLICY_EXPONENTIAL)
+                .setExtras(PersistableBundle().apply {
+                    putString(DOWNLOAD_SCHEDULE_ID, UUID.randomUUID().toString())
+                })
             val foregroundTransfer = Build.VERSION.SDK_INT >= 34 && userInitiated
             if (Build.VERSION.SDK_INT >= 34) builder.setUserInitiated(foregroundTransfer)
             val job = builder.build()
