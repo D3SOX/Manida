@@ -18,9 +18,10 @@ import kotlinx.coroutines.flow.sample
 @OptIn(FlowPreview::class)
 class DownloadService : JobService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val running = mutableMapOf<Int, Job>()
+    private val running = mutableMapOf<Pair<Int, String?>, Job>()
 
     override fun onStartJob(params: JobParameters): Boolean {
+        val key = requestKey(params)
         val visibleTransfer = Build.VERSION.SDK_INT >= 34 && params.isUserInitiatedJob
         if (visibleTransfer) showTransfer(params)
         val app = application as MusicApplication
@@ -44,20 +45,23 @@ class DownloadService : JobService() {
             } finally {
                 progress?.cancel()
                 if (isActive) {
-                    running.remove(params.jobId)
+                    running.remove(key)
                     jobFinished(params, retry)
                 }
             }
         }
-        running[params.jobId] = task
+        running[key] = task
         task.start()
         return true
     }
 
     override fun onStopJob(params: JobParameters): Boolean {
-        running.remove(params.jobId)?.cancel()
+        running.remove(requestKey(params))?.cancel()
         return true
     }
+
+    // A replacement can start before Android delivers the previous request's stop callback.
+    private fun requestKey(params: JobParameters) = params.jobId to params.extras.getString(DOWNLOAD_SCHEDULE_ID)
 
     override fun onDestroy() { scope.cancel(); super.onDestroy() }
 
