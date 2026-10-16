@@ -114,7 +114,12 @@ def run(name, attempt):
     print(f"{name}: {time.monotonic() - started:.1f}s", flush=True)
     print("::endgroup::", flush=True)
     if timed_out:
-        raise SystemExit(f"{name} timed out after {arguments.class_timeout} seconds; aborting shard")
+        print(f"::warning title=Hung Android test::{name} timed out after {arguments.class_timeout} seconds", flush=True)
+        # The killed run can leave its instrumentation on the device, so stop both packages before the next class
+        # or the retry starts its own Gradle run.
+        for package in ["me.d3sox.manida", "me.d3sox.manida.test"]:
+            subprocess.run(["adb", "-s", serial, "shell", "am", "force-stop", package], capture_output=True, timeout=30)
+        return None
     cases = [case for report in reports.glob("TEST-*.xml")
              for case in ET.parse(report).getroot().findall(".//testcase")]
     completed = [case for case in cases if case.find("skipped") is None]

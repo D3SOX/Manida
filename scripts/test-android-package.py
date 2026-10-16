@@ -66,10 +66,21 @@ class AndroidPackageTest(unittest.TestCase):
                     deadline = time.monotonic() + 15
                     while time.monotonic() < deadline:
                         root = tree()
-                        deny = next((n for n in root.iter("node") if n.get("resource-id", "").endswith(":id/permission_deny_button")), None)
-                        if deny is not None:
-                            x1, y1, x2, y2 = map(int, re.findall(r"\d+", deny.get("bounds")))
+                        # Answer permission prompts, and "isn't responding" dialogs that slow emulators show for system apps.
+                        # Manida's own dialog is a failure, not something to wait out.
+                        title = next((n.get("text", "") for n in root.iter("node") if n.get("resource-id") == "android:id/alertTitle"), "")
+                        if "Manida" in title:
+                            self.fail("Manida stopped responding: " + title)
+                        dialog = next((n for n in root.iter("node") if n.get("resource-id", "").endswith(":id/permission_deny_button")
+                                       or n.get("resource-id") == "android:id/aerr_wait"), None)
+                        if dialog is not None:
+                            x1, y1, x2, y2 = map(int, re.findall(r"\d+", dialog.get("bounds")))
                             adb("shell", "input", "tap", str((x1+x2)//2), str((y1+y2)//2))
+                            continue
+                        # A slow emulator can leave the launcher in front after the launch, so bring the app back.
+                        if not any(n.get("package") == APP for n in root.iter("node")):
+                            adb("shell", "am", "start", "--user", "0", "-n", APP + "/.MainActivity")
+                            time.sleep(1)
                             continue
                         nodes = [node for node in root.iter("node") if label in [node.get("text"), node.get("content-desc")]]
                         if nodes:

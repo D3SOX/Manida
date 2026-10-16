@@ -39,7 +39,7 @@ class AndroidAutoEqUiTest {
             var requested = false
             fun update(allowClick: Boolean): Boolean {
                 val root = instrumentation.uiAutomation.rootInActiveWindow ?: return false
-                if (waitOnNotRespondingDialog(root.findAccessibilityNodeInfosByViewId("android:id/aerr_wait").filter { it.isVisibleToUser })) return false
+                if (waitOnNotRespondingDialog(root)) return false
                 val titles = root.findAccessibilityNodeInfosByViewId("android:id/title").filter { it.isVisibleToUser }
                 val sidebarOpen = titles.any { it.text?.toString() == "Downloads" && !it.isEditable }
                 if (text == "Show roots" && sidebarOpen) return true
