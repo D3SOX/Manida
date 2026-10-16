@@ -173,6 +173,11 @@ class CollectionSortingUiTest {
                 runBlocking { controller.createPlaylist("Aardvark").join() }
                 waitUntil(timeoutMillis = 3_000) { controller.state.value.playlists.size == 4 }
                 assertTrue(onNodeWithText("Bravo").fetchSemanticsNode().boundsInRoot.top < onNodeWithText("Aardvark").fetchSemanticsNode().boundsInRoot.top)
+                val aardvark = controller.state.value.playlists.single { it.name == "Aardvark" }.id
+                onNodeWithTag("collection-reorder:$alpha", useUnmergedTree = true).performCustomAccessibilityActionWithLabel("Move up")
+                waitUntil(timeoutMillis = 3_000) {
+                    controller.state.value.preferences.collectionLayouts[LibraryTab.PLAYLISTS]?.order == listOf(alpha, charlie, bravo, aardvark)
+                }
             }
         } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
     }

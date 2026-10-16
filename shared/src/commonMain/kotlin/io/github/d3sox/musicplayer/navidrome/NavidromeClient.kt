@@ -186,7 +186,8 @@ class NavidromeClient(
         request(if (favorite) "star" else "unstar", listOf("id" to songId))
     }
 
-    suspend fun coverArt(coverId: String): ByteArray = serverRequest {
+    /** Downloads a cover scaled to [size] pixels, or the original image when [size] is null. */
+    suspend fun coverArt(coverId: String, size: Int? = 1024): ByteArray = serverRequest {
         val salt = Uuid.random().toString()
         http.prepareGet("${baseUrl.trimEnd('/')}/rest/getCoverArt.view") {
             parameter("u", credentials.username)
@@ -196,7 +197,7 @@ class NavidromeClient(
             parameter("c", "Manida")
             parameter("f", "json")
             parameter("id", coverId)
-            parameter("size", "1024")
+            size?.let { parameter("size", it.toString()) }
         }.execute { response ->
             check(response.status.value in 200..299 && response.headers[HttpHeaders.ContentType]?.startsWith("image/") == true) {
                 "Server returned no artwork"
@@ -207,7 +208,7 @@ class NavidromeClient(
             while (true) {
                 val count = channel.readAvailable(buffer)
                 if (count < 0) break
-                check(bytes.size + count <= 8 * 1024 * 1024) { "Server artwork is too large" }
+                check(bytes.size + count <= 10 * 1024 * 1024) { "Server artwork is too large" }
                 if (count > 0) bytes.write(buffer, 0, count)
             }
             bytes.readByteArray()

@@ -759,7 +759,7 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
         val link = previous.server
         if (link != null && (cover != null || removeCover)) {
             val client = serverPlaylistClient(link)
-            val oldCover = if (client.playlistImageUploaded(link.id!!)) link.coverArt?.let { client.coverArt(it) } else null
+            val oldCover = if (client.playlistImageUploaded(link.id!!)) link.coverArt?.let { client.coverArt(it, size = null) } else null
             val oldLocalCover = artwork?.read("playlist:$playlistId")
             setServerPlaylistCover(playlistId, link, client, cover)
             collections.edit(playlistId, name, description)

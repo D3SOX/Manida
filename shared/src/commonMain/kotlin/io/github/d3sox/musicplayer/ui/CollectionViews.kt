@@ -16,7 +16,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -74,8 +76,20 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
     }
     @Composable
     fun ReorderableCollectionItemScope.DragHandle(entry: CollectionItem) {
+        fun moveBy(offset: Int): Boolean {
+            val rows = sortedEntries.toMutableList()
+            val from = rows.indexOf(entry)
+            if (from + offset !in rows.indices) return false
+            rows.add(from + offset, rows.removeAt(from))
+            dragged = rows
+            update { it.copy(order = rows.map(CollectionItem::id)) }
+            return true
+        }
         Box(Modifier.size(48.dp).testTag("collection-reorder:${entry.id}")
-            .semantics { contentDescription = "Reorder ${entry.title}" }
+            .semantics {
+                contentDescription = "Reorder ${entry.title}"
+                customActions = listOf(CustomAccessibilityAction("Move up") { moveBy(-1) }, CustomAccessibilityAction("Move down") { moveBy(1) })
+            }
             .draggableHandle(onDragStopped = { dragged?.let { rows -> update { it.copy(order = rows.map(CollectionItem::id)) } } }),
             contentAlignment = Alignment.Center) { Icon(AppIcon.DRAG.vector, null) }
     }
