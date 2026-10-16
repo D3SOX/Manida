@@ -76,7 +76,8 @@ ET.ElementTree(suite).write(reports / 'TEST-example.xml')
         pid = int((self.root / "gradle.pid").read_text())
         with self.assertRaises(ProcessLookupError):
             os.kill(pid, 0)
-        self.assertEqual(1, len((self.root / "invocations").read_text().splitlines()))
+        # A hang is retried once in a new Gradle run, like any other failure, and fails the shard when it repeats.
+        self.assertEqual(2, len((self.root / "invocations").read_text().splitlines()))
 
     def matrix(self):
         # Planning runs on a fresh runner with neither an Android SDK nor a device.
