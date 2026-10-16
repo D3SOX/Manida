@@ -67,7 +67,7 @@ jobs:
       - run: python3 scripts/test-linux-player.py
       - name: Create the Arch development package
         run: |
-          version=$(sed -n 's/.*packageVersion = "\([^"]*\)".*/\1/p' desktopApp/build.gradle.kts)
+          version=$(sed -n 's/^appVersion=//p' gradle.properties)
           docker compose -f scripts/compose.yaml run --rm -T -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \
             -e "MANIDA_BUILD_UID=$(id -u)" -e "MANIDA_VERSION=$version" -e GITHUB_RUN_NUMBER -e GITHUB_RUN_ID \
             arch \
@@ -79,7 +79,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version=$(sed -n 's/.*packageVersion = "\([^"]*\)".*/\1/p' desktopApp/build.gradle.kts)
+          version=$(sed -n 's/^appVersion=//p' gradle.properties)
           python3 scripts/package-appimage.py --image desktopApp/build/compose/binaries/main/app/manida \
             --output .test-environment/development --version "$version-dev-${GITHUB_SHA:0:12}" \
             --mpv-library .test-environment/mpv-runtime/lib/libmpv.so.2

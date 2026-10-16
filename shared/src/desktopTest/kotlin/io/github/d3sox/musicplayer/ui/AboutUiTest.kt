@@ -36,6 +36,12 @@ class AboutUiTest {
                 val logo = onNodeWithContentDescription("Manida logo").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
                 val page = onNodeWithTag("settings-page").fetchSemanticsNode().boundsInRoot
                 assertTrue(kotlin.math.abs(logo.center.x - page.center.x) < 2f, "The app logo must be centered")
+                val version = java.util.Properties().apply {
+                    Files.newInputStream(java.nio.file.Path.of(System.getProperty("musicplayer.testRoot"), "gradle.properties"))
+                        .use { load(it) }
+                }.getProperty("appVersion")
+                onNodeWithText("Version $version").assertIsDisplayed()
+                captureUiSnapshot("about-manida")
                 for (label in listOf("Source code", "View license")) {
                     val bounds = onNodeWithText(label).assertHasClickAction().fetchSemanticsNode().boundsInRoot
                     assertTrue(kotlin.math.abs(bounds.center.x - page.center.x) < 2f, "$label must be centered")

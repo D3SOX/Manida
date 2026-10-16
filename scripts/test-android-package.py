@@ -55,7 +55,7 @@ class AndroidPackageTest(unittest.TestCase):
             adb("install", "--user", "0", str(signed))
             try:
                 package = adb("shell", "dumpsys", "package", APP)
-                version = re.search(r'versionName = "([^"]+)"', (ROOT / "androidApp/build.gradle.kts").read_text())[1]
+                version = re.search(r"(?m)^appVersion=(.+)$", (ROOT / "gradle.properties").read_text())[1]
                 self.assertIn("versionName=" + version, package)
                 self.assertRegex(package, r"(?m)^\s*flags=\[ (?![^\n]*DEBUGGABLE)")
                 adb("shell", "am", "start", "-W", "--user", "0", "-n", APP + "/.MainActivity")

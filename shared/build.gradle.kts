@@ -7,6 +7,26 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val generateAppVersion = tasks.register("generateAppVersion") {
+    val appVersion = providers.gradleProperty("appVersion")
+    val output = layout.buildDirectory.dir("generated/appVersion")
+    inputs.property("appVersion", appVersion)
+    outputs.dir(output)
+    doLast {
+        output.get().file("io/github/d3sox/musicplayer/ui/AppVersion.desktop.kt").asFile.apply {
+            parentFile.mkdirs()
+            writeText("""
+                package io.github.d3sox.musicplayer.ui
+
+                import androidx.compose.runtime.Composable
+
+                @Composable
+                internal actual fun appVersion(): String = "${appVersion.get()}"
+            """.trimIndent() + "\n")
+        }
+    }
+}
+
 kotlin {
     jvmToolchain(21)
     android {
@@ -60,6 +80,7 @@ kotlin {
             }
         }
         getByName("desktopMain") {
+            kotlin.srcDir(generateAppVersion)
             kotlin.srcDir("src/jvmMain/kotlin")
             dependencies {
                 implementation(compose.desktop.currentOs)
