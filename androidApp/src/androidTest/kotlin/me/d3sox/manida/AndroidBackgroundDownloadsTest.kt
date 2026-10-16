@@ -18,6 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -45,11 +46,20 @@ class AndroidBackgroundDownloadsTest {
         var playlistId: String? = null
         var restoreNetwork: (() -> Unit)? = null
         try {
-            controller.updatePreferences { it.copy(downloadsPaused = false, downloadOnMetered = false) }.join()
+            controller.updatePreferences { it.copy(downloadsPaused = true, downloadOnMetered = false) }.join()
             controller.connectServer("http://127.0.0.1:14533", "fixture", "fixture-password").join()
             val playlist = controller.state.value.playlists.single { it.server?.id == remote.id }
             playlistId = playlist.id
             controller.setPlaylistDownload(playlist.id, true).join()
+            scenario.close()
+            client.savePlaylist(remote.name, listOf(first.id, added.id), remote.id)
+            restoreNetwork = useUnmeteredWifi()
+            check(withTimeoutOrNull(30_000) {
+                controller.state.first { it.downloadNetwork.connected && !it.downloadNetwork.metered }
+            } != null) { "Expected unmetered Wi-Fi, got ${controller.state.value.downloadNetwork}" }
+            // Schedule only after the remote edit: an earlier periodic run can still be active
+            // when `jobscheduler run -f` returns, so that command need not start a fresh refresh.
+            controller.setDownloadsPaused(false).join()
             val scheduler = context.getSystemService(JobScheduler::class.java)
             val periodic = withTimeout(5_000) {
                 while (true) {
@@ -63,10 +73,6 @@ class AndroidBackgroundDownloadsTest {
             }
             assertTrue(periodic.isPersisted)
             assertEquals(15 * 60_000L, periodic.intervalMillis)
-            scenario.close()
-            client.savePlaylist(remote.name, listOf(first.id, added.id), remote.id)
-            restoreNetwork = useUnmeteredWifi()
-            withTimeout(30_000) { controller.state.first { it.downloadNetwork.connected && !it.downloadNetwork.metered } }
             val output = ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(
                 "cmd jobscheduler run -f ${context.packageName} ${periodic.id}")).bufferedReader().use { it.readText() }
             check("Running job" in output) { output }
@@ -163,7 +169,9 @@ class AndroidBackgroundDownloadsTest {
             scenario.close()
             restoreNetwork = useUnmeteredWifi()
             controller.setDownloadsPaused(false).join()
-            withTimeout(30_000) { controller.state.first { it.downloadNetwork.connected && !it.downloadNetwork.metered } }
+            check(withTimeoutOrNull(30_000) {
+                controller.state.first { it.downloadNetwork.connected && !it.downloadNetwork.metered }
+            } != null) { "Expected unmetered Wi-Fi, got ${controller.state.value.downloadNetwork}" }
             val scheduler = context.getSystemService(JobScheduler::class.java)
             val job = withTimeout(5_000) {
                 while (true) {
@@ -195,18 +203,22 @@ class AndroidBackgroundDownloadsTest {
         }
     }
 
-    /** CI emulators may only have metered cellular data, so turn on Wi-Fi and mark it unmetered for unmetered-only jobs. */
+    /** Select Wi-Fi explicitly; Android can prefer validated cellular data while Wi-Fi validation is pending. */
     private fun useUnmeteredWifi(): () -> Unit {
         fun shell(command: String): String = ParcelFileDescriptor.AutoCloseInputStream(
             InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)).bufferedReader().use { it.readText() }
         val originalMetered = shell("cmd netpolicy list wifi-networks").lineSequence().firstOrNull { it.startsWith("AndroidWifi;") }
             ?.substringAfter(';')?.let { if (it == "none") "undefined" else it } ?: "undefined"
         val wifiWasOn = shell("settings get global wifi_on").trim() != "0"
-        val restore = {
+        val originalMobile = shell("settings get global mobile_data").trim()
+        check(originalMobile in listOf("0", "1"))
+        val restore: () -> Unit = {
             shell("cmd netpolicy set metered-network AndroidWifi $originalMetered")
             if (!wifiWasOn) shell("svc wifi disable")
+            shell(if (originalMobile == "1") "svc data enable" else "svc data disable")
         }
         try {
+            shell("svc data disable")
             shell("svc wifi enable")
             shell("cmd netpolicy set metered-network AndroidWifi false")
         } catch (failure: Throwable) {
