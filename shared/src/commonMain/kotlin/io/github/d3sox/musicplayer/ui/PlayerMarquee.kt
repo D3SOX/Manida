@@ -37,7 +37,8 @@ internal class PlayerMarqueeState(private val scope: CoroutineScope) {
 
     fun update(key: Any, overflow: Float, velocity: Float) {
         consumers[key] = overflow
-        this.velocity = velocity
+        // Hidden copies use other text sizes; only text that scrolls sets the speed.
+        if (overflow > 0f) this.velocity = velocity
         refresh()
     }
 
