@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -82,14 +83,18 @@ internal fun MilkDropControls(presets: List<MilkDropPresetInfo>, selected: Int, 
                 }
             }
         }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Change preset every 20 seconds", Modifier.weight(1f))
-            Switch(settings.automatic, { enabled -> change { it.copy(automatic = enabled) } }, Modifier.semantics { contentDescription = "Change presets automatically" })
+        @Composable fun SwitchRow(label: String, description: String, checked: Boolean, toggle: (Boolean) -> Unit) =
+            // The whole row toggles, not just the switch.
+            Row(Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch, onValueChange = toggle)
+                .semantics { contentDescription = description }, verticalAlignment = Alignment.CenterVertically) {
+                Text(label, Modifier.weight(1f))
+                Switch(checked, null)
+            }
+        SwitchRow("Change preset every 20 seconds", "Change presets automatically", settings.automatic) { enabled ->
+            change { it.copy(automatic = enabled) }
         }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Only play favorite presets", Modifier.weight(1f))
-            Switch(settings.favoritesOnly, { enabled -> change { it.copy(favoritesOnly = enabled) } },
-                Modifier.semantics { contentDescription = "Only play favorite presets" })
+        SwitchRow("Only play favorite presets", "Only play favorite presets", settings.favoritesOnly) { enabled ->
+            change { it.copy(favoritesOnly = enabled) }
         }
         if (settings.favoritesOnly && eligible.isEmpty()) Text("Favorite a preset to start the visualizer.", style = MaterialTheme.typography.bodySmall)
     }
