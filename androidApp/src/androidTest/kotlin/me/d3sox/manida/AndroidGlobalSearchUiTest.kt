@@ -49,8 +49,17 @@ class AndroidGlobalSearchUiTest {
                 compose.onNodeWithTag("search-type:PLAYLISTS").performScrollTo().performClick()
                 compose.onNodeWithContentDescription("Playlist options: Signal playlist").performClick()
                 compose.onNodeWithText("Edit playlist").assertIsDisplayed()
-                instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
-                compose.waitUntil(5_000) { compose.onAllNodesWithText("Edit playlist").fetchSemanticsNodes().isEmpty() }
+                // Slow emulators sometimes drop an injected Back while the menu's window is opening, so repeat it
+                // at most once a second until the menu closes.
+                var lastBack = 0L
+                compose.waitUntil(10_000) {
+                    val open = compose.onAllNodesWithText("Edit playlist").fetchSemanticsNodes().isNotEmpty()
+                    if (open && System.currentTimeMillis() - lastBack >= 1_000) {
+                        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+                        lastBack = System.currentTimeMillis()
+                    }
+                    !open
+                }
                 compose.onNodeWithContentDescription("Close search").performClick()
                 compose.onNodeWithTag("home-page").assertIsDisplayed()
                 assertNull(controller.state.value.error)
