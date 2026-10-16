@@ -68,7 +68,8 @@ class AndroidFileConsentTest {
                     withTimeout(5_000) {
                         fun allow(node: AccessibilityNodeInfo?): Boolean {
                             if (node == null) return false
-                            if (node.text?.toString() == "Allow" && node.isClickable)
+                            // System images expose this label as either "Allow" or "ALLOW".
+                            if (node.text?.toString()?.equals("Allow", ignoreCase = true) == true && node.isClickable)
                                 return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
                             return (0 until node.childCount).any { allow(node.getChild(it)) }
                         }
