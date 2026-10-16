@@ -335,6 +335,16 @@ class PlaybackQueueTest {
         }
     }
 
+    @Test fun startingAnEmptyQueueFromAnUpNextSongLeavesNoUpNext() = runBlocking {
+        withQueue { queue ->
+            queue.replace(listOf("a", "b"))
+            queue.playNext("requested")
+            queue.select(queue.snapshot().upNext.single().id)
+            queue.startEmpty()
+            assertEquals(listOf(QueueSection.CONTEXT), queue.snapshot().entries.map { it.section })
+        }
+    }
+
     @Test fun overwriteKeepsTheSavedIdentityAndNameAndSelectsTheReplacement() = runBlocking {
         withQueue { queue ->
             queue.replace(listOf("old"))
