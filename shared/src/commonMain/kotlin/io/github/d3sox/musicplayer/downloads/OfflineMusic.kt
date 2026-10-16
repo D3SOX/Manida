@@ -41,6 +41,7 @@ class OfflineMusic(private val store: MusicStore, private val library: MusicLibr
     private val preferences = MusicPreferences(store)
     private val transfers = Mutex()
     private val runs = Mutex()
+    private val refreshing = Mutex()
     @Volatile private var processing: Deferred<Unit>? = null
     @Volatile private var changingLibrary = false
 
@@ -242,7 +243,10 @@ class OfflineMusic(private val store: MusicStore, private val library: MusicLibr
         refresh()
     }
 
-    private suspend fun refresh() { mutableState.value = store.list<DownloadRecord>("downloads").associateBy { it.trackId } }
+    // Refreshes run concurrently, so read and publish under one lock. Otherwise an older read can replace newer state.
+    private suspend fun refresh() = refreshing.withLock {
+        mutableState.value = store.list<DownloadRecord>("downloads").associateBy { it.trackId }
+    }
     override fun close() { processing?.cancel(); supervisor.cancel() }
     suspend fun closeAndJoin() { val task = processing; close(); task?.join(); supervisor.join() }
 }
