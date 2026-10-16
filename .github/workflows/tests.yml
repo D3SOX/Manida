@@ -102,6 +102,11 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      # The emulator action downloads these without retrying, so a corrupt archive would fail the job before tests run.
+      - run: >-
+          bash scripts/sdkmanager-retry.sh emulator platform-tools 'build-tools;37.0.0'
+          'platforms;android-${{ matrix.device.api }}'
+          'system-images;android-${{ matrix.device.api }};${{ matrix.device.target }};x86_64'
       - uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         # Leave time for uploading reports if emulator boot, fixture setup, or teardown stalls.
         timeout-minutes: 20
