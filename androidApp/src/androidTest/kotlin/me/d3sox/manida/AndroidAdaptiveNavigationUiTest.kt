@@ -1,10 +1,14 @@
 package me.d3sox.manida
 
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
+import android.os.SystemClock
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import io.github.d3sox.musicplayer.library.LibraryTab
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -14,13 +18,36 @@ import org.junit.Test
 class AndroidAdaptiveNavigationUiTest {
     @get:Rule val compose = createEmptyComposeRule()
 
+    /**
+     * Compose can hang forever if it syncs while a rotation detaches the old activity's views,
+     * so wait for the recreated activity before touching Compose again.
+     */
+    private fun ActivityScenario<MainActivity>.rotate(orientation: Int) {
+        onActivity { it.requestedOrientation = orientation }
+        val expected = if (orientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) Configuration.ORIENTATION_LANDSCAPE
+            else Configuration.ORIENTATION_PORTRAIT
+        val deadline = SystemClock.uptimeMillis() + 10_000
+        while (true) {
+            var settled = false
+            InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                settled = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).any {
+                    it is MainActivity && it.resources.configuration.orientation == expected && it.hasWindowFocus()
+                }
+            }
+            if (settled) return
+            check(SystemClock.uptimeMillis() < deadline) { "The activity did not settle after rotating" }
+            Thread.sleep(50)
+        }
+    }
+
     @Test fun rotatingAPhoneShowsMorePagesAndRestoresTheSelectedOverflowPage() {
         val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MusicApplication
         val controller = app.controller
         runBlocking { controller.updatePreferences { it.copy(lastLibraryTab = LibraryTab.RECOMMENDATIONS) }.join() }
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             var originalOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            scenario.onActivity { originalOrientation = it.requestedOrientation; it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+            scenario.onActivity { originalOrientation = it.requestedOrientation }
+            scenario.rotate(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
             try {
                 compose.waitUntil(5_000) { controller.state.value.libraryReady }
                 compose.onNodeWithText("More").assertIsSelected()
@@ -28,7 +55,7 @@ class AndroidAdaptiveNavigationUiTest {
                 val portraitCount = compose.onAllNodes(items).fetchSemanticsNodes().size
                 val portraitWidth = compose.onNodeWithTag("library-navigation").fetchSemanticsNode().boundsInRoot.width
                 assertTrue(portraitCount <= 5)
-                scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
+                scenario.rotate(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
                 compose.waitUntil(10_000) {
                     compose.onAllNodes(hasTestTag("library-navigation")).fetchSemanticsNodes().singleOrNull()?.boundsInRoot?.width
                         ?.let { it > portraitWidth } == true
@@ -37,7 +64,7 @@ class AndroidAdaptiveNavigationUiTest {
                 compose.openLibraryPage("Recommendations")
                 compose.onNodeWithText("Songs").performClick().assertIsSelected()
                 compose.waitUntil(5_000) { controller.state.value.preferences.lastLibraryTab == LibraryTab.SONGS }
-                scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+                scenario.rotate(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
                 compose.waitUntil(10_000) {
                     compose.onAllNodes(hasTestTag("library-navigation")).fetchSemanticsNodes().singleOrNull()?.boundsInRoot?.width
                         ?.let { it <= portraitWidth } == true
