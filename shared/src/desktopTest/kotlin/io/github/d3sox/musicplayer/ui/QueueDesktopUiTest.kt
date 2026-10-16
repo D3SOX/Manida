@@ -155,7 +155,21 @@ class QueueDesktopUiTest {
         onNodeWithText(tracks[0].metadata.title).assertIsDisplayed()
     }
 
-    @Test fun anEmptyManualQueueHasNoHeadingOrRemainingTime() = withPlayer { controller, tracks ->
+    @Test fun removingAPreviousTrackKeepsTheExpandedHistoryScrollPosition() = withPlayer { controller, tracks ->
+        runBlocking { controller.skip(19).join() }
+        val list = onNode(hasScrollToIndexAction())
+        list.performScrollToIndex(0)
+        onNodeWithText("Show all 20").performClick()
+        list.performScrollToIndex(0)
+        onNodeWithText(tracks[0].metadata.title).assertIsDisplayed()
+        val removed = controller.state.value.queue.entries.first { it.trackId == tracks[1].id }
+        runBlocking { controller.removeQueueEntry(removed.id).join() }
+        waitForIdle()
+        onNodeWithText("Previously played").assertIsDisplayed()
+        onNodeWithText(tracks[0].metadata.title).assertIsDisplayed()
+    }
+
+    @Test fun anEmptyManualQueueHasNoHeadingOrRemainingTime()= withPlayer { controller, tracks ->
         onNodeWithText("Up next").assertDoesNotExist()
         onNodeWithContentDescription("Manual queue time remaining").assertDoesNotExist()
         runBlocking { controller.enqueue(tracks[0].id, QueueAction.APPEND).join() }

@@ -223,7 +223,8 @@ internal fun PlayerPanels(state: AppState, controller: MusicController, sheet: A
                 show(if (origin == PlayerPanel.QUEUE) PlayerPanel.PLAYING else PlayerPanel.MINI)
             })
         val queueVisible by remember(sheet) { derivedStateOf { sheet.offset < 0f || sheet.targetValue == PlayerPanel.QUEUE } }
-        LaunchedEffect(queueVisible, state.queue.currentEntryId, rows.indexOfFirst { it.key == "queue:current" }) {
+        // Removing earlier tracks shifts the current row; that must not pull a scrolled history back to it.
+        LaunchedEffect(queueVisible, state.queue.currentEntryId, previousTrackLimit) {
             if (queueVisible && state.queue.entries.isNotEmpty()) {
                 withFrameNanos { }
                 queueScroll.scrollToItem(rows.indexOfFirst { it.key == "queue:current" }.coerceAtLeast(0))
