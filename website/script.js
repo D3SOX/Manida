@@ -218,6 +218,7 @@
 
   let start = performance.now();
   let raf = 0;
+  let presetTimer = 0;
 
   function running() { return renderer && visible && !paused && !reducedQuery.matches && !document.hidden; }
 
@@ -231,10 +232,24 @@
   function update() {
     if (running()) {
       if (!raf) raf = requestAnimationFrame(loop);
-    } else if (raf) {
-      cancelAnimationFrame(raf);
-      raf = 0;
+      if (!presetTimer) presetTimer = setTimeout(nextPreset, 10000);
+    } else {
+      if (raf) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      }
+      clearTimeout(presetTimer);
+      presetTimer = 0;
     }
+  }
+
+  function nextPreset() {
+    clearTimeout(presetTimer);
+    presetTimer = 0;
+    index = (index + 1) % presets.length;
+    applyColours();
+    if (!running()) still();
+    update();
   }
 
   // Reduced motion: simulate a couple of seconds off-screen and show one still frame.
@@ -267,13 +282,10 @@
     renderer = null;
     canvas.hidden = true;
     motionButton.hidden = true;
+    update();
   });
 
-  nextButton.addEventListener("click", () => {
-    index = (index + 1) % presets.length;
-    applyColours();
-    if (!running()) still();
-  });
+  nextButton.addEventListener("click", nextPreset);
   motionButton.addEventListener("click", () => {
     paused = !paused;
     if (!paused) start = performance.now() - frame * 16;
