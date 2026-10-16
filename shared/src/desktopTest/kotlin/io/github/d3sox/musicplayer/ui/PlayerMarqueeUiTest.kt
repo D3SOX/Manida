@@ -2,6 +2,7 @@ package io.github.d3sox.musicplayer.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
@@ -71,6 +72,34 @@ class PlayerMarqueeUiTest {
         mainClock.advanceTimeBy(32)
         val resized = onNodeWithTag("marquee").captureToImage().toPixelMap()
         assertTrue(difference(scrolling, resized) < .025, "The marquee must retain its position when the player width changes")
+    }
+
+    @Test fun aMarqueeStopsAnimatingOnceItsTextFitsOrIsHidden() = runComposeUiTest {
+        var width by mutableStateOf(200.dp)
+        var active by mutableStateOf(true)
+        lateinit var shared: PlayerMarqueeState
+        mainClock.autoAdvance = false
+        setContent { MaterialTheme {
+            val scope = rememberCoroutineScope()
+            val scrolling = remember { PlayerMarqueeState(scope) }
+            SideEffect { shared = scrolling }
+            Box(Modifier.requiredWidth(width)) {
+                PlayerMarquee("ABCDEFGHIJKLMNOPQRSTUVWXYZ ".repeat(5), TextStyle(fontFamily = FontFamily.Monospace, fontSize = 16.sp),
+                    marqueeState = scrolling, active = active)
+            }
+        } }
+        mainClock.advanceTimeBy(4_000)
+        assertTrue(shared.position > 0f, "The test must reach a scrolling title")
+        runOnIdle { width = 4_000.dp }
+        mainClock.advanceTimeBy(100)
+        val fitting = shared.position
+        mainClock.advanceTimeBy(3_000)
+        assertEquals(fitting, shared.position, "Text that fits must not keep requesting frames")
+        runOnIdle { width = 200.dp; active = false }
+        mainClock.advanceTimeBy(100)
+        val hidden = shared.position
+        mainClock.advanceTimeBy(3_000)
+        assertEquals(hidden, shared.position, "Hidden text must not keep requesting frames")
     }
 
     private fun difference(first: PixelMap, second: PixelMap): Double {
