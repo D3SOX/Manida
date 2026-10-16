@@ -311,8 +311,11 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
         scrobbling?.let { service -> scope.launch {
             service.observe().collect { status -> operations.withLock { mutableState.update { it.copy(scrobbling = status) } } }
         } }
-        scope.launch { library.observe().collect { tracks ->
-            operations.withLock { mutableState.update { it.copy(tracks = tracks) } }
+        scope.launch { library.observe().collect {
+            operations.withLock {
+                val tracks = library.tracks()
+                mutableState.update { it.copy(tracks = tracks) }
+            }
         } }
         playlists?.let { collections -> scope.launch {
             collections.observe().collect { updated ->
