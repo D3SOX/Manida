@@ -39,6 +39,8 @@ internal fun <T> AnimatedNavigation(target: T, parent: T, canGoBack: Boolean,
     var seeking by remember { mutableStateOf<Job?>(null) }
     LaunchedEffect(target, gesture) {
         if (!gesture) {
+            // Forward navigation opens a fresh page; only going back restores saved state.
+            if (depth(target) > depth(state.currentState)) holder.removeState(target.toString())
             if (state.currentState == target && state.targetState != target) {
                 // Reverse the existing back preview; retargeting would start a new entrance.
                 coroutineScope {

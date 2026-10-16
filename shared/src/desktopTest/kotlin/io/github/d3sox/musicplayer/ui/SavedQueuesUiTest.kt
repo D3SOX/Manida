@@ -62,4 +62,38 @@ class SavedQueuesUiTest {
             }
         } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
     }
+
+    @Test fun reopeningSavedQueuesAfterSelectingFromADetailPageShowsTheList() {
+        val directory = Files.createTempDirectory("saved-queues-reopen-ui")
+        val store = openMusicStore(directory.resolve("library.db").toString())
+        val library = MusicLibrary(store)
+        val audio = Path.of(System.getProperty("musicplayer.testRoot"), "androidApp/src/androidTest/assets/fixture.flac").toString()
+        val track = runBlocking { library.importTrack(TrackMetadata("Song", durationMs = 3_000), TrackSource("source:1", SourceKind.LOCAL, audio)) }
+        val queue = PlaybackQueue(store)
+        val controller = MusicController(library, queue, MpvPlaybackEngine("null"))
+        try {
+            runComposeUiTest {
+                setContent { MusicPlayerApp(controller) }
+                waitUntil(timeoutMillis = 5_000) { controller.state.value.libraryReady }
+                runBlocking { controller.playTrack(track.id, listOf(track.id)).join(); controller.pause().join(); controller.saveQueue("Evening").join() }
+                fun selectFromDetailPage() {
+                    onNode(hasText("Evening") and hasClickAction()).performClick()
+                    onNodeWithText("Select queue").performClick()
+                }
+                onNodeWithContentDescription("Settings").performClick()
+                onNodeWithText("Saved queues").performScrollTo().performClick()
+                selectFromDetailPage()
+                onNodeWithText("Saved queues").performScrollTo().performClick()
+                onNodeWithText("Save current queue").assertIsDisplayed()
+                selectFromDetailPage()
+                onNodeWithContentDescription("Back").performClick()
+                onNodeWithTag("mini-player").performClick()
+                onNodeWithContentDescription("Queue").performClick()
+                onNodeWithContentDescription("Saved queues").performClick()
+                onNodeWithText("Manage saved queues").performClick()
+                onNodeWithText("Save current queue").assertIsDisplayed()
+                assertNull(controller.state.value.error)
+            }
+        } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
 }
