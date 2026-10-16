@@ -31,7 +31,7 @@ compose.desktop {
             appResourcesRootDir.set(layout.buildDirectory.dir("visualizer-resources"))
             targetFormats(TargetFormat.Deb)
             packageName = "manida"
-            packageVersion = "0.2.0"
+            packageVersion = providers.gradleProperty("appVersion").get()
             linux { iconFile.set(rootProject.file("packaging/manida.png")) }
             modules("java.sql", "java.net.http", "jdk.unsupported", "jdk.security.auth")
         }

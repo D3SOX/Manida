@@ -18,6 +18,9 @@ import io.github.d3sox.musicplayer.resources.manida_logo
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
+internal expect fun appVersion(): String
+
+@Composable
 internal fun AboutManida(dismiss: () -> Unit) {
     val uriHandler = LocalUriHandler.current
     val source = "https://github.com/D3SOX/Manida"
@@ -36,6 +39,8 @@ internal fun AboutManida(dismiss: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Image(painterResource(Res.drawable.manida_logo), "Manida logo", Modifier.size(144.dp))
             Text("Manida", style = MaterialTheme.typography.headlineLarge)
+            Text("Version ${appVersion()}", style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Local music and your music server in one library.", textAlign = TextAlign.Center)
             Text("AGPL-3.0-only", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
