@@ -15,4 +15,3 @@ python scripts/package-linux.py --image desktopApp/build/compose/binaries/main/a
 python scripts/package-repository.py --release .test-environment/release \
     --output .test-environment/pages --signing-key "${MANIDA_ARCH_SIGNING_FINGERPRINT:?Configure the full signing fingerprint}"
 cp .test-environment/pages/arch/x86_64/*.pkg.tar.zst.sig .test-environment/release/
-cp .test-environment/pages/manida.asc .test-environment/release/
