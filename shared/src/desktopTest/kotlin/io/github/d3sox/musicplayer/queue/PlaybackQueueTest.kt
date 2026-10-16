@@ -316,6 +316,25 @@ class PlaybackQueueTest {
         }
     }
 
+    @Test fun startingAnEmptyQueueKeepsOnlyTheCurrentSongAndLeavesTheSavedQueueIntact() = runBlocking {
+        withQueue { queue ->
+            queue.replace(listOf("a", "b", "c"), startIndex = 1, contextName = "Album", origin = QueueOrigin(collectionId = "album"))
+            queue.append("requested")
+            queue.save("Evening", select = true)
+            queue.setPosition(42_000)
+            val before = queue.snapshot()
+            queue.startEmpty()
+            val empty = queue.snapshot()
+            assertEquals(listOf(before.entries[1]), empty.entries)
+            assertEquals(before.currentEntryId, empty.currentEntryId)
+            assertEquals(42_000, empty.positionMs)
+            assertEquals(QueueSnapshot().contextName, empty.contextName)
+            assertEquals(null, empty.origin)
+            assertEquals(null, empty.selectedSavedQueueId)
+            assertEquals(before.copy(selectedSavedQueueId = null), queue.saved().single { it.name == "Evening" }.snapshot)
+        }
+    }
+
     @Test fun overwriteKeepsTheSavedIdentityAndNameAndSelectsTheReplacement() = runBlocking {
         withQueue { queue ->
             queue.replace(listOf("old"))

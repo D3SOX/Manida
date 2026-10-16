@@ -391,16 +391,16 @@ internal fun PlayerPanels(state: AppState, controller: MusicController, sheet: A
                         }
                         Box {
                             var selectingQueue by remember { mutableStateOf(false) }
-                            AppIconButton(AppIcon.QUEUE, "Saved queues", onClick = {
-                                if (state.savedQueues.none { it.kind == io.github.d3sox.musicplayer.queue.SavedQueueKind.LIVE }) savedQueues() else selectingQueue = true
-                            })
+                            AppIconButton(AppIcon.QUEUE, "Saved queues", onClick = { selectingQueue = true })
                             DropdownMenu(selectingQueue, { selectingQueue = false }) {
                                 state.savedQueues.filter { it.kind == io.github.d3sox.musicplayer.queue.SavedQueueKind.LIVE }.forEach { saved ->
                                     AppMenuItem(text = { Text(saved.name) },
                                         leadingIcon = { Icon(if (saved.id == state.queue.selectedSavedQueueId) AppIcon.CHECK.vector else AppIcon.QUEUE.vector, null) },
                                         onClick = { selectingQueue = false; controller.loadSavedQueue(saved.id) })
                                 }
-                                AppMenuItem(text = { Text("Use temporary queue") }, onClick = { selectingQueue = false; controller.detachSavedQueue() })
+                                if (state.queue.selectedSavedQueueId != null)
+                                    AppMenuItem(text = { Text("Use temporary queue") }, onClick = { selectingQueue = false; controller.detachSavedQueue() })
+                                AppMenuItem(text = { Text("New empty queue") }, onClick ={ selectingQueue = false; controller.startEmptyQueue() })
                                 AppMenuItem(text = { Text("Manage saved queues") }, onClick = { selectingQueue = false; savedQueues() })
                             }
                         }

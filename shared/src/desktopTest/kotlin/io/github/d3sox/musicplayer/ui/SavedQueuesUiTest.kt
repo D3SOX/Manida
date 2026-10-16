@@ -96,4 +96,30 @@ class SavedQueuesUiTest {
             }
         } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
     }
+
+    @Test fun aNewEmptyQueueKeepsOnlyThePlayingSong() {
+        val directory = Files.createTempDirectory("empty-queue-ui")
+        val store = openMusicStore(directory.resolve("library.db").toString())
+        val library = MusicLibrary(store)
+        val audio = Path.of(System.getProperty("musicplayer.testRoot"), "androidApp/src/androidTest/assets/fixture.flac").toString()
+        val tracks = runBlocking { (1..3).map { library.importTrack(TrackMetadata("Song $it", durationMs = 3_000), TrackSource("source:$it", SourceKind.LOCAL, audio)) } }
+        val queue = PlaybackQueue(store)
+        val controller = MusicController(library, queue, MpvPlaybackEngine("null"))
+        try {
+            runComposeUiTest {
+                setContent { MusicPlayerApp(controller) }
+                waitUntil(timeoutMillis = 5_000) { controller.state.value.libraryReady }
+                runBlocking { controller.playTrack(tracks[1].id, tracks.map { it.id }, 1, "Album").join(); controller.pause().join() }
+                val playing = controller.state.value.queue.currentEntryId
+                onNodeWithTag("mini-player").performClick()
+                onNodeWithContentDescription("Queue").performClick()
+                onNodeWithContentDescription("Saved queues").performClick()
+                onNodeWithText("New empty queue").performClick()
+                waitUntil(timeoutMillis = 5_000) { controller.state.value.queue.entries.size == 1 }
+                assertEquals(playing, controller.state.value.queue.currentEntryId)
+                assertEquals(listOf(tracks[1].id), runBlocking { queue.snapshot() }.entries.map { it.trackId })
+                assertNull(controller.state.value.error)
+            }
+        } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
 }
