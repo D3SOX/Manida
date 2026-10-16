@@ -19,11 +19,11 @@ enum class ColorMode { SYSTEM, ARTWORK, CUSTOM }
 enum class CollectionView { LIST, GRID }
 
 @Serializable
-enum class CollectionSort { NAME, ARTIST, YEAR, SONG_COUNT, RECENT }
+enum class CollectionSort { NAME, ARTIST, YEAR, SONG_COUNT, RECENT, CUSTOM }
 
 @Serializable
 data class CollectionLayout(val view: CollectionView = CollectionView.GRID, val columns: Int? = null,
-    val sort: CollectionSort = CollectionSort.NAME, val descending: Boolean = false)
+    val sort: CollectionSort = CollectionSort.NAME, val descending: Boolean = false, val order: List<String> = emptyList())
 
 @Serializable
 data class LibraryPosition(val index: Int = 0, val offset: Int = 0)

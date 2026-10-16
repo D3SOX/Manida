@@ -19,6 +19,7 @@ internal fun CollectionSort.label() = when (this) {
     CollectionSort.YEAR -> "Year"
     CollectionSort.SONG_COUNT -> "Song count"
     CollectionSort.RECENT -> "Recently added music"
+    CollectionSort.CUSTOM -> "Custom order"
 }
 
 internal fun CollectionSort.icon() = when (this) {
@@ -27,6 +28,7 @@ internal fun CollectionSort.icon() = when (this) {
     CollectionSort.YEAR -> AppIcon.YEAR
     CollectionSort.SONG_COUNT -> AppIcon.REPEAT_COUNT
     CollectionSort.RECENT -> AppIcon.RECENT
+    CollectionSort.CUSTOM -> AppIcon.DRAG
 }
 
 @Composable
@@ -50,10 +52,16 @@ internal fun CollectionOrder(tab: LibraryTab, layout: CollectionLayout, controll
             (tab to change(settings.collectionLayouts[tab] ?: CollectionLayout()))) }
     }
     Box {
-        SortIconButton(layout.sort.icon(), "Collection order", "${layout.sort.label()}, ${if (layout.descending) "Descending" else "Ascending"}") { expanded = true }
+        val current = if (layout.sort == CollectionSort.CUSTOM) layout.sort.label()
+            else "${layout.sort.label()}, ${if (layout.descending) "Descending" else "Ascending"}"
+        SortIconButton(layout.sort.icon(), "Collection order", current) { expanded = true }
         DropdownMenu(expanded, { expanded = false }) {
             val choices = listOf(CollectionSort.NAME, CollectionSort.SONG_COUNT, CollectionSort.RECENT) +
-                if (tab == LibraryTab.ALBUMS) listOf(CollectionSort.ARTIST, CollectionSort.YEAR) else emptyList()
+                when (tab) {
+                    LibraryTab.ALBUMS -> listOf(CollectionSort.ARTIST, CollectionSort.YEAR)
+                    LibraryTab.PLAYLISTS -> listOf(CollectionSort.CUSTOM)
+                    else -> emptyList()
+                }
             choices.forEach { sort ->
                 AppMenuItem(text = { Text(sort.label()) }, leadingIcon = { Icon(sort.icon().vector, null) },
                     trailingIcon = { if (sort == layout.sort) Icon(AppIcon.CHECK.vector, null) },
@@ -62,11 +70,13 @@ internal fun CollectionOrder(tab: LibraryTab, layout: CollectionLayout, controll
                         expanded = false
                     })
             }
-            HorizontalDivider()
-            val label = if (layout.descending) "Descending" else "Ascending"
-            AppMenuItem(text = { Text(label) }, leadingIcon = { Icon((if (layout.descending) AppIcon.DESCENDING else AppIcon.ASCENDING).vector, null) },
-                modifier = Modifier.semantics { contentDescription = label },
-                onClick = { update { it.copy(descending = !it.descending) }; expanded = false })
+            if (layout.sort != CollectionSort.CUSTOM) {
+                HorizontalDivider()
+                val label = if (layout.descending) "Descending" else "Ascending"
+                AppMenuItem(text = { Text(label) }, leadingIcon = { Icon((if (layout.descending) AppIcon.DESCENDING else AppIcon.ASCENDING).vector, null) },
+                    modifier = Modifier.semantics { contentDescription = label },
+                    onClick = { update { it.copy(descending = !it.descending) }; expanded = false })
+            }
         }
     }
 }

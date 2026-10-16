@@ -135,6 +135,48 @@ class CollectionSortingUiTest {
         } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
     }
 
+    @Test fun playlistsCanBeDraggedIntoACustomOrderThatIsRemembered() {
+        val directory = Files.createTempDirectory("playlist-custom-order")
+        val store = openMusicStore(directory.resolve("music.db").toString())
+        val library = MusicLibrary(store)
+        val playlists = io.github.d3sox.musicplayer.playlists.Playlists(store)
+        val preferences = MusicPreferences(store)
+        val (alpha, bravo, charlie) = runBlocking { listOf("Alpha", "Bravo", "Charlie").map { playlists.create(it, emptyList()).id } }
+        val controller = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"), preferences = preferences, playlists = playlists)
+        try {
+            runComposeUiTest {
+                setContent { MusicPlayerApp(controller) }
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.libraryReady }
+                openLibraryPage("Playlists")
+                onNodeWithContentDescription("Collection view").performClick()
+                onNodeWithText("List").performClick()
+                onNodeWithTag("collection-reorder:$alpha", useUnmergedTree = true).assertDoesNotExist()
+                onNodeWithContentDescription("Collection order").performClick()
+                onNodeWithText("Custom order").performClick()
+                onNodeWithContentDescription("Collection order").performClick()
+                onNodeWithContentDescription("Ascending").assertDoesNotExist()
+                onNodeWithText("Custom order").performClick()
+                val handle = onNodeWithTag("collection-reorder:$charlie", useUnmergedTree = true)
+                val target = onNodeWithTag("collection-reorder:$alpha", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center.y
+                val start = handle.fetchSemanticsNode().boundsInRoot.center.y
+                handle.performTouchInput { down(center); moveBy(androidx.compose.ui.geometry.Offset(0f, -20f), delayMillis = 50) }
+                waitForIdle()
+                repeat(6) {
+                    handle.performTouchInput { moveBy(androidx.compose.ui.geometry.Offset(0f, (target - start + 20f) / 6), delayMillis = 50) }
+                    waitForIdle()
+                }
+                handle.performTouchInput { up() }
+                val expected = listOf(charlie, alpha, bravo)
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.preferences.collectionLayouts[LibraryTab.PLAYLISTS]?.order == expected }
+                val tops = listOf("Charlie", "Alpha", "Bravo").map { onNodeWithText(it).fetchSemanticsNode().boundsInRoot.top }
+                kotlin.test.assertEquals(tops.sorted(), tops)
+                runBlocking { controller.createPlaylist("Aardvark").join() }
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.playlists.size == 4 }
+                assertTrue(onNodeWithText("Bravo").fetchSemanticsNode().boundsInRoot.top < onNodeWithText("Aardvark").fetchSemanticsNode().boundsInRoot.top)
+            }
+        } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
+
     @Test
     fun collectionSortingChangesTheVisibleOrderAndRemembersItIndependentlyFromSongs() {
         val directory = Files.createTempDirectory("collection-sorting")
