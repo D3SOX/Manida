@@ -246,7 +246,7 @@
   }
 
   function syncMotionUi() {
-    motionButton.hidden = reducedQuery.matches;
+    motionButton.hidden = !renderer || reducedQuery.matches;
     motionButton.textContent = paused ? "Play" : "Pause";
     motionButton.setAttribute("aria-pressed", String(paused));
     if (reducedQuery.matches) still();

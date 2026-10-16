@@ -168,6 +168,8 @@ p { margin: 0; }
 }
 .deck-button:hover { background: rgb(255 255 255 / 0.15); }
 .deck-button[hidden] { display: none; }
+.toggle-motion { min-inline-size: 6em; flex: none; }
+.toggle-motion[hidden] { display: inline-block; visibility: hidden; }
 
 /* Calm content */
 main > section { padding-block: clamp(3.5rem, 7vw, 6rem); }
@@ -305,5 +307,6 @@ footer {
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
+  .toggle-motion { visibility: hidden; }
   *, *::before, *::after { transition: none !important; }
 }
