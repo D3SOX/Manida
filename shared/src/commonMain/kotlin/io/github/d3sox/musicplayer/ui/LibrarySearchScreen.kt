@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.d3sox.musicplayer.app.AppState
@@ -27,7 +28,8 @@ import io.github.d3sox.musicplayer.queue.QueueOrigin
 
 @Composable
 internal fun LibrarySearchScreen(state: AppState, controller: MusicController, bottomSpace: Dp, dismiss: () -> Unit) {
-    var query by rememberSaveable { mutableStateOf("") }
+    var search by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
+    val query = search.text
     var type by rememberSaveable { mutableStateOf(SearchType.ALL) }
     var openedType by rememberSaveable { mutableStateOf<SearchType?>(null) }
     var openedId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -51,9 +53,9 @@ internal fun LibrarySearchScreen(state: AppState, controller: MusicController, b
             if (selection.active) SongSelectionHeader(selection, controller)
             else Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 AppIconButton(AppIcon.BACK, "Close search") { stopTyping(); if (opened != null) openedId = null else dismiss() }
-                TextField(query, { query = it; openedId = null }, placeholder = { Text("Search your library") }, singleLine = true,
+                TextField(search, { if (it.text != query) openedId = null; search = it }, placeholder = { Text("Search your library") }, singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { stopTyping() }),
-                    trailingIcon = { if (query.isNotEmpty()) AppIconButton(AppIcon.CLOSE, "Clear search") { query = ""; openedId = null } },
+                    trailingIcon = { if (query.isNotEmpty()) AppIconButton(AppIcon.CLOSE, "Clear search") { search = TextFieldValue(); openedId = null } },
                     modifier = Modifier.weight(1f).focusRequester(focus).semantics { contentDescription = "Search your library" })
                 LaunchedEffect(Unit) { focus.requestFocus() }
             }

@@ -100,7 +100,10 @@ fun MusicPlayerApp(controller: MusicController, onAddMusic: (() -> Unit)? = null
         val messages = remember { SnackbarHostState() }
         fun openNotice(destination: ActionDestination) {
             when (destination) {
-                ActionDestination.QUEUE -> { page = AppPage.LIBRARY; scope.launch { playerSheet.animateTo(PlayerPanel.QUEUE, spring()) } }
+                ActionDestination.QUEUE -> {
+                    if (page != AppPage.SEARCH) page = AppPage.LIBRARY
+                    scope.launch { playerSheet.animateTo(PlayerPanel.QUEUE, spring()) }
+                }
                 ActionDestination.FAVORITES -> openLibrary(io.github.d3sox.musicplayer.library.LibraryTab.FAVORITES, null)
                 ActionDestination.PLAYLISTS -> openLibrary(io.github.d3sox.musicplayer.library.LibraryTab.PLAYLISTS, null)
                 ActionDestination.DOWNLOADS -> page = AppPage.DOWNLOADS
