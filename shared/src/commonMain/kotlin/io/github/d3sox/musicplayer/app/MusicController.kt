@@ -760,12 +760,14 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
         if (link != null && (cover != null || removeCover)) {
             val client = serverPlaylistClient(link)
             val oldCover = if (client.playlistImageUploaded(link.id!!)) link.coverArt?.let { client.coverArt(it) } else null
+            val oldLocalCover = artwork?.read("playlist:$playlistId")
             setServerPlaylistCover(playlistId, link, client, cover)
             collections.edit(playlistId, name, description)
             refreshPlaylists()
             confirm("Playlist updated", ActionDestination.PLAYLISTS, undo = {
                 collections.edit(playlistId, previous.name, previous.description)
                 setServerPlaylistCover(playlistId, link, serverPlaylistClient(link), oldCover)
+                oldLocalCover?.let { artwork?.save("playlist:$playlistId", it) }
                 refreshPlaylists()
             }, redo = {
                 collections.edit(playlistId, name, description)
@@ -802,18 +804,13 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
         client: io.github.d3sox.musicplayer.navidrome.NavidromeClient, cover: ByteArray?) {
         val remoteId = requireNotNull(link.id)
         val key = "server-playlist-cover:$playlistId"
+        if (cover != null) client.setPlaylistImage(remoteId, cover) else client.removePlaylistImage(remoteId)
+        // Drop a cover kept only in the app once the server has the new one, so a failed request changes nothing.
         artwork?.remove("playlist:$playlistId")
-        if (cover != null) {
-            client.setPlaylistImage(remoteId, cover)
-            artwork?.save(key, cover)
-        } else {
-            client.removePlaylistImage(remoteId)
-            val generated = client.playlist(remoteId).coverArt
-            if (generated == null) artwork?.remove(key)
-            else try { artwork?.fetch(key, client, generated) }
-            catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { artwork?.remove(key) }
-        }
+        if (cover != null) artwork?.save(key, cover)
+        else try { client.playlist(remoteId).coverArt?.let { artwork?.fetch(key, client, it) } ?: artwork?.remove(key) }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { artwork?.remove(key) }
     }
     fun renamePlaylist(playlistId: String, name: String) = action {
         requireNotNull(playlists) { "Playlists are unavailable" }.rename(playlistId, name)

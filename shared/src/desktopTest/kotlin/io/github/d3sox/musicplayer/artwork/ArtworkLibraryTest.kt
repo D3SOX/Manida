@@ -160,6 +160,7 @@ class ArtworkLibraryTest {
         val generated = png(0x00FF00)
         val uploads = mutableListOf<String>()
         var deletions = 0
+        var rejectUpload = true
         val http = HttpClient(MockEngine { request ->
             val path = request.url.encodedPath
             when {
@@ -171,6 +172,10 @@ class ArtworkLibraryTest {
                 path == "/api/playlist/mix" -> respond("""{"id":"mix","uploadedImage":""}""")
                 path == "/api/playlist/mix/image" -> {
                     assertEquals("Bearer native-token", request.headers["x-nd-authorization"])
+                    if (request.method != io.ktor.http.HttpMethod.Delete && rejectUpload) {
+                        rejectUpload = false
+                        return@MockEngine respond("broken", io.ktor.http.HttpStatusCode.InternalServerError)
+                    }
                     if (request.method == io.ktor.http.HttpMethod.Delete) deletions++
                     else uploads += String(request.body.toByteArray(), Charsets.ISO_8859_1)
                     respond("""{"status":"ok"}""")
@@ -196,6 +201,11 @@ class ArtworkLibraryTest {
             assertContentEquals(artworkPreview(generated), artwork.read(key))
             assertEquals(artwork.path(key), controller.state.value.artwork[key])
             val custom = png(0xFF0000)
+            val appOnly = png(0xFFFF00)
+            artwork.save("playlist:${playlist.id}", appOnly)
+            controller.editPlaylist(playlist.id, "Mix", "", cover = custom).join()
+            assertContentEquals(artworkPreview(appOnly), artwork.read("playlist:${playlist.id}"), "A failed upload must keep the app-only cover")
+            assertContentEquals(artworkPreview(generated), artwork.read(key))
             controller.editPlaylist(playlist.id, "Mix", "", cover = custom).join()
             assertEquals(1, uploads.size)
             kotlin.test.assertTrue("name=\"image\"; filename=" in uploads.single())
