@@ -185,7 +185,7 @@ jobs:
         run: |
           cd release
           gh release create "$GITHUB_REF_NAME" --verify-tag --title "Manida ${GITHUB_REF_NAME#v}" \
-            --prerelease --generate-notes ./*.apk ./*.AppImage ./*.pkg.tar.zst \
+            --prerelease=false --generate-notes ./*.apk ./*.AppImage ./*.pkg.tar.zst \
             ./*.pkg.tar.zst.sig ./manida.asc ./manida-repositories.tar.gz
   website:
     needs: publish
