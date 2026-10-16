@@ -286,6 +286,14 @@ class AndroidFileEditingUiTest {
                 }
                 assertTrue(requireNotNull(resolver.openInputStream(uri)).use { it.readBytes() }.contentEquals(bytes))
             }
-        } finally { resolver.delete(uri, null, null) }
+        } finally {
+            // After Manida renames the file and undoes it, Android can refuse the test's own delete. A leftover file
+            // duplicates the track in a retry, so let the shell remove it instead.
+            try { resolver.delete(uri, null, null) }
+            catch (_: SecurityException) {
+                ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(
+                    "content delete --uri $uri")).use { it.readBytes() }
+            }
+        }
     }
 }
