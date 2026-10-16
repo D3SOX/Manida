@@ -135,7 +135,7 @@ class NavidromeChanges(private val store: MusicStore, private val library: Music
             if (previous?.pendingSync != true) {
                 val ids = remote.songIds.map { requireNotNull(mapping[it]) { "Refresh the server library before importing its playlists" } }
                 val link = PlaylistServer(connection.serverId, remote.id, remote.name, remote.songIds, remote.owner,
-                    readOnly = remote.owner != connection.username, baselineDescription = remote.description)
+                    readOnly = remote.owner != connection.username, baselineDescription = remote.description, coverArt = remote.coverArt)
                 store.put("playlist:$id", "playlists", previous?.copy(name = remote.name, trackIds = ids, server = link, description = remote.description)
                     ?: Playlist(id, remote.name, ids, server = link, description = remote.description))
             }

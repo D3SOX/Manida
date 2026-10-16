@@ -10,6 +10,11 @@ import io.ktor.http.ContentType
 import io.ktor.client.request.parameter
 import io.ktor.client.request.prepareGet
 import io.ktor.client.request.header
+import io.ktor.client.request.delete
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
+import io.ktor.client.statement.HttpResponse
+import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.fromHttpToGmtDate
 import io.ktor.client.statement.bodyAsText
@@ -33,7 +38,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 data class ServerPlaylist(val id: String, val name: String, val songIds: List<String>, val changed: String,
-    val owner: String, val description: String = "")
+    val owner: String, val description: String = "", val coverArt: String? = null)
 
 class ServerCredentials(val username: String, internal val password: String) {
     override fun toString(): String = "ServerCredentials(username=$username, password=[redacted])"
@@ -154,7 +159,8 @@ class NavidromeClient(
     private fun parsePlaylist(playlist: JsonObject): ServerPlaylist = ServerPlaylist(
         playlist.getValue("id").jsonPrimitive.content, playlist.getValue("name").jsonPrimitive.content,
         playlist["entry"]?.jsonArray.orEmpty().map { it.jsonObject.getValue("id").jsonPrimitive.content },
-        playlist["changed"]?.jsonPrimitive?.content.orEmpty(), playlist["owner"]?.jsonPrimitive?.content.orEmpty(), playlist["comment"]?.jsonPrimitive?.content.orEmpty())
+        playlist["changed"]?.jsonPrimitive?.content.orEmpty(), playlist["owner"]?.jsonPrimitive?.content.orEmpty(), playlist["comment"]?.jsonPrimitive?.content.orEmpty(),
+        playlist["coverArt"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() })
 
     private suspend fun request(endpoint: String, parameters: List<Pair<String, String>> = emptyList()): JsonObject = serverRequest {
         val salt = Uuid.random().toString()
@@ -180,7 +186,8 @@ class NavidromeClient(
         request(if (favorite) "star" else "unstar", listOf("id" to songId))
     }
 
-    suspend fun coverArt(coverId: String): ByteArray = serverRequest {
+    /** Downloads a cover scaled to [size] pixels, or the original image when [size] is null. */
+    suspend fun coverArt(coverId: String, size: Int? = 1024): ByteArray = serverRequest {
         val salt = Uuid.random().toString()
         http.prepareGet("${baseUrl.trimEnd('/')}/rest/getCoverArt.view") {
             parameter("u", credentials.username)
@@ -190,7 +197,7 @@ class NavidromeClient(
             parameter("c", "Manida")
             parameter("f", "json")
             parameter("id", coverId)
-            parameter("size", "1024")
+            size?.let { parameter("size", it.toString()) }
         }.execute { response ->
             check(response.status.value in 200..299 && response.headers[HttpHeaders.ContentType]?.startsWith("image/") == true) {
                 "Server returned no artwork"
@@ -201,7 +208,7 @@ class NavidromeClient(
             while (true) {
                 val count = channel.readAvailable(buffer)
                 if (count < 0) break
-                check(bytes.size + count <= 8 * 1024 * 1024) { "Server artwork is too large" }
+                check(bytes.size + count <= 10 * 1024 * 1024) { "Server artwork is too large" }
                 if (count > 0) bytes.write(buffer, 0, count)
             }
             bytes.readByteArray()
@@ -231,6 +238,47 @@ class NavidromeClient(
         if (login.status.value == 401) throw NavidromeException(40)
         if (login.status.value !in 200..299) throw NavidromeRequestException("Navidrome file access failed: HTTP ${login.status.value}")
         return Json.parseToJsonElement(login.bodyAsText()).jsonObject.getValue("token").jsonPrimitive.content.also { nativeToken = it }
+    }
+
+    private suspend fun nativeRequest(send: suspend HttpClient.(token: String) -> HttpResponse): HttpResponse = nativeAccess.withLock {
+        http.config { followRedirects = false }.use { nativeHttp ->
+            var response = nativeHttp.send(nativeSession(nativeHttp))
+            if (response.status.value == 401) {
+                response.bodyAsText()
+                nativeToken = null
+                response = nativeHttp.send(nativeSession(nativeHttp))
+            }
+            when (response.status.value) {
+                in 200..299 -> response
+                403 -> throw NavidromeException(50)
+                404, 405 -> throw NavidromeRequestException("This music server can't change playlist covers. Navidrome 0.61 or newer is required.")
+                else -> throw NavidromeRequestException("Navidrome rejected the playlist cover: HTTP ${response.status.value}")
+            }
+        }
+    }
+
+    suspend fun playlistImageUploaded(id: String): Boolean = serverRequest {
+        val playlist = Json.parseToJsonElement(nativeRequest { token ->
+            get("$baseUrl/api/playlist/$id") { header("x-nd-authorization", "Bearer $token") }
+        }.bodyAsText()).jsonObject
+        playlist["uploadedImage"]?.jsonPrimitive?.content.orEmpty().isNotBlank()
+    }
+
+    suspend fun setPlaylistImage(id: String, image: ByteArray) = serverRequest {
+        nativeRequest { token ->
+            post("$baseUrl/api/playlist/$id/image") {
+                header("x-nd-authorization", "Bearer $token")
+                setBody(MultiPartFormDataContent(formData {
+                    append("image", image, Headers.build { append(HttpHeaders.ContentDisposition, "filename=\"cover\"") })
+                }))
+            }
+        }.bodyAsText()
+        Unit
+    }
+
+    suspend fun removePlaylistImage(id: String) = serverRequest {
+        nativeRequest { token -> delete("$baseUrl/api/playlist/$id/image") { header("x-nd-authorization", "Bearer $token") } }.bodyAsText()
+        Unit
     }
 
     suspend fun musicFiles(): List<NavidromeMusicFile> = serverRequest {

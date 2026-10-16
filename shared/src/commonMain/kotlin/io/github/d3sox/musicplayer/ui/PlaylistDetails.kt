@@ -32,7 +32,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
-internal fun Playlist.artworkPath(state: AppState): String? = state.artwork["playlist:$id"]
+internal fun Playlist.artworkPath(state: AppState, custom: Boolean = true): String? = state.artwork["playlist:$id"].takeIf { custom }
+    ?: state.artwork["server-playlist-cover:$id"]
     ?: trackIds.firstNotNullOfOrNull { state.artwork[it] }
 
 @Composable
@@ -146,7 +147,7 @@ internal fun EditPlaylistDialog(playlist: Playlist, state: AppState, controller:
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Surface(Modifier.size(120.dp).align(Alignment.CenterHorizontally), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
                 if (preview != null) Image(requireNotNull(preview), "Playlist cover preview", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                else CollectionArtwork(playlist.artworkPath(state).takeUnless { removeCover }, playlist.name, AppIcon.QUEUE, Modifier.fillMaxSize())
+                else CollectionArtwork(if (removeCover && playlist.server != null) null else playlist.artworkPath(state, custom = !removeCover), playlist.name, AppIcon.QUEUE, Modifier.fillMaxSize())
             }
             OutlinedButton(onClick = {
                 scope.launch {
@@ -158,8 +159,10 @@ internal fun EditPlaylistDialog(playlist: Playlist, state: AppState, controller:
                     finally { picking = false }
                 }
             }, enabled = !picking, modifier = Modifier.fillMaxWidth()) { Icon(AppIcon.ARTWORK_COLORS.vector, null); Spacer(Modifier.width(8.dp)); Text("Change cover") }
-            if (state.artwork["playlist:${playlist.id}"] != null || cover != null) TextButton(onClick = { cover = null; removeCover = true }) {
-                Icon(AppIcon.REMOVE.vector, null); Spacer(Modifier.width(8.dp)); Text("Use song artwork")
+            if (state.artwork["playlist:${playlist.id}"] != null || cover != null || (playlist.server != null && !removeCover))
+                TextButton(onClick = { cover = null; removeCover = true }) {
+                Icon(AppIcon.REMOVE.vector, null); Spacer(Modifier.width(8.dp))
+                Text(if (playlist.server != null) "Use generated cover" else "Use song artwork")
             }
             pickerError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             OutlinedTextField(name, { name = it }, label = { Text("Title") }, singleLine = true,

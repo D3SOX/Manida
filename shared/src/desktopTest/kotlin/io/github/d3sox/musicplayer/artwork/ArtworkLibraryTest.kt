@@ -5,6 +5,7 @@ import io.github.d3sox.musicplayer.navidrome.ServerCredentials
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.toByteArray
 import io.ktor.http.HttpHeaders
 import io.ktor.http.headersOf
 import kotlinx.coroutines.runBlocking
@@ -146,6 +147,74 @@ class ArtworkLibraryTest {
             val track = library.tracks().single()
             http.close()
             assertContentEquals(png, ArtworkLibrary(directory.resolve("artwork").toString()).read(track.id))
+        } finally { controller.close(); vault.delete("navidrome"); http.close(); store.close(); directory.toFile().deleteRecursively() }
+    }
+
+    @Test
+    fun aNavidromePlaylistShowsItsServerCoverAndUploadsCustomCoversToTheServer() = runBlocking {
+        val directory = Files.createTempDirectory("server-playlist-artwork")
+        val store = openMusicStore(directory.resolve("library.db").toString())
+        fun png(rgb: Int) = ByteArrayOutputStream().also { output ->
+            ImageIO.write(BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB).apply { for (x in 0..31) for (y in 0..31) setRGB(x, y, rgb) }, "png", output)
+        }.toByteArray()
+        val generated = png(0x00FF00)
+        val uploads = mutableListOf<String>()
+        var deletions = 0
+        var rejectUpload = true
+        val http = HttpClient(MockEngine { request ->
+            val path = request.url.encodedPath
+            when {
+                path == "/rest/getCoverArt.view" -> respond(if (request.url.parameters["id"] == "pl-mix") generated else png(0x0000FF),
+                    headers = headersOf(HttpHeaders.ContentType, "image/png"))
+                path == "/rest/getPlaylists.view" -> respond("""{"subsonic-response":{"status":"ok","playlists":{"playlist":[{"id":"mix"}]}}}""")
+                path == "/rest/getPlaylist.view" -> respond("""{"subsonic-response":{"status":"ok","playlist":{"id":"mix","name":"Mix","owner":"fixture","coverArt":"pl-mix","entry":[{"id":"song-a"}]}}}""")
+                path == "/auth/login" -> respond("""{"token":"native-token"}""")
+                path == "/api/playlist/mix" -> respond("""{"id":"mix","uploadedImage":""}""")
+                path == "/api/playlist/mix/image" -> {
+                    assertEquals("Bearer native-token", request.headers["x-nd-authorization"])
+                    if (request.method != io.ktor.http.HttpMethod.Delete && rejectUpload) {
+                        rejectUpload = false
+                        return@MockEngine respond("broken", io.ktor.http.HttpStatusCode.InternalServerError)
+                    }
+                    if (request.method == io.ktor.http.HttpMethod.Delete) deletions++
+                    else uploads += String(request.body.toByteArray(), Charsets.ISO_8859_1)
+                    respond("""{"status":"ok"}""")
+                }
+                else -> {
+                    val songs = if (request.url.parameters["songOffset"] == "0") """[{"id":"song-a","title":"Server song","coverArt":"album-cover"}]""" else "[]"
+                    respond("""{"subsonic-response":{"status":"ok","searchResult3":{"song":$songs}}}""")
+                }
+            }
+        })
+        val vault = SecretServiceVault("io.github.d3sox.musicplayer.tests.${Uuid.random()}")
+        val library = MusicLibrary(store)
+        val artwork = ArtworkLibrary(directory.resolve("artwork").toString())
+        val connection = NavidromeConnection(store, http, vault)
+        val controller = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"), connection, artwork = artwork,
+            playlists = io.github.d3sox.musicplayer.playlists.Playlists(store),
+            serverChanges = io.github.d3sox.musicplayer.navidrome.NavidromeChanges(store, library, connection::client))
+        try {
+            withTimeout(3_000) { controller.state.first { !it.loading } }
+            controller.connectServer("https://music.example.test", "fixture", "fixture-password").join()
+            val playlist = controller.state.value.playlists.single()
+            val key = "server-playlist-cover:${playlist.id}"
+            assertContentEquals(artworkPreview(generated), artwork.read(key))
+            assertEquals(artwork.path(key), controller.state.value.artwork[key])
+            val custom = png(0xFF0000)
+            val appOnly = png(0xFFFF00)
+            artwork.save("playlist:${playlist.id}", appOnly)
+            controller.editPlaylist(playlist.id, "Mix", "", cover = custom).join()
+            assertContentEquals(artworkPreview(appOnly), artwork.read("playlist:${playlist.id}"), "A failed upload must keep the app-only cover")
+            assertContentEquals(artworkPreview(generated), artwork.read(key))
+            controller.editPlaylist(playlist.id, "Mix", "", cover = custom).join()
+            assertEquals(1, uploads.size)
+            kotlin.test.assertTrue("name=\"image\"; filename=" in uploads.single())
+            kotlin.test.assertTrue(String(custom, Charsets.ISO_8859_1) in uploads.single())
+            assertEquals(null, artwork.read("playlist:${playlist.id}"), "A server playlist cover must not be kept only in the app")
+            assertContentEquals(artworkPreview(custom), artwork.read(key))
+            controller.editPlaylist(playlist.id, "Mix", "", removeCover = true).join()
+            assertEquals(1, deletions)
+            assertContentEquals(artworkPreview(generated), artwork.read(key))
         } finally { controller.close(); vault.delete("navidrome"); http.close(); store.close(); directory.toFile().deleteRecursively() }
     }
 

@@ -15,6 +15,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -25,6 +29,10 @@ import io.github.d3sox.musicplayer.library.LibraryTab
 import io.github.d3sox.musicplayer.settings.CollectionLayout
 import io.github.d3sox.musicplayer.settings.CollectionView
 import io.github.d3sox.musicplayer.settings.CollectionSort
+import sh.calvin.reorderable.ReorderableCollectionItemScope
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyGridState
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 internal data class CollectionItem(val id: String, val title: String, val subtitle: String,
     val artwork: String?, val icon: AppIcon, val songCount: Int = 0, val artist: String = "", val year: Int = 0, val recentAt: Long = 0,
@@ -36,22 +44,54 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
     val listScroll = rememberLibraryListState(controller, "collections:${tab.name}:list")
     val gridScroll = rememberLibraryGridState(controller, "collections:${tab.name}:grid")
     val layout = state.preferences.collectionLayouts[tab] ?: CollectionLayout()
-    val sortedEntries = remember(entries, layout.sort, layout.descending) {
+    val sorted = remember(entries, layout.sort, layout.descending, layout.order) {
+        val positions = layout.order.withIndex().associate { it.value to it.index }
         val comparator = when (layout.sort) {
             CollectionSort.NAME -> compareBy<CollectionItem> { it.title.lowercase() }
             CollectionSort.ARTIST -> compareBy { it.artist.lowercase() }
             CollectionSort.YEAR -> compareBy { it.year }
             CollectionSort.SONG_COUNT -> compareBy { it.songCount }
             CollectionSort.RECENT -> compareBy { it.recentAt }
+            CollectionSort.CUSTOM -> compareBy { positions[it.id] ?: Int.MAX_VALUE }
         }.thenBy { it.title.lowercase() }
         entries.sortedWith(if (layout.descending) comparator.reversed() else comparator)
     }
+    val custom = layout.sort == CollectionSort.CUSTOM
+    var dragged by remember(sorted) { mutableStateOf<List<CollectionItem>?>(null) }
+    val sortedEntries = dragged ?: sorted
+    fun move(from: Any, to: Any) {
+        val rows = sortedEntries.toMutableList()
+        val source = rows.indexOfFirst { it.id == from }
+        val target = rows.indexOfFirst { it.id == to }
+        if (source >= 0 && target >= 0) dragged = rows.apply { add(target, removeAt(source)) }
+    }
+    val listReorder = rememberReorderableLazyListState(listScroll) { from, to -> move(from.key, to.key) }
+    val gridReorder = rememberReorderableLazyGridState(gridScroll) { from, to -> move(from.key, to.key) }
     val gridCells = layout.columns?.let { GridCells.Fixed(it.coerceIn(2, 6)) } ?: GridCells.Adaptive(156.dp)
     var menu by remember { mutableStateOf(false) }
     fun update(change: (CollectionLayout) -> CollectionLayout) {
         controller.updatePreferences { settings ->
             settings.copy(collectionLayouts = settings.collectionLayouts + (tab to change(settings.collectionLayouts[tab] ?: CollectionLayout())))
         }
+    }
+    @Composable
+    fun ReorderableCollectionItemScope.DragHandle(entry: CollectionItem) {
+        fun moveBy(offset: Int): Boolean {
+            val rows = sortedEntries.toMutableList()
+            val from = rows.indexOf(entry)
+            if (from + offset !in rows.indices) return false
+            rows.add(from + offset, rows.removeAt(from))
+            dragged = rows
+            update { it.copy(order = rows.map(CollectionItem::id)) }
+            return true
+        }
+        Box(Modifier.size(48.dp).testTag("collection-reorder:${entry.id}")
+            .semantics {
+                contentDescription = "Reorder ${entry.title}"
+                customActions = listOf(CustomAccessibilityAction("Move up") { moveBy(-1) }, CustomAccessibilityAction("Move down") { moveBy(1) })
+            }
+            .draggableHandle(onDragStopped = { dragged?.let { rows -> update { it.copy(order = rows.map(CollectionItem::id)) } } }),
+            contentAlignment = Alignment.Center) { Icon(AppIcon.DRAG.vector, null) }
     }
     Column(modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -87,17 +127,23 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
         Box(Modifier.weight(1f).fillMaxWidth()) {
         if (layout.view == CollectionView.LIST) LazyColumn(Modifier.fillMaxSize(), state = listScroll) {
             items(sortedEntries, key = { it.id }) { entry ->
+                ReorderableItem(listReorder, entry.id, enabled = custom) { _ ->
                 CollectionActionHost(entry, tab, state, controller, { open(entry.id) }) { menu ->
                 ListItem(modifier = Modifier.combinedClickable(onClick = { open(entry.id) }, onLongClick = menu),
                     headlineContent = { Text(entry.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                     leadingContent = { CollectionArtwork(entry.artwork, entry.title, entry.icon, Modifier.size(48.dp)) },
                     supportingContent = { Text(entry.subtitle, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-                    trailingContent = { AppIconButton(AppIcon.MORE, "${tab.label.removeSuffix("s")} options: ${entry.title}", onClick = menu) })
+                    trailingContent = { Row(verticalAlignment = Alignment.CenterVertically) {
+                        AppIconButton(AppIcon.MORE, "${tab.label.removeSuffix("s")} options: ${entry.title}", onClick = menu)
+                        if (custom) DragHandle(entry)
+                    } })
+                }
                 }
             }
         } else LazyVerticalGrid(gridCells, Modifier.fillMaxSize(), state = gridScroll,
             contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(sortedEntries, key = { it.id }) { entry ->
+                ReorderableItem(gridReorder, entry.id, enabled = custom) { _ ->
                 CollectionActionHost(entry, tab, state, controller, { open(entry.id) }) { menu ->
                 ElevatedCard(modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium)
                     .combinedClickable(onClick = { open(entry.id) }, onLongClick = menu)) {
@@ -106,10 +152,12 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(entry.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             AppIconButton(AppIcon.MORE, "${tab.label.removeSuffix("s")} options: ${entry.title}", onClick = menu)
+                            if (custom) DragHandle(entry)
                         }
                         Text(entry.subtitle, style = MaterialTheme.typography.bodySmall, maxLines = 2,
                             overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                }
                 }
                 }
             }
@@ -120,6 +168,7 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
             CollectionSort.YEAR -> if (entry.year == 0) "Unknown year" else "${entry.year}"
             CollectionSort.SONG_COUNT -> countLabel(entry.songCount, "song")
             CollectionSort.RECENT -> if (entry.recentAt == 0L) "No songs" else formatScrollDate(entry.recentAt)
+            CollectionSort.CUSTOM -> "${index + 1}"
         } }
         if (layout.view == CollectionView.LIST) LibraryScrollbar(listScroll, entries.size, "Scroll ${tab.label.lowercase()}", label = ::indicator)
         else LibraryScrollbar(gridScroll, entries.size, "Scroll ${tab.label.lowercase()}", label = ::indicator)
