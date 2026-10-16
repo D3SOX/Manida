@@ -54,6 +54,10 @@ def package(output: Path, cache: Path):
                     contents[f"notices/{repository}/{relative}"] = data
     if len(presets) != 10347:
         raise RuntimeError(f"Expected the complete 552 + 9,795 preset collections, got {len(presets)}")
+    for preset in sorted((ROOT / "native/presets").glob("*.milk")):
+        path = f"presets/Manida/{preset.name}"
+        contents[path] = preset.read_bytes()
+        presets.append(dict(path=path, name=preset.stem, collection="Manida", category="Website"))
     contents["catalog.json"] = json.dumps(presets, ensure_ascii=False, separators=(",", ":")).encode()
     contents["notices/SOURCES.txt"] = ("MilkDrop presets and textures retain their upstream authorship and notices.\n\n" +
                                        "\n".join(sources) + "\n").encode()

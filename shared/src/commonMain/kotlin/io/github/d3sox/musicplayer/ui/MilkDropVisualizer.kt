@@ -104,7 +104,8 @@ private fun MilkDropPresetPicker(presets: List<MilkDropPresetInfo>, selected: In
     var notices by remember { mutableStateOf("") }
     LaunchedEffect(credits) { if (credits) notices = Res.readBytes("files/visualizer/milkdrop-notices.txt").decodeToString() }
     var query by remember { mutableStateOf("") }
-    val collection = settings.collection
+    // Custom was the collection for user-supplied files before they joined Manida.
+    val collection = if (settings.collection == "Custom") "Manida" else settings.collection
     val category = settings.category
     val collections = remember(presets) { presets.map { it.collection }.distinct().sorted() }
     val categories = remember(presets, collection, settings.favorites) {

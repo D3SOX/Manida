@@ -86,14 +86,23 @@ class MilkDropPresetsUiTest {
         val root = File(System.getProperty("musicplayer.testRoot"), "shared/build/milkdrop-tests").apply { mkdirs() }
         val directory = Files.createTempDirectory(root.toPath(), "picker").toFile()
         try {
+            File(directory, "Imported preset.milk").writeText("user preset")
             val presets = runBlocking { milkDropLibrary(directory) }.presets.map { it.info }
             val selected = mutableIntStateOf(0)
-            val settings = mutableStateOf(MilkDropSettings(automatic = false))
+            val settings = mutableStateOf(MilkDropSettings(automatic = false, collection = "Custom",
+                favorites = setOf("custom/Imported preset.milk")))
             runComposeUiTest {
                 setContent { MaterialTheme {
                     MilkDropControls(presets, selected.intValue, { selected.intValue = it }, settings.value,
                         { update -> settings.value = update(settings.value) })
                 } }
+                onNodeWithContentDescription("Choose MilkDrop preset").performClick()
+                onNodeWithText("Custom").assertDoesNotExist()
+                onNode(hasText("Manida") and hasAnySibling(hasText("All"))).assertIsSelected()
+                onNodeWithText("6 presets").assertIsDisplayed()
+                onNodeWithContentDescription("Unfavorite preset: Imported preset").assertExists()
+                onNodeWithText("Imported preset").performClick()
+                assertEquals("custom/Imported preset.milk", presets[selected.intValue].id)
                 onNodeWithContentDescription("Choose MilkDrop preset").performClick()
                 onNodeWithText("Original MilkDrop").performClick()
                 onNodeWithText("552 presets").assertIsDisplayed()

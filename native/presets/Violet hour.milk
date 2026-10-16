@@ -1,0 +1,94 @@
+MILKDROP_PRESET_VERSION=201
+PSVERSION_WARP=2
+PSVERSION_COMP=2
+// Port of the matching shader in website/script.js.
+// Motion advances on detected bass attacks instead of elapsed song time.
+[preset00]
+fRating=5.000000
+fGammaAdj=1.000000
+fDecay=1.000000
+fWaveAlpha=0.000000
+bTexWrap=0
+bDarkenCenter=0
+bRedBlueStereo=0
+bBrighten=0
+bDarken=0
+bSolarize=0
+bInvert=0
+bMotionVectorsOn=0
+mv_a=0.000000
+ob_size=0.000000
+ib_size=0.000000
+zoom=1.000000
+rot=0.000000
+warp=0.000000
+// Detect rising bass attacks, with hysteresis and a 180 ms retrigger guard.
+// q1 = pulse, q2 = beat-driven motion, q3 = feedback step.
+per_frame_init_1=last_time=time; last_beat=-1; previous_bass=1; armed=1; motion_target=0; pulse=0; motion=0;
+per_frame_1=dt=min(max(time-last_time,0),0.1); last_time=time;
+per_frame_2=attack=max(bass-bass_att,0); armed=if(below(attack,0.04),1,armed);
+per_frame_3=hit=armed*above(bass,1.1)*above(attack,0.12)*above(bass-previous_bass,0.06)*above(time-last_beat,0.18);
+per_frame_4=last_beat=if(hit,time,last_beat); armed=if(hit,0,armed); previous_bass=bass;
+per_frame_5=pulse=if(hit,1,pulse*exp(-10*dt));
+per_frame_6=motion_target=motion_target+0.5*hit; motion=motion+(motion_target-motion)*(1-exp(-12*dt));
+per_frame_7=q1=pulse; q2=motion; q3=dt*60;
+warp_1=`float waveDist(float2 q, float r, float a, float t, float beat, float wave) {
+warp_2=`      if (wave < 0.5) {            // breathing ring
+warp_3=`        return abs(r - (0.2 + 0.05 * beat + 0.025 * sin(a * 5.0 + t * 2.0)));
+warp_4=`      } else if (wave < 1.5) {     // oscilloscope line
+warp_5=`        float y = 0.13 * sin(q.x * 9.0 + t * 3.0) * sin(q.x * 2.3 - t) * (0.5 + beat);
+warp_6=`        return abs(q.y - y);
+warp_7=`      } else if (wave < 2.5) {     // lissajous dots
+warp_8=`        float d = 1.0;
+warp_9=`        for (int i = 0; i < 14; i++) {
+warp_10=`          float f = float(i);
+warp_11=`          float2 p = 0.32 * float2(sin(t * 1.1 + f * 0.45), sin(t * 1.6 + f * 0.7));
+warp_12=`          d = min(d, length(q - p) - 0.006 - 0.012 * beat);
+warp_13=`        }
+warp_14=`        return max(d, 0.0);
+warp_15=`      } else if (wave < 3.5) {     // six-fold kaleidoscope
+warp_16=`        float s = 1.0471976;
+warp_17=`        float k = (a - s * floor(a / s)) - s * 0.5;
+warp_18=`        float2 p = r * float2(cos(k), sin(k));
+warp_19=`        return r > 0.42 ? 1.0 : abs(p.y - 0.05 * sin(p.x * 22.0 - t * 4.0) * (0.4 + beat));
+warp_20=`      }
+warp_21=`      float sp = frac(a / 6.2831853 * 2.0 - r * 3.5 + t * 0.2);  // spiral
+warp_22=`      return r > 0.4 ? 1.0 : abs(sp - 0.5) * r * 0.9;
+warp_23=`    }
+warp_24=`
+warp_25=`shader_body
+warp_26=`{
+warp_27=`    float t = q2;
+warp_28=`    // The per-frame detector supplies one decaying pulse per bass attack.
+warp_29=`    float beat = q1;
+warp_30=`    float aspectRatio = texsize.x / texsize.y;
+warp_31=`    float2 q = uv_orig - 0.5;
+warp_32=`    q.x *= aspectRatio;
+warp_33=`    float r = length(q), a = atan2(q.y, q.x);
+warp_34=`    float z = pow(max(0.9, 1.0 + (1.018 - 1.0 + 0.012 * sin(t * 0.7 + r * 7.0) + 0.025) * beat), q3);
+warp_35=`    float ro = 0.006 * (1.0 + 0.6 * sin(t * 0.31)) * beat * q3;
+warp_36=`    float2 w = float2(cos(ro) * q.x + sin(ro) * q.y, -sin(ro) * q.x + cos(ro) * q.y) / z;
+warp_37=`    w += 0.0045 * beat * q3 * float2(sin(w.y * 7.0 + t * 1.3), cos(w.x * 6.0 - t * 1.1));
+warp_38=`    w.x /= aspectRatio;
+warp_39=`    float3 col = tex2D(sampler_fc_main, w + 0.5).rgb;
+warp_40=`    col = lerp(col, col.brg, 1.0 - pow(0.996, q3)) * pow(0.962, q3) - 1.5 / 255.0 * q3;
+warp_41=`    float d = waveDist(q, r, a, t, beat, 0.0);
+warp_42=`    float line = 1.0 - smoothstep(0.0, 0.012, d);
+warp_43=`    float3 c1 = float3(0.56078431, 0.45490196, 0.91764706);
+warp_44=`    float3 c2 = float3(0.84705882, 0.72941176, 1.00000000);
+warp_45=`    float3 c3 = float3(0.37254902, 0.78823529, 0.72156863);
+warp_46=`    float3 wc = lerp(c1, c2, 0.5 + 0.5 * sin(a * 2.0 + t * 0.8));
+warp_47=`    wc = lerp(wc, c3, beat * 0.6);
+warp_48=`    col += line * wc * (0.18 + 0.5 * beat) * q3;
+warp_49=`    ret = max(col, 0.0);
+warp_50=`}
+comp_1=`shader_body
+comp_2=`{
+comp_3=`    float3 col = tex2D(sampler_main, uv).rgb;
+comp_4=`    col = 1.0 - exp(-col * 1.2);
+comp_5=`    float lum = dot(col, float3(0.299, 0.587, 0.114));
+comp_6=`    col = saturate(lerp(float3(lum, lum, lum), col, 1.6));
+comp_7=`    float3 ink = float3(0.09, 0.07, 0.12);
+comp_8=`    float v = 1.0 - smoothstep(0.3, 1.1, length(uv - 0.5));
+comp_9=`    ret = lerp(ink, ink + col * (1.0 - ink), v * 0.85 + 0.15);
+comp_10=`}

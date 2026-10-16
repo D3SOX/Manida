@@ -50,25 +50,28 @@ class AndroidMilkDropTest {
                     EGL14.EGL_WIDTH, 320, EGL14.EGL_HEIGHT, 240, EGL14.EGL_NONE), 0)
                 assertTrue(EGL14.eglMakeCurrent(display, surface, surface, glContext))
                 val library = milkDropLibrary(File(context.cacheDir, "milkdrop-test-presets"))
-                assertEquals(10347, library.presets.size)
+                assertEquals(10352, library.presets.size)
                 assertEquals(67, library.textures.listFiles().orEmpty().size)
                 val presets = listOf(library.presets.first(),
                     library.presets.single { it.name == "Flexi + Rovastar - postcard from Fractopia" },
                     library.presets.single { it.name == "Phat_shifter - Angel" }) +
                     library.presets.filter { it.info.collection == "Cream of the Crop" && !it.info.category.startsWith("! Transition") }
                         .groupBy { it.info.category.substringBefore('/') }.values.map { it.first() }
-                val visiblePresets = presets.take(3).toSet()
+                val websitePresets = library.presets.filter { it.info.collection == "Manida" }
+                assertEquals(5, websitePresets.size)
+                val visiblePresets = (presets.take(3) + websitePresets).toSet()
                 try {
                     repeat(2) {
                         val handle = ProjectMNative.create(320, 240, false, library.textures.path)
                         try {
-                            for (preset in presets) {
+                            for (preset in presets + websitePresets) {
                                 ProjectMNative.load(handle, preset.file.path, false)
                                 repeat(24) { ProjectMNative.render(handle, samples, 320, 240); Thread.sleep(10) }
                                 val pixels = ProjectMNative.pixels(handle)
                                 assertEquals(320 * 240 * 4, pixels.size)
                                 val colored = (pixels.indices step 4).count { index ->
-                                    (pixels[index].toInt() and 255) + (pixels[index + 1].toInt() and 255) + (pixels[index + 2].toInt() and 255) > 30
+                                    (pixels[index].toInt() and 255) + (pixels[index + 1].toInt() and 255) + (pixels[index + 2].toInt() and 255) >
+                                        if (preset.info.collection == "Manida") 180 else 30
                                 }
                                 // Beat-gated and feedback presets can stay black for this steady test tone.
                                 if (preset in visiblePresets) assertTrue("${preset.name} must render the player's audio", colored > 50)

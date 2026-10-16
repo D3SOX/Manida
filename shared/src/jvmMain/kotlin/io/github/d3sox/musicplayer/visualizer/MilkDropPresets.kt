@@ -58,7 +58,7 @@ suspend fun milkDropLibrary(directory: File): MilkDropLibrary = presetPreparatio
     val presets = catalog.map { MilkDropPreset(MilkDropPresetInfo(it.name, it.collection, it.category, it.path), File(bundled, it.path)) }
     val custom = directory.walkTopDown().onEnter { it == directory || !it.name.startsWith(".") }
         .filter { it.isFile && it.extension.equals("milk", true) }
-        .map { MilkDropPreset(MilkDropPresetInfo(it.nameWithoutExtension, "Custom", it.parentFile.relativeTo(directory).path,
+        .map { MilkDropPreset(MilkDropPresetInfo(it.nameWithoutExtension, "Manida", it.parentFile.relativeTo(directory).path,
             "custom/${it.relativeTo(directory).path}"), it) }
     MilkDropLibrary((presets + custom).sortedWith(compareBy<MilkDropPreset> {
         when (it.info.collection) { "Original MilkDrop" -> 0; "Cream of the Crop" -> 1; else -> 2 }
