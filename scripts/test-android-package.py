@@ -130,7 +130,14 @@ class AndroidPackageTest(unittest.TestCase):
                 remote = "/sdcard/Music/ManidaPackageChecks/native.flac"
                 adb("shell", "mkdir", "-p", "/sdcard/Music/ManidaPackageChecks")
                 adb("push", str(fixture), remote)
-                adb("shell", "am", "broadcast", "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE", "-d", "file://" + remote)
+                # Current Android ignores the old scan-file broadcast, so index the volume and wait for the file.
+                adb("shell", "content", "call", "--uri", "content://media", "--method", "scan_volume", "--arg", "external_primary")
+                deadline = time.monotonic() + 60
+                while "native.flac" not in adb("shell", "content", "query", "--uri", "content://media/external/audio/media",
+                                               "--projection", "_display_name"):
+                    if time.monotonic() > deadline:
+                        self.fail("Android did not index the package fixture")
+                    time.sleep(1)
                 api = int(adb("shell", "getprop", "ro.build.version.sdk").strip())
                 permission = "android.permission.READ_MEDIA_AUDIO" if api >= 33 else "android.permission.READ_EXTERNAL_STORAGE"
                 adb("shell", "pm", "grant", APP, permission)
@@ -138,7 +145,11 @@ class AndroidPackageTest(unittest.TestCase):
                 for _ in range(3): adb("shell", "input", "keyevent", "4")
                 adb("shell", "am", "start", "-W", "--user", "0", "-n", APP + "/.MainActivity")
                 click("Settings"); click("Local music"); click("Scan music")
-                time.sleep(1)
+                deadline = time.monotonic() + 30
+                while "Scan complete" not in ET.tostring(tree(), encoding="unicode"):
+                    if time.monotonic() > deadline:
+                        self.fail("Manida did not finish scanning the device's music")
+                    time.sleep(0.5)
                 for _ in range(2): adb("shell", "input", "keyevent", "4")
                 click("Songs"); click("Native package fixture"); click("Native package fixture", last=True)
                 click("MilkDrop visualizer")
