@@ -207,6 +207,13 @@ class PlaybackQueue(private val store: MusicStore, private val queueId: String =
 
     suspend fun detachSaved() = write(snapshot().copy(selectedSavedQueueId = null))
 
+    /** Starts a temporary queue that keeps only the current song; a selected live queue keeps its contents. */
+    suspend fun startEmpty() = store.transaction {
+        val current = snapshot()
+        write(QueueSnapshot(listOfNotNull(current.entries.getOrNull(current.currentIndex)), current.currentEntryId,
+            current.positionMs, repeatMode = current.repeatMode, repeatPlays = current.repeatPlays), replacement = true)
+    }
+
     internal suspend fun updateSavedSnapshot(id: String, snapshot: QueueSnapshot) = store.transaction {
         val saved = requireNotNull(store.read<SavedQueue>("saved-queue:$id")) { "Saved queue is missing" }
         store.put("saved-queue:$id", "saved-queues", saved.copy(snapshot = snapshot.copy(selectedSavedQueueId = null)))

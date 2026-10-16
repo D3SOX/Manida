@@ -713,6 +713,7 @@ class PlayerUiTest {
                 onNodeWithTag("mini-player").performClick()
                 onNodeWithContentDescription("Queue").performClick()
                 onNodeWithContentDescription("Saved queues").performClick()
+                onNodeWithText("Manage saved queues").performClick()
                 onNodeWithText("Save current queue").performClick()
                 onNodeWithContentDescription("Queue name").performTextInput("Evening")
                 onNodeWithText("Save queue").performClick()

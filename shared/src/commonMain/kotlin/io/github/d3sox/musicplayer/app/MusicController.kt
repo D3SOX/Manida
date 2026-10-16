@@ -1049,6 +1049,13 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
         queue.detachSaved()
         mutableState.update { it.copy(queue = it.queue.copy(selectedSavedQueueId = null)) }
     }
+    fun startEmptyQueue() = action {
+        persistPlaybackPosition()
+        queue.startEmpty()
+        val snapshot = queue.snapshot()
+        mutableState.update { it.copy(queue = snapshot) }
+        if (queueLoaded) engine.updateQueue(playableQueue(snapshot))
+    }
     fun setQueueShuffled(enabled: Boolean) = action {
         queue.shuffle(enabled)
         val snapshot = queue.snapshot()
