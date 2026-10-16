@@ -11,7 +11,7 @@ android {
         applicationId = "me.d3sox.manida"
         minSdk = 31
         targetSdk = 37
-        versionCode = 3
+        versionCode = 4
         versionName = providers.gradleProperty("appVersion").get()
         manifestPlaceholders["appLabel"] = "Manida"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
