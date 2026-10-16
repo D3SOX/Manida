@@ -45,11 +45,18 @@ class AndroidBackgroundDownloadsTest {
         var playlistId: String? = null
         var restoreNetwork: (() -> Unit)? = null
         try {
-            controller.updatePreferences { it.copy(downloadsPaused = false, downloadOnMetered = false) }.join()
+            controller.updatePreferences { it.copy(downloadsPaused = true, downloadOnMetered = false) }.join()
             controller.connectServer("http://127.0.0.1:14533", "fixture", "fixture-password").join()
             val playlist = controller.state.value.playlists.single { it.server?.id == remote.id }
             playlistId = playlist.id
             controller.setPlaylistDownload(playlist.id, true).join()
+            scenario.close()
+            client.savePlaylist(remote.name, listOf(first.id, added.id), remote.id)
+            restoreNetwork = useUnmeteredWifi()
+            withTimeout(30_000) { controller.state.first { it.downloadNetwork.connected && !it.downloadNetwork.metered } }
+            // Schedule only after the remote edit: an earlier periodic run can still be active
+            // when `jobscheduler run -f` returns, so that command need not start a fresh refresh.
+            controller.setDownloadsPaused(false).join()
             val scheduler = context.getSystemService(JobScheduler::class.java)
             val periodic = withTimeout(5_000) {
                 while (true) {
@@ -63,10 +70,6 @@ class AndroidBackgroundDownloadsTest {
             }
             assertTrue(periodic.isPersisted)
             assertEquals(15 * 60_000L, periodic.intervalMillis)
-            scenario.close()
-            client.savePlaylist(remote.name, listOf(first.id, added.id), remote.id)
-            restoreNetwork = useUnmeteredWifi()
-            withTimeout(30_000) { controller.state.first { it.downloadNetwork.connected && !it.downloadNetwork.metered } }
             val output = ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(
                 "cmd jobscheduler run -f ${context.packageName} ${periodic.id}")).bufferedReader().use { it.readText() }
             check("Running job" in output) { output }

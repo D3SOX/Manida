@@ -117,7 +117,8 @@ class AndroidFileEditingUiTest {
                 compose.onNode(hasContentDescription("Track options: Northern Light") and
                     hasAnyAncestor(hasTestTag("track-row:${app.controller.state.value.songAt(song.toString())!!.id}"))).performClick()
                 compose.openFileAction("Replace artwork")
-                compose.waitUntil(5_000) {
+                // A cold DocumentsUI launch can spend more than five seconds loading providers.
+                compose.waitUntil(15_000) {
                     instrumentation.uiAutomation.rootInActiveWindow?.packageName?.let { it.toString() != app.packageName } == true
                 }
                 fun clickPickerItem(text: String) {
