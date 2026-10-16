@@ -1,10 +1,14 @@
 package io.github.d3sox.musicplayer.ui
 
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
+import androidx.compose.ui.text.TextRange
 import io.github.d3sox.musicplayer.app.MusicController
 import io.github.d3sox.musicplayer.library.*
 import io.github.d3sox.musicplayer.playback.MpvPlaybackEngine
@@ -19,6 +23,72 @@ import kotlin.test.*
 
 @OptIn(ExperimentalTestApi::class)
 class GlobalSearchUiTest {
+    @Test fun restoringSearchKeepsTheCursorAtTheEndOfTheQuery() {
+        val directory = Files.createTempDirectory("search-cursor-ui")
+        val store = openMusicStore(directory.resolve("library.db").toString())
+        val controller = MusicController(MusicLibrary(store), PlaybackQueue(store), MpvPlaybackEngine("null"), preferences = MusicPreferences(store))
+        try {
+            runSkikoComposeUiTest(size = Size(420f, 900f)) {
+                var visible by mutableStateOf(true)
+                setContent {
+                    val savedState = rememberSaveableStateHolder()
+                    if (visible) savedState.SaveableStateProvider("app") { MusicPlayerApp(controller) }
+                }
+                waitUntil(timeoutMillis = 5_000) { controller.state.value.libraryReady }
+                onNodeWithContentDescription("Search").performClick()
+                onNodeWithContentDescription("Search your library").performTextInput("Signal")
+                runOnIdle { visible = false }
+                waitForIdle()
+                runOnIdle { visible = true }
+                onNodeWithTag("library-search-page").assertIsDisplayed()
+                onNodeWithContentDescription("Search your library")
+                    .assertTextEquals("Signal")
+                    .assert(SemanticsMatcher.expectValue(SemanticsProperties.TextSelectionRange, TextRange(6)))
+                    .performTextInput(" song")
+                onNodeWithContentDescription("Search your library").assertTextEquals("Signal song")
+            }
+        } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
+
+    @Test fun openingTheQueueFromSearchAndSwipingDownTwicePreservesTheSearch() {
+        val directory = Files.createTempDirectory("search-queue-ui")
+        val store = openMusicStore(directory.resolve("library.db").toString())
+        val library = MusicLibrary(store)
+        val queue = PlaybackQueue(store)
+        val audio = Path.of(System.getProperty("musicplayer.testRoot"), "androidApp/src/androidTest/assets/fixture.flac").toString()
+        val song = runBlocking { library.importTrack(TrackMetadata("Signal song", "Signal artist"),
+            TrackSource("search-queue", SourceKind.LOCAL, audio)) }
+        val controller = MusicController(library, queue, MpvPlaybackEngine("null"), preferences = MusicPreferences(store))
+        try {
+            runSkikoComposeUiTest(size = Size(420f, 900f)) {
+                setContent { MusicPlayerApp(controller) }
+                waitUntil(timeoutMillis = 5_000) { controller.state.value.libraryReady }
+                onNodeWithContentDescription("Search").performClick()
+                onNodeWithContentDescription("Search your library").performTextInput("Signal")
+                onNodeWithTag("search-type:SONGS").performClick()
+                onNodeWithContentDescription("Track options: Signal song").performClick()
+                onNodeWithText("Add to queue").performClick()
+                waitUntil(timeoutMillis = 3_000) { onAllNodesWithText("Added to queue").fetchSemanticsNodes().isNotEmpty() }
+                onNodeWithContentDescription("Open queue").performClick()
+                onNodeWithTag("queue-header").assertIsDisplayed()
+                onNodeWithTag("queue-mini-player").performTouchInput {
+                    swipe(center, center.copy(y = center.y + 600f), 400)
+                }
+                onNodeWithTag("now-playing").assertIsDisplayed().performTouchInput {
+                    swipe(center.copy(y = 32f), center.copy(y = height * .75f), 400)
+                }
+                onNodeWithTag("mini-player").assertIsDisplayed()
+                onNodeWithTag("library-search-page").assertIsDisplayed()
+                onNodeWithContentDescription("Search your library").assertTextEquals("Signal")
+                    .assert(SemanticsMatcher.expectValue(SemanticsProperties.TextSelectionRange, TextRange(6)))
+                onNodeWithTag("search-type:SONGS").assertIsSelected()
+                onNodeWithTag("track-row:${song.id}").assertIsDisplayed()
+                assertEquals(listOf(song.id), controller.state.value.queue.entries.map { it.trackId })
+                assertFalse(controller.state.value.playback.playing)
+            }
+        } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
+
     @Test fun searchFromHomeCoversTheLibraryAndLongPressUsesTheCollectionActions() {
         val directory = Files.createTempDirectory("global-search-ui")
         val store = openMusicStore(directory.resolve("library.db").toString())
