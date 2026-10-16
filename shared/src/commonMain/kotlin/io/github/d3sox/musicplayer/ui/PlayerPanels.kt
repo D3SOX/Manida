@@ -369,10 +369,10 @@ internal fun PlayerPanels(state: AppState, controller: MusicController, sheet: A
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             PlayerMarquee(current.metadata.title, MaterialTheme.typography.titleSmall,
                                 motion.anchor(PlayerPanel.QUEUE, PlayerElement.TITLE, queueProgress >= .999f),
-                                marqueeState = motion.marquee(PlayerElement.TITLE, current.metadata.title))
+                                marqueeState = motion.marquee(PlayerElement.TITLE, current.metadata.title), active = queueProgress >= .999f)
                             PlayerMarquee(current.metadata.artist.ifBlank { "Unknown artist" }, MaterialTheme.typography.bodySmall,
                                 motion.anchor(PlayerPanel.QUEUE, PlayerElement.ARTIST, queueProgress >= .999f), color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                marqueeState = motion.marquee(PlayerElement.ARTIST, current.metadata.artist.ifBlank { "Unknown artist" }))
+                                marqueeState = motion.marquee(PlayerElement.ARTIST, current.metadata.artist.ifBlank { "Unknown artist" }), active = queueProgress >= .999f)
                         }
                         AppVolume(controller, Modifier.width(240.dp))
                         FilledIconButton(onClick = { controller.togglePlayback() },
@@ -601,10 +601,10 @@ internal fun MiniTrackInformation(state: AppState, track: Track, modifier: Modif
         Column(Modifier.weight(1f)) {
             PlayerMarquee(track.metadata.title, MaterialTheme.typography.titleSmall,
                 if (preview == null) motion?.anchor(PlayerPanel.MINI, PlayerElement.TITLE, visible) ?: Modifier else Modifier.testTag("mini-preview-title"),
-                marqueeState = if (preview == null) motion?.marquee(PlayerElement.TITLE, track.metadata.title) else null)
+                marqueeState = if (preview == null) motion?.marquee(PlayerElement.TITLE, track.metadata.title) else null, active = visible)
             PlayerMarquee(track.metadata.artist.ifBlank { "Unknown artist" }, MaterialTheme.typography.bodySmall,
                 motion?.anchor(PlayerPanel.MINI, PlayerElement.ARTIST, visible) ?: Modifier, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                marqueeState = if (preview == null) motion?.marquee(PlayerElement.ARTIST, track.metadata.artist.ifBlank { "Unknown artist" }) else null)
+                marqueeState = if (preview == null) motion?.marquee(PlayerElement.ARTIST, track.metadata.artist.ifBlank { "Unknown artist" }) else null, active = visible)
         }
     }
 }

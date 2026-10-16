@@ -33,11 +33,26 @@ internal class PlayerMarqueeState(private val scope: CoroutineScope) {
     private var job: Job? = null
     private var pause = 2f
     private var direction = 1
+    private var velocity = 0f
 
     fun update(key: Any, overflow: Float, velocity: Float) {
         consumers[key] = overflow
-        range = maxOf(range, overflow)
-        if (range <= 0 || job?.isActive == true) return
+        // Hidden copies use other text sizes; only text that scrolls sets the speed.
+        if (overflow > 0f) this.velocity = velocity
+        refresh()
+    }
+
+    fun remove(key: Any) {
+        consumers.remove(key)
+        refresh()
+    }
+
+    // Only overflowing visible text requests frames; an idle marquee would redraw the window on every vsync.
+    private fun refresh() {
+        range = consumers.values.maxOrNull() ?: 0f
+        if (range <= 0f) { job?.cancel(); job = null; return }
+        position = position.coerceAtMost(range)
+        if (job?.isActive == true) return
         job = scope.launch {
             var previous = 0L
             while (isActive) withInfiniteAnimationFrameNanos { now ->
@@ -51,16 +66,11 @@ internal class PlayerMarqueeState(private val scope: CoroutineScope) {
             }
         }
     }
-
-    fun remove(key: Any) {
-        consumers.remove(key)
-        if (consumers.isEmpty()) { job?.cancel(); job = null }
-    }
 }
 
 @Composable
 internal fun PlayerMarquee(text: String, style: TextStyle, modifier: Modifier = Modifier,
-    color: Color = Color.Unspecified, centerProgress: Float = 0f, marqueeState: PlayerMarqueeState? = null) {
+    color: Color = Color.Unspecified, centerProgress: Float = 0f, marqueeState: PlayerMarqueeState? = null, active: Boolean = true) {
     val scope = rememberCoroutineScope()
     val scrolling = marqueeState ?: remember(text) { PlayerMarqueeState(scope) }
     val key = remember(scrolling) { Any() }
@@ -71,8 +81,9 @@ internal fun PlayerMarquee(text: String, style: TextStyle, modifier: Modifier = 
     val em = with(density) { if (style.fontSize.isUnspecified) 16.sp.toPx() else style.fontSize.toPx() }
     val velocity = with(density) { 30.dp.toPx() } / em
     var viewport by remember { mutableIntStateOf(0) }
-    LaunchedEffect(scrolling, viewport, layout.size.width, em) {
-        if (viewport > 0) scrolling.update(key, ((layout.size.width - viewport) / em).coerceAtLeast(0f), velocity)
+    LaunchedEffect(scrolling, viewport, layout.size.width, em, active) {
+        val overflow = layout.size.width - viewport
+        if (viewport > 0) scrolling.update(key, if (active && overflow > 1) overflow / em else 0f, velocity)
     }
     DisposableEffect(scrolling, key) { onDispose { scrolling.remove(key) } }
     Canvas(modifier.fillMaxWidth().height(with(density) { layout.size.height.toDp() }).onSizeChanged { viewport = it.width }

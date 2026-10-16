@@ -58,6 +58,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.math.abs
 import io.github.d3sox.musicplayer.downloads.OfflineMusic
 import io.github.d3sox.musicplayer.downloads.DownloadRecord
+import io.github.d3sox.musicplayer.downloads.DownloadStatus
 import io.github.d3sox.musicplayer.downloads.DownloadNetwork
 import io.github.d3sox.musicplayer.playlists.Playlist
 import io.github.d3sox.musicplayer.playlists.Playlists
@@ -327,9 +328,13 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
             }
         } }
         offline?.let { downloads -> scope.launch {
+            var completed: Map<String, String?>? = null
             downloads.state.collect { progress ->
                 operations.withLock {
-                    if (queueLoaded) engine.updateQueue(playableQueue(queue.snapshot()))
+                    // Byte progress only affects the UI; the player needs to hear about finished or evicted files.
+                    val files = progress.filterValues { it.status == DownloadStatus.COMPLETE }.mapValues { it.value.path }
+                    if (queueLoaded && files != completed) engine.updateQueue(playableQueue(queue.snapshot()))
+                    completed = files
                     mutableState.update { it.copy(downloads = progress) }
                 }
             }

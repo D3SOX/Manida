@@ -41,11 +41,11 @@ internal fun PlayingTrackDetails(state: AppState, controller: MusicController, c
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     PlayerMarquee(track.metadata.title, MaterialTheme.typography.headlineSmall,
                         if (direction == 0) motion.anchor(PlayerPanel.PLAYING, PlayerElement.TITLE, visible) else Modifier,
-                        marqueeState = if (direction == 0) motion.marquee(PlayerElement.TITLE, track.metadata.title) else null)
+                        marqueeState = if (direction == 0) motion.marquee(PlayerElement.TITLE, track.metadata.title) else null, active = visible)
                     PlayerMarquee(track.metadata.artist.ifBlank { "Unknown artist" }, MaterialTheme.typography.titleMedium,
                         if (direction == 0) motion.anchor(PlayerPanel.PLAYING, PlayerElement.ARTIST, visible) else Modifier,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        marqueeState = if (direction == 0) motion.marquee(PlayerElement.ARTIST, track.metadata.artist.ifBlank { "Unknown artist" }) else null)
+                        marqueeState = if (direction == 0) motion.marquee(PlayerElement.ARTIST, track.metadata.artist.ifBlank { "Unknown artist" }) else null, active = visible)
                 }
                 IconToggleButton(track.favorite, { controller.setFavorite(track.id, it) }) {
                     Icon((if (track.favorite) AppIcon.FAVORITE_FILLED else AppIcon.FAVORITE).vector,
