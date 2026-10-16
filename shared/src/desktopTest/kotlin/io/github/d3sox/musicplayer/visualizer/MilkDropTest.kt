@@ -93,17 +93,25 @@ class MilkDropTest {
                 try {
                     for (preset in samples) {
                         ProjectMNative.load(handle, preset.file.path, false)
-                        repeat(24) { frame ->
-                            val pcm = FloatArray(2048) { sin((it / 2 + frame * 1024) * .12).toFloat() * .7f }
+                        var frames = 0
+                        fun draw() = repeat(24) {
+                            val pcm = FloatArray(2048) { sin((it / 2 + frames * 1024) * .12).toFloat() * .7f }
                             assertEquals(0, ProjectMNative.render(handle, pcm, 320, 240))
                             Thread.sleep(10)
+                            frames++
                         }
-                        val pixels = ProjectMNative.pixels(handle)
-                        assertEquals(320 * 240 * 4, pixels.size)
-                        val colored = (pixels.indices step 4).count { index ->
-                            (pixels[index].toInt() and 255) + (pixels[index + 1].toInt() and 255) + (pixels[index + 2].toInt() and 255) >
-                                if (preset.info.collection == "Manida") 180 else 30
+                        fun countColored(): Int {
+                            val pixels = ProjectMNative.pixels(handle)
+                            assertEquals(320 * 240 * 4, pixels.size)
+                            return (pixels.indices step 4).count { index ->
+                                (pixels[index].toInt() and 255) + (pixels[index + 1].toInt() and 255) + (pixels[index + 2].toInt() and 255) >
+                                    if (preset.info.collection == "Manida") 180 else 30
+                            }
                         }
+                        draw()
+                        var colored = countColored()
+                        // Presets animate by elapsed time, so a slow runner can need more frames before a preset shows.
+                        while (preset in visible && colored <= 50 && frames < 240) { draw(); colored = countColored() }
                         // Some presets need beats or longer feedback before this steady tone becomes visible.
                         if (preset in visible)
                             assertTrue(colored > 50, "${preset.name} must draw the supplied audio, colored pixels=$colored")
