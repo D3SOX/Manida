@@ -67,6 +67,10 @@ class AndroidPackageTest(unittest.TestCase):
                     while time.monotonic() < deadline:
                         root = tree()
                         # Answer permission prompts, and "isn't responding" dialogs that slow emulators show for system apps.
+                        # Manida's own dialog is a failure, not something to wait out.
+                        title = next((n.get("text", "") for n in root.iter("node") if n.get("resource-id") == "android:id/alertTitle"), "")
+                        if "Manida" in title:
+                            self.fail("Manida stopped responding: " + title)
                         dialog = next((n for n in root.iter("node") if n.get("resource-id", "").endswith(":id/permission_deny_button")
                                        or n.get("resource-id") == "android:id/aerr_wait"), None)
                         if dialog is not None:
