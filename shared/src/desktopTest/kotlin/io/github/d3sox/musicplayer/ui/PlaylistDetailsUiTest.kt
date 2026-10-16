@@ -228,4 +228,40 @@ class PlaylistDetailsUiTest {
             }
         } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
     }
+
+    @Test fun aServerPlaylistCoverReplacesSongArtworkUntilACustomCoverIsChosen() {
+        val directory = Files.createTempDirectory("server-playlist-cover")
+        val store = openMusicStore(directory.resolve("music.db").toString())
+        val artwork = ArtworkLibrary(directory.resolve("artwork").toString())
+        fun png(color: java.awt.Color) = ByteArrayOutputStream().also { output ->
+            ImageIO.write(BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB).apply {
+                createGraphics().let { graphics -> graphics.color = color; graphics.fillRect(0, 0, 32, 32); graphics.dispose() }
+            }, "png", output)
+        }.toByteArray()
+        val library = MusicLibrary(store)
+        val playlist = runBlocking {
+            val track = library.importTrack(TrackMetadata("Song"), TrackSource("local", SourceKind.LOCAL, "/music/song.flac"))
+            artwork.save(track.id, png(java.awt.Color.BLUE))
+            Playlists(store).create("Evening", listOf(track.id)).also { artwork.save("server-playlist-cover:${it.id}", png(java.awt.Color.GREEN)) }
+        }
+        val controller = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"),
+            playlists = Playlists(store), artwork = artwork)
+        try {
+            runComposeUiTest {
+                setContent { MusicPlayerApp(controller, artworkPicker = ArtworkPicker { png(java.awt.Color.RED) }) }
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.artwork.containsKey("server-playlist-cover:${playlist.id}") }
+                openLibraryPage("Playlists")
+                onNodeWithText("Evening").performClick()
+                fun center() = onNodeWithContentDescription("Playlist artwork: Evening").captureToImage().toPixelMap().let { it[it.width / 2, it.height / 2] }
+                assertTrue(center().let { it.green > .8f && it.blue < .2f }, "The server cover must replace song artwork")
+                onNodeWithContentDescription("Playlist options").performClick()
+                onNodeWithText("Edit playlist").performClick()
+                onNodeWithText("Change cover").performClick()
+                onNodeWithText("Save").performClick()
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.artwork.containsKey("playlist:${playlist.id}") }
+                waitForIdle()
+                assertTrue(center().let { it.red > .8f && it.green < .2f }, "A custom cover must replace the server cover")
+            }
+        } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
 }

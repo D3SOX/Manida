@@ -236,7 +236,7 @@ class NavidromeChangesTest {
                 request.url.encodedPath.endsWith("/getPlaylists.view") ->
                     """{"subsonic-response":{"status":"ok","playlists":{"playlist":[{"id":"public"}]}}}"""
                 request.url.encodedPath.endsWith("/getPlaylist.view") ->
-                    """{"subsonic-response":{"status":"ok","playlist":{"id":"public","name":"Shared music","owner":"another-user","entry":[{"id":"song"},{"id":"song"}]}}}"""
+                    """{"subsonic-response":{"status":"ok","playlist":{"id":"public","name":"Shared music","owner":"another-user","coverArt":"pl-public_1","entry":[{"id":"song"},{"id":"song"}]}}}"""
                 else -> error("Unexpected playlist request: ${request.url.encodedPath}")
             }
             respond(body)
@@ -250,6 +250,7 @@ class NavidromeChangesTest {
             val playlists = Playlists(store)
             val playlist = playlists.all().single()
             assertEquals(listOf(track.id, track.id), playlist.trackIds)
+            assertEquals("pl-public_1", playlist.server?.coverArt)
             assertFailsWith<IllegalArgumentException> { playlists.append(playlist.id, track.id) }
             assertFailsWith<IllegalArgumentException> { playlists.replaceTracks(playlist.id, emptyList()) }
             assertFailsWith<IllegalArgumentException> { playlists.moveTrack(playlist.id, 0, 1) }

@@ -443,7 +443,7 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
         val sftp = serverFiles?.configuration()
         val uploads = serverFiles?.pendingUploads().orEmpty()
         artworkUpdates.withLock {
-            val covers = artwork?.paths(tracks.map { it.id } + collections.map { "playlist:${it.id}" }).orEmpty()
+            val covers = artwork?.paths(tracks.map { it.id } + collections.flatMap { listOf("playlist:${it.id}", "server-playlist-cover:${it.id}") }).orEmpty()
             mutableState.update { it.copy(savedQueues = savedQueues, loading = loading, server = profile,
                 playlists = collections, artwork = covers, fileEdits = editHistory, listens = listens,
                 sftp = sftp, serverUploads = uploads) }
@@ -756,6 +756,24 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
         val collections = requireNotNull(playlists) { "Playlists are unavailable" }
         val previous = requireNotNull(collections.get(playlistId)) { "Playlist is missing" }
         require(previous.server?.readOnly != true) { "Only the owner can edit this playlist" }
+        val link = previous.server
+        if (link != null && (cover != null || removeCover)) {
+            val client = serverPlaylistClient(link)
+            val oldCover = if (client.playlistImageUploaded(link.id!!)) link.coverArt?.let { client.coverArt(it) } else null
+            setServerPlaylistCover(playlistId, link, client, cover)
+            collections.edit(playlistId, name, description)
+            refreshPlaylists()
+            confirm("Playlist updated", ActionDestination.PLAYLISTS, undo = {
+                collections.edit(playlistId, previous.name, previous.description)
+                setServerPlaylistCover(playlistId, link, serverPlaylistClient(link), oldCover)
+                refreshPlaylists()
+            }, redo = {
+                collections.edit(playlistId, name, description)
+                setServerPlaylistCover(playlistId, link, serverPlaylistClient(link), cover)
+                refreshPlaylists()
+            })
+            return@action
+        }
         val key = "playlist:$playlistId"
         val oldCover = if (cover != null || removeCover) artwork?.read(key) else null
         if (cover != null) requireNotNull(artwork) { "Artwork editing is unavailable" }.save(key, cover)
@@ -773,6 +791,29 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
             if (cover != null) artwork?.save(key, cover) else if (removeCover) artwork?.remove(key)
             refreshPlaylists()
         })
+    }
+    private suspend fun serverPlaylistClient(link: io.github.d3sox.musicplayer.playlists.PlaylistServer): io.github.d3sox.musicplayer.navidrome.NavidromeClient {
+        requireNotNull(link.id) { "Wait for this playlist to sync before changing its cover" }
+        navidrome?.profile()?.let { networkAccess(it.baseUrl) }
+        return requireNotNull(navidrome?.client()?.takeIf { it.serverId == link.serverId }) { "Connect to the music server to change this playlist's cover" }
+    }
+    /** Uploads [cover] to the server, or removes the uploaded cover when it is null so Navidrome generates one again. */
+    private suspend fun setServerPlaylistCover(playlistId: String, link: io.github.d3sox.musicplayer.playlists.PlaylistServer,
+        client: io.github.d3sox.musicplayer.navidrome.NavidromeClient, cover: ByteArray?) {
+        val remoteId = requireNotNull(link.id)
+        val key = "server-playlist-cover:$playlistId"
+        artwork?.remove("playlist:$playlistId")
+        if (cover != null) {
+            client.setPlaylistImage(remoteId, cover)
+            artwork?.save(key, cover)
+        } else {
+            client.removePlaylistImage(remoteId)
+            val generated = client.playlist(remoteId).coverArt
+            if (generated == null) artwork?.remove(key)
+            else try { artwork?.fetch(key, client, generated) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { artwork?.remove(key) }
+        }
     }
     fun renamePlaylist(playlistId: String, name: String) = action {
         requireNotNull(playlists) { "Playlists are unavailable" }.rename(playlistId, name)
@@ -866,6 +907,13 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
                 catch (cancelled: CancellationException) { throw cancelled }
                 catch (_: Exception) { /* A missing cover must not prevent importing its music. */ }
             }
+        }
+        if (artwork != null) playlists?.all().orEmpty().filter { it.server?.serverId == client.serverId }.forEach { playlist ->
+            val key = "server-playlist-cover:${playlist.id}"
+            val cover = playlist.server?.coverArt
+            try { if (cover == null) artwork.remove(key) else artwork.fetch(key, client, cover) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { /* A missing cover must not prevent importing the playlist. */ }
         }
     }
 
