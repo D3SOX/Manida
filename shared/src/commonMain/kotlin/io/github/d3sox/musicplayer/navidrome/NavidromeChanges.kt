@@ -146,7 +146,8 @@ class NavidromeChanges(private val store: MusicStore, private val library: Music
         val remotes = if (!changedOnly) connection.playlists() else {
             val known = Playlists(store).all().mapNotNull { it.server?.takeIf { link -> link.serverId == connection.serverId && link.id != null } }
                 .associate { it.id to it.changed }
-            connection.playlistVersions().filter { (id, changed) -> known[id] != changed }.keys.map { connection.playlist(it) }
+            // Servers that omit change times get every playlist downloaded again.
+            connection.playlistVersions().filter { (id, changed) -> changed.isEmpty() || known[id] != changed }.keys.map { connection.playlist(it) }
         }
         for (remote in remotes) {
             val imported = store.transaction {
