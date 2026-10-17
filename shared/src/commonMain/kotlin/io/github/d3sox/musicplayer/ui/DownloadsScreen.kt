@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.contentDescription
@@ -19,6 +20,9 @@ internal fun DownloadsScreen(state: AppState, controller: MusicController, dismi
     val paused = state.preferences.downloadsPaused
     val playlists = state.playlistDownloads
     val batch = state.downloadBatch
+    // Progress updates arrive several times a second, so avoid scanning the library for each song.
+    val titles = remember(state.tracks) { state.tracks.associate { it.id to it.metadata.title } }
+    val downloads = remember(state.downloads, titles) { state.downloads.values.sortedBy { titles[it.trackId] } }
     val waiting = state.downloads.values.any { it.status != DownloadStatus.COMPLETE } || batch.total > 0
     SettingsScreen(onDismissRequest = dismiss, title = { Text("Downloads") }, text = {
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -51,9 +55,8 @@ internal fun DownloadsScreen(state: AppState, controller: MusicController, dismi
                     }
                 }
                 if (playlists.isNotEmpty() && state.downloads.isNotEmpty()) item { HorizontalDivider() }
-                items(state.downloads.values.sortedBy { record -> state.tracks.firstOrNull { it.id == record.trackId }?.metadata?.title },
-                    key = { it.trackId }) { record ->
-                    val title = state.tracks.firstOrNull { it.id == record.trackId }?.metadata?.title ?: "Unavailable song"
+                items(downloads, key = { it.trackId }) { record ->
+                    val title = titles[record.trackId] ?: "Unavailable song"
                     Column {
                         Text(title,
                             style = MaterialTheme.typography.titleMedium)
