@@ -1,23 +1,6 @@
 name: Tests
 on:
   pull_request:
-    paths:
-      - .github/workflows/tests.yml
-      - androidApp/**
-      - desktopApp/**
-      - shared/**
-      - native/**
-      - gradle/**
-      - '*.gradle.kts'
-      - gradle.properties
-      - gradlew
-      - gradlew.bat
-      - scripts/**
-      - '!scripts/package-website.py'
-      - packaging/**
-      - '!packaging/screenshots/**'
-      - '!packaging/fdroid-qr*.png'
-      - .fdroid.yml
   workflow_call:
   workflow_dispatch:
 permissions:
@@ -26,7 +9,43 @@ concurrency:
   group: tests-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
+  # Filter paths here instead of in `on:` so the required Tests check always reports.
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.scope.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Check whether this change affects the apps
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 - <<'PY'
+          from fnmatch import fnmatch
+          import os
+          import subprocess
+
+          include = ['.github/workflows/tests.yml', 'androidApp/*', 'desktopApp/*', 'shared/*', 'native/*', 'gradle/*',
+                     '*.gradle.kts', 'gradle.properties', 'gradlew', 'gradlew.bat', 'scripts/*', 'packaging/*', '.fdroid.yml']
+          exclude = ['scripts/package-website.py', 'packaging/screenshots/*', 'packaging/fdroid-qr*.png']
+          run = True
+          if os.environ['EVENT_NAME'] == 'pull_request':
+              paths = subprocess.check_output(['git', 'diff', '--name-only', '-z', '--no-renames',
+                                               f"{os.environ['BASE']}...{os.environ['HEAD']}"]).decode().split('\0')
+              run = any(any(fnmatch(path, pattern) for pattern in include) and not any(fnmatch(path, pattern) for pattern in exclude)
+                        for path in paths if path)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('run=' + str(run).lower() + '\n')
+          PY
   android-shards:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -41,6 +60,8 @@ jobs:
           shards="$(python3 scripts/test-android-suite.py --matrix)"
           echo "shards=$shards" >> "$GITHUB_OUTPUT"
   desktop:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -128,3 +149,12 @@ jobs:
             .test-environment/android-class-results
             .test-environment/pairing.log
             .test-environment/sftp.log
+  tests:
+    name: Tests
+    needs: [changes, android-shards, desktop, android]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
