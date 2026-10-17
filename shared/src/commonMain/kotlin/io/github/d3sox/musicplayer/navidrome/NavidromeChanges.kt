@@ -165,7 +165,7 @@ class NavidromeChanges(private val store: MusicStore, private val library: Music
                     changed = remote.changed)
                 store.put("playlist:$id", "playlists", previous?.copy(name = remote.name, trackIds = ids, server = link, description = remote.description)
                     ?: Playlist(id, remote.name, ids, server = link, description = remote.description))
-                id to (previous?.server?.changed != remote.changed)
+                id to (remote.changed.isEmpty() || previous?.server?.changed != remote.changed)
             } ?: continue
             if (artwork != null) {
                 val (id, changed) = imported
