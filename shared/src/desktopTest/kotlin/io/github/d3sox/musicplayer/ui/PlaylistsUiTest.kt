@@ -479,4 +479,49 @@ class PlaylistsUiTest {
             }
         } finally { controller.close(); store.close(); directory.toFile().deleteRecursively() }
     }
+
+    @Test
+    fun playlistsWithAFolderPrefixAreGroupedAndCanBeMovedBetweenFolders() {
+        val directory = Files.createTempDirectory("playlist-folders-ui")
+        val store = openMusicStore(directory.resolve("library.db").toString())
+        val library = MusicLibrary(store)
+        val playlists = Playlists(store)
+        val preferences = io.github.d3sox.musicplayer.settings.MusicPreferences(store)
+        val (morning, night) = runBlocking { listOf("Road ▸ Morning", "Road▸Night", "AC/DC").map { playlists.create(it, emptyList()).id } }
+        val controller = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"), preferences = preferences, playlists = playlists)
+        try {
+            runComposeUiTest {
+                setContent { MusicPlayerApp(controller) }
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.libraryReady }
+                openLibraryPage("Playlists")
+                onNodeWithText("AC/DC").assertIsDisplayed()
+                onNodeWithText("3 playlists").assertIsDisplayed()
+                onNodeWithText("Road").assertIsDisplayed()
+                onNodeWithText("Morning").assertDoesNotExist()
+                onNodeWithText("Road").performClick()
+                onNodeWithText("AC/DC").assertDoesNotExist()
+                onNodeWithText("Night").assertIsDisplayed()
+                onNodeWithContentDescription("Collection order").performClick()
+                onNodeWithText("Rearrange").performClick()
+                onNodeWithTag("collection-reorder:$night", useUnmergedTree = true).performCustomAccessibilityActionWithLabel("Move up")
+                waitUntil(timeoutMillis = 3_000) {
+                    controller.state.value.preferences.collectionLayouts[LibraryTab.PLAYLISTS]?.order?.take(2) == listOf(night, morning)
+                }
+                onNodeWithContentDescription("Finish rearranging").performClick()
+                onNodeWithText("Morning").performClick()
+                onNodeWithText("Playlist in Road · 0 songs").assertIsDisplayed()
+                onNodeWithContentDescription("Playlist options").performClick()
+                onNodeWithText("Edit playlist").performClick()
+                onNodeWithContentDescription("Playlist folder").performTextReplacement("Trips")
+                onNodeWithText("Save").performClick()
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.playlists.single { it.id == morning }.name == "Trips ▸ Morning" }
+                onNodeWithContentDescription("Back").performClick()
+                onNodeWithText("Night").assertIsDisplayed()
+                onNodeWithText("Morning").assertDoesNotExist()
+                onNodeWithContentDescription("Back").performClick()
+                onNodeWithText("Trips").assertIsDisplayed()
+                onNodeWithText("AC/DC").assertIsDisplayed()
+            }
+        } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
 }

@@ -35,6 +35,15 @@ data class Playlist(val id: String, val name: String, val trackIds: List<String>
     val conflict: PlaylistConflict? = null, val rule: LibraryQuery? = null, val description: String = "",
     val shuffle: Boolean = false, val sort: PlaylistSort = PlaylistSort.CUSTOM, val descending: Boolean = false)
 
+// Navidrome has no playlist folders, so names like "Folder ▸ Playlist" group playlists. Keyboards cannot type the
+// separator, so existing names with slashes or other punctuation are left alone.
+const val PLAYLIST_FOLDER_SEPARATOR = '▸'
+private fun Playlist.folderSplit() = name.indexOf(PLAYLIST_FOLDER_SEPARATOR).takeIf { it >= 0 }
+    ?.let { name.substring(0, it).trim() to name.substring(it + 1).trim() }?.takeIf { (folder, title) -> folder.isNotEmpty() && title.isNotEmpty() }
+val Playlist.folder: String? get() = folderSplit()?.first
+val Playlist.title: String get() = folderSplit()?.second ?: name
+fun playlistName(folder: String, title: String) = if (folder.isBlank()) title.trim() else "${folder.trim()} $PLAYLIST_FOLDER_SEPARATOR ${title.trim()}"
+
 @Serializable
 internal data class PlaylistRemoval(val playlist: Playlist, val revision: String = Uuid.random().toString())
 

@@ -28,6 +28,10 @@ import com.materialkolor.ktx.themeColor
 import io.github.d3sox.musicplayer.app.AppState
 import io.github.d3sox.musicplayer.app.MusicController
 import io.github.d3sox.musicplayer.playlists.Playlist
+import io.github.d3sox.musicplayer.playlists.PLAYLIST_FOLDER_SEPARATOR
+import io.github.d3sox.musicplayer.playlists.folder
+import io.github.d3sox.musicplayer.playlists.playlistName
+import io.github.d3sox.musicplayer.playlists.title
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
@@ -58,8 +62,8 @@ internal fun PlaylistHero(playlist: Playlist, state: AppState, controller: Music
                 Modifier.size(200.dp).align(Alignment.Center).semantics { contentDescription = "Playlist artwork: ${playlist.name}" })
             AppIconButton(AppIcon.BACK, "Back", Modifier.align(Alignment.TopStart), onClick = back)
         }
-        Text(playlist.name, style = MaterialTheme.typography.headlineMedium)
-        Text("${if (playlist.rule == null) "Playlist" else "Smart playlist"} · ${countLabel(playlist.trackIds.size, "song")}",
+        Text(playlist.title, style = MaterialTheme.typography.headlineMedium)
+        Text("${if (playlist.rule == null) "Playlist" else "Smart playlist"}${playlist.folder?.let { " in $it" }.orEmpty()} · ${countLabel(playlist.trackIds.size, "song")}",
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (playlist.description.isNotBlank()) Text(playlist.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -134,7 +138,8 @@ internal fun PlaylistHero(playlist: Playlist, state: AppState, controller: Music
 
 @Composable
 internal fun EditPlaylistDialog(playlist: Playlist, state: AppState, controller: MusicController, dismiss: () -> Unit) {
-    var name by remember(playlist.id) { mutableStateOf(playlist.name) }
+    var name by remember(playlist.id) { mutableStateOf(playlist.title) }
+    var folder by remember(playlist.id) { mutableStateOf(playlist.folder.orEmpty()) }
     var description by remember(playlist.id) { mutableStateOf(playlist.description) }
     var cover by remember { mutableStateOf<ByteArray?>(null) }
     var removeCover by remember { mutableStateOf(false) }
@@ -167,10 +172,12 @@ internal fun EditPlaylistDialog(playlist: Playlist, state: AppState, controller:
             pickerError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             OutlinedTextField(name, { name = it }, label = { Text("Title") }, singleLine = true,
                 modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Playlist title" })
+            OutlinedTextField(folder, { folder = it.filter { c -> c != PLAYLIST_FOLDER_SEPARATOR } }, label = { Text("Folder") }, singleLine = true,
+                                modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Playlist folder" })
             OutlinedTextField(description, { description = it }, label = { Text("Description") }, minLines = 2, maxLines = 4,
                 modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Playlist description" })
         }
-    }, confirmButton = { Button(onClick = { controller.editPlaylist(playlist.id, name, description, cover, removeCover); dismiss() },
+    }, confirmButton = { Button(onClick = { controller.editPlaylist(playlist.id, playlistName(folder, name), description, cover, removeCover); dismiss() },
         enabled = name.isNotBlank() && !picking) { Icon(AppIcon.CHECK.vector, null); Spacer(Modifier.width(8.dp)); Text("Save") } },
         dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } })
 }
