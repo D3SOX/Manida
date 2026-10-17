@@ -30,9 +30,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 
 @Composable
-internal fun PlaylistsScreen(state: AppState, controller: MusicController, backEnabled: Boolean = true, destination: LibraryDestination? = null) {
+internal fun PlaylistsScreen(state: AppState, controller: MusicController, backEnabled: Boolean = true, destination: LibraryDestination? = null,
+    rearranging: Boolean = false, finishRearranging: () -> Unit = {}) {
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
-    var rearranging by rememberSaveable(selected) { mutableStateOf(false) }
+    var rearrangingSongs by rememberSaveable(selected) { mutableStateOf(false) }
     var handledDestination by rememberSaveable { mutableIntStateOf(-1) }
     LaunchedEffect(destination) {
         if (destination?.tab == io.github.d3sox.musicplayer.library.LibraryTab.PLAYLISTS && destination.revision != handledDestination) {
@@ -61,6 +62,7 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
                 trackIds = collection.trackIds)
         }
     }
+    if (rearranging && backEnabled && selected == null) PlatformBackHandler(finishRearranging)
     AnimatedNavigation(selected, null, canGoBack = backEnabled && selected != null,
         onBack = { selected = null }, depth = { if (it == null) 0 else 1 }) { page ->
     val playlist = state.playlists.firstOrNull { it.id == page }
@@ -81,7 +83,8 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
                 }
                 }
             }
-            CollectionBrowser(collections, io.github.d3sox.musicplayer.library.LibraryTab.PLAYLISTS, state, controller, Modifier.weight(1f)) { selected = it }
+            CollectionBrowser(collections, io.github.d3sox.musicplayer.library.LibraryTab.PLAYLISTS, state, controller, Modifier.weight(1f),
+                rearranging = rearranging, finishRearranging = finishRearranging) { selected = it }
         } else {
             val catalog = remember(state.tracks) { state.tracks.associateBy { it.id } }
             val ordered = remember(playlist, catalog) { playlist.orderedTracks(catalog) }
@@ -106,11 +109,11 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
                         resolve = { resolving = true }, busy = fileBusy,
                         rearrange = if (editable && playlist.trackIds.size > 1) ({
                             controller.setPlaylistSort(playlist.id, io.github.d3sox.musicplayer.playlists.PlaylistSort.CUSTOM, false)
-                            rearranging = true
-                        }) else null, finishRearranging = if (rearranging) ({ rearranging = false }) else null)
+                            rearrangingSongs = true
+                        }) else null, finishRearranging = if (rearrangingSongs) ({ rearrangingSongs = false }) else null)
             }
             CompositionLocalProvider(LocalLibraryOrigin provides io.github.d3sox.musicplayer.queue.QueueOrigin(io.github.d3sox.musicplayer.library.LibraryTab.PLAYLISTS, playlist.id)) {
-            if (rearranging && editable) PlaylistRearrangeList(playlist, state, controller, Modifier.weight(1f), header)
+            if (rearrangingSongs && editable) PlaylistRearrangeList(playlist, state, controller, Modifier.weight(1f), header)
             else SongList(ordered.map { it.value }, controller, Modifier.weight(1f), playlist.id.takeIf { editable },
                 scrollIndicator = { "${it + 1} / ${playlist.trackIds.size}" }, contextName = playlist.name,
                 playlistPositions = ordered.map { it.index }, shuffleContext = playlist.shuffle, header = header)

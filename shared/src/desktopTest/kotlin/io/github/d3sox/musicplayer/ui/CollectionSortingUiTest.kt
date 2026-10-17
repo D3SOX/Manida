@@ -156,6 +156,10 @@ class CollectionSortingUiTest {
                 onNodeWithContentDescription("Collection order").performClick()
                 onNodeWithContentDescription("Ascending").assertDoesNotExist()
                 onNodeWithText("Custom order").performClick()
+                onNodeWithTag("collection-reorder:$alpha", useUnmergedTree = true).assertDoesNotExist()
+                onNodeWithContentDescription("Collection order").performClick()
+                onNodeWithText("Rearrange").performClick()
+                onNodeWithContentDescription("Collection view").assertDoesNotExist()
                 val handle = onNodeWithTag("collection-reorder:$charlie", useUnmergedTree = true)
                 val target = onNodeWithTag("collection-reorder:$alpha", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center.y
                 val start = handle.fetchSemanticsNode().boundsInRoot.center.y
@@ -178,6 +182,9 @@ class CollectionSortingUiTest {
                 waitUntil(timeoutMillis = 3_000) {
                     controller.state.value.preferences.collectionLayouts[LibraryTab.PLAYLISTS]?.order == listOf(alpha, charlie, bravo, aardvark)
                 }
+                onNodeWithContentDescription("Finish rearranging").performClick()
+                onNodeWithTag("collection-reorder:$alpha", useUnmergedTree = true).assertDoesNotExist()
+                onNodeWithContentDescription("Collection view").assertIsDisplayed()
             }
         } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
     }
