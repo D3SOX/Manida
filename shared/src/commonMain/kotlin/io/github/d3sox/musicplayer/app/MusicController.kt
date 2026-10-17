@@ -378,7 +378,6 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
             recover { fileEdits?.recover() }
             recover { serverFiles?.recover() }
             recover { trimFileHistory() }
-            recover { linkSameFiles() }
             recover { pairedDevices?.start() }
             recover {
                 val authorization = scrobbling?.pendingLastFmAuthorization()
