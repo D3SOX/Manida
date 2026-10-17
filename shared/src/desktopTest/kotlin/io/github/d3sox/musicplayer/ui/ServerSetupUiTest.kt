@@ -48,6 +48,8 @@ class ServerSetupUiTest {
                 }
                 onNodeWithContentDescription("Settings").performClick()
                 onNodeWithText("Music server").performScrollTo().performClick()
+                onNodeWithText("Connected").assertExists()
+                onNodeWithText("Password").assertDoesNotExist()
                 onNodeWithText("Refresh library").performClick()
                 waitUntil(timeoutMillis = 5_000) {
                     controller.state.value.tracks.first { it.metadata.title == "Northern Light" }.favorite
@@ -55,6 +57,38 @@ class ServerSetupUiTest {
             }
         } finally {
             runBlocking { controller.closeAndJoin(); client.setFavorite(original.id, original.favorite); vault.delete("navidrome") }
+            store.close(); http.close(); directory.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun disconnectingTheServerKeepsItsSongsButMarksThemUnavailable() {
+        val directory = Files.createTempDirectory("server-disconnect-ui")
+        val store = openMusicStore(directory.resolve("library.db").toString())
+        val http = HttpClient(OkHttp)
+        val vault = SecretServiceVault("io.github.d3sox.musicplayer.tests.${Uuid.random()}")
+        val controller = MusicController(MusicLibrary(store), PlaybackQueue(store), MpvPlaybackEngine("null"),
+            NavidromeConnection(store, http, vault))
+        try {
+            runBlocking { controller.connectServer(System.getenv("MUSICPLAYER_TEST_NAVIDROME_URL") ?: "http://127.0.0.1:14533",
+                "fixture", "fixture-password").join() }
+            runComposeUiTest {
+                setContent { MusicPlayerApp(controller) }
+                waitUntil(timeoutMillis = 5_000) {
+                    onAllNodesWithContentDescription("Settings").fetchSemanticsNodes().isNotEmpty()
+                }
+                onNodeWithContentDescription("Settings").performClick()
+                onNodeWithText("Music server").performScrollTo().performClick()
+                onNodeWithText("Disconnect").performClick()
+                onNodeWithText("Disconnect music server?").assertExists()
+                onAllNodesWithText("Disconnect").onLast().performClick()
+                waitUntil(timeoutMillis = 5_000) { controller.state.value.server == null && !controller.state.value.loading }
+                onNodeWithText("Password").assertExists()
+                assertEquals(3, controller.state.value.tracks.size)
+                assertEquals(true, controller.state.value.tracks.all { track -> track.sources.none { it.available } })
+            }
+        } finally {
+            runBlocking { controller.closeAndJoin(); vault.delete("navidrome") }
             store.close(); http.close(); directory.toFile().deleteRecursively()
         }
     }

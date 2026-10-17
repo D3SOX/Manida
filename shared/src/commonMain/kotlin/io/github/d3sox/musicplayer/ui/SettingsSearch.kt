@@ -46,7 +46,7 @@ internal fun SettingsSearch(query: String, onQuery: (String) -> Unit, back: () -
             category("Downloads & cache", AppIcon.DOWNLOAD, "Source priority" to "local downloads server mixed library",
                 "Playback cache" to "storage offline", "Download network" to "metered wifi unmetered")
             add(SettingResult("Manage downloads", "Downloads & cache", AppIcon.DOWNLOAD, "offline progress auto playlist", "Manage downloads"))
-            add(SettingResult("Music server", "Music server", AppIcon.SERVER, "navidrome subsonic address url username password connect refresh"))
+            add(SettingResult("Music server", "Music server", AppIcon.SERVER, "navidrome subsonic address url username password connect refresh disconnect"))
             category("Listening & scrobbling", AppIcon.HISTORY, "Record listening history" to "statistics recommendations",
                 "Clear listening history" to "delete statistics")
             if (controller.scrobblingAvailable) {
