@@ -479,4 +479,83 @@ class PlaylistsUiTest {
             }
         } finally { controller.close(); store.close(); directory.toFile().deleteRecursively() }
     }
+
+    @Test
+    fun playlistsWithAFolderPrefixAreGroupedAndCanBeMovedBetweenFolders() {
+        val directory = Files.createTempDirectory("playlist-folders-ui")
+        val store = openMusicStore(directory.resolve("library.db").toString())
+        val library = MusicLibrary(store)
+        val playlists = Playlists(store)
+        val preferences = io.github.d3sox.musicplayer.settings.MusicPreferences(store)
+        val (morning, night, slash, dawn) = runBlocking { listOf("Road ▸ Morning", "Road▸Night", "AC/DC", "Road ▸ Coast ▸ Dawn").map { playlists.create(it, emptyList()).id } }
+        val controller = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"), preferences = preferences, playlists = playlists)
+        try {
+            runComposeUiTest {
+                setContent { MusicPlayerApp(controller) }
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.libraryReady }
+                openLibraryPage("Playlists")
+                onNodeWithText("AC/DC").assertIsDisplayed()
+                onNodeWithText("4 playlists").assertIsDisplayed()
+                onNodeWithText("Road").assertIsDisplayed()
+                onNodeWithText("Morning").assertDoesNotExist()
+                runBlocking { controller.updatePreferences { settings -> settings.copy(collectionLayouts = mapOf(LibraryTab.PLAYLISTS to
+                    io.github.d3sox.musicplayer.settings.CollectionLayout(order = listOf(slash, morning, night, dawn)))) }.join() }
+                onNodeWithText("Road").performClick()
+                onNodeWithText("AC/DC").assertDoesNotExist()
+                onNodeWithText("Night").assertIsDisplayed()
+                onNodeWithText("Dawn").assertDoesNotExist()
+                onNodeWithText("3 playlists").assertIsDisplayed()
+                onNodeWithText("Coast").performClick()
+                onNodeWithText("Dawn").performClick()
+                onNodeWithText("Playlist in Road ▸ Coast · 0 songs").assertIsDisplayed()
+                onNodeWithContentDescription("Playlist options").performClick()
+                onNodeWithText("Edit playlist").performClick()
+                onNodeWithContentDescription("Playlist title").performTextReplacement("Da▸wn")
+                onNodeWithContentDescription("Playlist title").assertTextEquals("Title", "Dawn")
+                onNodeWithContentDescription("Playlist folder").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Road ▸ Coast"))
+                onNodeWithContentDescription("Playlist folder").performClick()
+                onNodeWithText("New folder").performClick()
+                onNodeWithText("Inside Road ▸ Coast").assertIsDisplayed()
+                onNodeWithText("Folder name").performTextInput("Cliffs")
+                onNodeWithText("Create").performClick()
+                onNodeWithText("Save").performClick()
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.playlists.any { it.name == "Road ▸ Coast ▸ Cliffs ▸ Dawn" } }
+                onNodeWithContentDescription("Back").performClick()
+                onNodeWithText("Road ▸ Coast ▸ Cliffs").assertIsDisplayed()
+                onNodeWithText("Dawn").assertIsDisplayed()
+                onNodeWithContentDescription("Back").performClick()
+                onNodeWithText("Cliffs").assertIsDisplayed()
+                onNodeWithContentDescription("Back").performClick()
+                onNodeWithText("Coast").assertIsDisplayed()
+                onNodeWithContentDescription("Collection order").performClick()
+                onNodeWithText("Rearrange").performClick()
+                onNodeWithTag("collection-reorder:$night", useUnmergedTree = true).performCustomAccessibilityActionWithLabel("Move up")
+                waitUntil(timeoutMillis = 3_000) {
+                    controller.state.value.preferences.collectionLayouts[LibraryTab.PLAYLISTS]?.order?.let { it.indexOf(night) in 0 until it.indexOf(morning) && it.containsAll(listOf(slash, dawn)) } == true
+                }
+                onNodeWithContentDescription("Finish rearranging").performClick()
+                onNodeWithText("Morning").performClick()
+                onNodeWithText("Playlist in Road · 0 songs").assertIsDisplayed()
+                onNodeWithContentDescription("Playlist options").performClick()
+                onNodeWithText("Edit playlist").performClick()
+                onNodeWithContentDescription("Playlist folder").performClick()
+                onNodeWithText("Road ▸ Coast ▸ Cliffs").assertIsDisplayed()
+                onNodeWithText("No folder").performClick()
+                onNodeWithContentDescription("Playlist folder").performClick()
+                onNodeWithText("New folder").performClick()
+                onNodeWithText("Inside", substring = true).assertDoesNotExist()
+                onNodeWithText("Folder name").performTextInput("Trips")
+                onNodeWithText("Create").performClick()
+                onNodeWithText("Save").performClick()
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.playlists.single { it.id == morning }.name == "Trips ▸ Morning" }
+                onNodeWithContentDescription("Back").performClick()
+                onNodeWithText("Trips").assertIsDisplayed()
+                onNodeWithText("Morning").assertIsDisplayed()
+                onNodeWithContentDescription("Back").performClick()
+                onNodeWithText("Road").assertIsDisplayed()
+                onNodeWithText("Morning").assertDoesNotExist()
+                onNodeWithText("AC/DC").assertIsDisplayed()
+            }
+        } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
 }

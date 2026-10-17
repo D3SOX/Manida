@@ -40,7 +40,7 @@ internal data class CollectionItem(val id: String, val title: String, val subtit
 
 @Composable
 internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, state: AppState, controller: MusicController,
-    modifier: Modifier = Modifier, rearranging: Boolean = false, finishRearranging: () -> Unit = {}, open: (String) -> Unit) {
+    modifier: Modifier = Modifier, total: Int = entries.size, rearranging: Boolean = false, finishRearranging: () -> Unit = {}, open: (String) -> Unit) {
     val listScroll = rememberLibraryListState(controller, "collections:${tab.name}:list")
     val gridScroll = rememberLibraryGridState(controller, "collections:${tab.name}:grid")
     val layout = state.preferences.collectionLayouts[tab] ?: CollectionLayout()
@@ -73,6 +73,11 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
             settings.copy(collectionLayouts = settings.collectionLayouts + (tab to change(settings.collectionLayouts[tab] ?: CollectionLayout())))
         }
     }
+    // Playlist folders are ordered separately, so keep the positions of entries this page does not show.
+    fun saveOrder(rows: List<CollectionItem>) = update { layout ->
+        val ids = rows.map(CollectionItem::id)
+        layout.copy(order = ids + (layout.order - ids.toSet()))
+    }
     @Composable
     fun ReorderableCollectionItemScope.DragHandle(entry: CollectionItem) {
         fun moveBy(offset: Int): Boolean {
@@ -81,7 +86,7 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
             if (from + offset !in rows.indices) return false
             rows.add(from + offset, rows.removeAt(from))
             dragged = rows
-            update { it.copy(order = rows.map(CollectionItem::id)) }
+            saveOrder(rows)
             return true
         }
         Box(Modifier.size(48.dp).testTag("collection-reorder:${entry.id}")
@@ -89,7 +94,7 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
                 contentDescription = "Reorder ${entry.title}"
                 customActions = listOf(CustomAccessibilityAction("Move up") { moveBy(-1) }, CustomAccessibilityAction("Move down") { moveBy(1) })
             }
-            .draggableHandle(onDragStopped = { dragged?.let { rows -> update { it.copy(order = rows.map(CollectionItem::id)) } } }),
+            .draggableHandle(onDragStopped = { dragged?.let(::saveOrder) }),
             contentAlignment = Alignment.Center) { Icon(AppIcon.DRAG.vector, null) }
     }
     val navigationActive = LocalNavigationActive.current
@@ -97,7 +102,7 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
         if (navigationActive && rearranging && it.key == Key.Escape && it.type == KeyEventType.KeyUp) { finishRearranging(); true } else false
     }) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(countLabel(entries.size, tab.label.lowercase().removeSuffix("s"), tab.label.lowercase()), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge,
+            Text(countLabel(total, tab.label.lowercase().removeSuffix("s"), tab.label.lowercase()), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (rearranging) AppIconButton(AppIcon.CHECK, "Finish rearranging", onClick = finishRearranging)
             else Box {

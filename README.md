@@ -36,7 +36,7 @@ I started it because I couldn't find a music player with all the features I want
 ## What it does
 
 - Browse songs, albums, artists, genres and folders. Search the whole library and filter the results by type. Choose your library tabs, rearrange Home's sections and hide the sections you don't use.
-- Manage playlists, smart playlists and M3U imports and exports. Drag your playlists into a custom order. Publish playlists to your music server and keep their changes synced, including covers on Navidrome 0.61 or newer.
+- Manage playlists, smart playlists and M3U imports and exports. Drag your playlists into a custom order and group them into folders, including folders inside folders. Folders are saved as `Folder ▸ Playlist` names, so they sync through your music server. Publish playlists to your music server and keep their changes synced, including covers on Navidrome 0.61 or newer.
 - Keep a separate Up next queue. Save queues with their played history, current song and playback position. Switch between live queues and snapshots, export them to playlists, and enable recovery snapshots if you want them.
 - Download server music for offline playback. Match local and server copies of the same song instead of showing duplicates.
 - Use gapless playback, crossfade, speed and pitch controls, repeat counts, an equalizer, mono audio and a sleep timer. Open common playback settings from Now playing. Browse AutoEQ headphone profiles or save your own settings as a profile.

@@ -26,6 +26,12 @@ import io.github.d3sox.musicplayer.library.SourceKind
 import io.github.d3sox.musicplayer.library.recentAt
 import io.github.d3sox.musicplayer.playlists.Playlist
 import io.github.d3sox.musicplayer.playlists.PlaylistImport
+import io.github.d3sox.musicplayer.playlists.folder
+import io.github.d3sox.musicplayer.playlists.folderPath
+import io.github.d3sox.musicplayer.playlists.folderSegments
+import io.github.d3sox.musicplayer.playlists.isInFolder
+import io.github.d3sox.musicplayer.playlists.parentFolder
+import io.github.d3sox.musicplayer.playlists.title
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 
@@ -33,11 +39,15 @@ import kotlinx.coroutines.CancellationException
 internal fun PlaylistsScreen(state: AppState, controller: MusicController, backEnabled: Boolean = true, destination: LibraryDestination? = null,
     rearranging: Boolean = false, finishRearranging: () -> Unit = {}) {
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    var folder by rememberSaveable { mutableStateOf<String?>(null) }
     var rearrangingSongs by rememberSaveable(selected) { mutableStateOf(false) }
     var handledDestination by rememberSaveable { mutableIntStateOf(-1) }
     LaunchedEffect(destination) {
         if (destination?.tab == io.github.d3sox.musicplayer.library.LibraryTab.PLAYLISTS && destination.revision != handledDestination) {
-            selected = destination.collectionId; handledDestination = destination.revision
+            val id = destination.collectionId
+            if (id?.startsWith(FOLDER_PREFIX) == true) { folder = id.removePrefix(FOLDER_PREFIX); selected = null }
+            else { selected = id; folder = null }
+            handledDestination = destination.revision
         }
     }
     var creating by remember { mutableStateOf(false) }
@@ -53,23 +63,51 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
     val scope = rememberCoroutineScope()
     val playlist = state.playlists.firstOrNull { it.id == selected }
     val recentAt = remember(state.tracks) { state.tracks.associate { it.id to it.recentAt } }
-    val collections = remember(state.playlists, state.artwork, recentAt) {
-        state.playlists.map { collection ->
-            CollectionItem(collection.id, collection.name,
-                "${countLabel(collection.trackIds.size, "song")}${if (collection.rule != null) " · Smart playlist" else ""}${if (collection.autoDownload) " · Automatic downloads" else ""}",
-                collection.artworkPath(state), AppIcon.QUEUE,
-                songCount = collection.trackIds.size, recentAt = collection.trackIds.maxOfOrNull { recentAt[it] ?: 0 } ?: 0,
-                trackIds = collection.trackIds)
-        }
+    // An open playlist belongs to its current folder, which also covers playlists opened from the player.
+    // A folder disappears once its last playlist moves out, so fall back to the closest folder that still exists.
+    val openFolder = if (playlist != null) playlist.folder else generateSequence(folder, ::parentFolder).firstOrNull { name -> state.playlists.any { isInFolder(it.folder, name) } }
+    fun collections(page: String?) = state.playlists.filter { it.folder == page }.map { collection ->
+        CollectionItem(collection.id, collection.title,
+            "${countLabel(collection.trackIds.size, "song")}${if (collection.rule != null) " · Smart playlist" else ""}${if (collection.autoDownload) " · Automatic downloads" else ""}",
+            collection.artworkPath(state), AppIcon.QUEUE,
+            songCount = collection.trackIds.size, recentAt = collection.trackIds.maxOfOrNull { recentAt[it] ?: 0 } ?: 0,
+            trackIds = collection.trackIds)
+    } + state.playlists.mapNotNull { playlist ->
+        // Group everything below this page by the subfolder it sits in.
+        val path = playlist.folder?.takeIf { it != page && (page == null || isInFolder(it, page)) } ?: return@mapNotNull null
+        folderPath(folderSegments(path).take((page?.let(::folderSegments)?.size ?: 0) + 1)) to playlist
+    }.groupBy({ it.first }, { it.second }).map { (name, contents) ->
+        val trackIds = contents.flatMap(Playlist::trackIds).distinct()
+        CollectionItem(FOLDER_PREFIX + name, folderSegments(name).last(), countLabel(contents.size, "playlist"), null, AppIcon.FOLDER,
+            songCount = trackIds.size, recentAt = trackIds.maxOfOrNull { recentAt[it] ?: 0 } ?: 0, trackIds = trackIds)
     }
+    fun closePlaylist() { folder = openFolder; selected = null }
+    fun open(id: String) { if (id.startsWith(FOLDER_PREFIX)) folder = id.removePrefix(FOLDER_PREFIX) else selected = id }
     if (rearranging && backEnabled && selected == null) PlatformBackHandler(finishRearranging)
-    AnimatedNavigation(selected, null, canGoBack = backEnabled && selected != null,
-        onBack = { selected = null }, depth = { if (it == null) 0 else 1 }) { page ->
+    val current = selected ?: openFolder?.let { FOLDER_PREFIX + it }
+    val parent = (if (selected != null) openFolder else openFolder?.let(::parentFolder))?.let { FOLDER_PREFIX + it }
+    AnimatedNavigation(current, parent, canGoBack = backEnabled && current != null,
+        onBack = { if (selected != null) closePlaylist() else folder = openFolder?.let(::parentFolder) }, depth = { page -> when {
+            page == null -> 0
+            page.startsWith(FOLDER_PREFIX) -> folderSegments(page.removePrefix(FOLDER_PREFIX)).size
+            else -> 1 + (state.playlists.firstOrNull { it.id == page }?.folder?.let(::folderSegments)?.size ?: 0)
+        } }) { page ->
     val playlist = state.playlists.firstOrNull { it.id == page }
+    val pageFolder = page?.takeIf { playlist == null && it.startsWith(FOLDER_PREFIX) }?.removePrefix(FOLDER_PREFIX)
     Column(Modifier.fillMaxSize()) {
         if (fileBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
         fileMessage?.let { Text(it, Modifier.padding(horizontal = 24.dp)) }
-        if (playlist == null) {
+        if (pageFolder != null) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                AppIconButton(AppIcon.BACK, "Back") { folder = parentFolder(pageFolder) }
+                Text(pageFolder, style = MaterialTheme.typography.titleLarge)
+            }
+            val entries = remember(state.playlists, state.artwork, recentAt, pageFolder) { collections(pageFolder) }
+            CompositionLocalProvider(LocalLibraryScrollKey provides "${LocalLibraryScrollKey.current}:folder:$pageFolder") {
+                CollectionBrowser(entries, io.github.d3sox.musicplayer.library.LibraryTab.PLAYLISTS, state, controller, Modifier.weight(1f),
+                    total = state.playlists.count { isInFolder(it.folder, pageFolder) }, rearranging = rearranging, finishRearranging = finishRearranging, open = ::open)
+            }
+        } else if (playlist == null) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PlaylistCreationButton("New", "New playlist", AppIcon.PLUS, Modifier.weight(1f)) { creating = true }
                 PlaylistCreationButton("Smart", "New smart playlist", AppIcon.RECOMMENDATIONS, Modifier.weight(1f)) { smartEditor = true }
@@ -83,8 +121,9 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
                 }
                 }
             }
-            CollectionBrowser(collections, io.github.d3sox.musicplayer.library.LibraryTab.PLAYLISTS, state, controller, Modifier.weight(1f),
-                rearranging = rearranging, finishRearranging = finishRearranging) { selected = it }
+            val entries = remember(state.playlists, state.artwork, recentAt) { collections(null) }
+            CollectionBrowser(entries, io.github.d3sox.musicplayer.library.LibraryTab.PLAYLISTS, state, controller, Modifier.weight(1f), total = state.playlists.size,
+                rearranging = rearranging, finishRearranging = finishRearranging, open = ::open)
         } else {
             val catalog = remember(state.tracks) { state.tracks.associateBy { it.id } }
             val ordered = remember(playlist, catalog) { playlist.orderedTracks(catalog) }
@@ -95,7 +134,7 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
                 } == true }
             val editable = playlist.rule == null && playlist.server?.readOnly != true
             val header: @Composable () -> Unit = {
-                    PlaylistHero(playlist, state, controller, ordered.map { it.value.id }, back = { selected = null }, edit = { renaming = true }, delete = { deleting = true }, export = {
+                    PlaylistHero(playlist, state, controller, ordered.map { it.value.id }, back = ::closePlaylist, edit = { renaming = true }, delete = { deleting = true }, export = {
                         scope.launch {
                             fileBusy = true; fileMessage = null
                             try {
@@ -147,7 +186,7 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
             "This playlist will also be deleted from your music server when connected. The music files will stay in your library."
             else "The music files will stay in your library.") },
         confirmButton = { TextButton(onClick = {
-            controller.deletePlaylist(playlist.id); deleting = false; selected = null
+            controller.deletePlaylist(playlist.id); deleting = false; closePlaylist()
         }) { Text("Delete") } }, dismissButton = { TextButton(onClick = { deleting = false }) { Text("Cancel") } })
     val conflict = playlist?.conflict
     if (resolving && playlist != null && conflict != null) {
@@ -166,6 +205,8 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
     }
     if (renaming && playlist != null) EditPlaylistDialog(playlist, state, controller) { renaming = false }
 }
+
+private const val FOLDER_PREFIX = "playlist-folder:"
 
 @Composable
 internal fun PlaylistPicker(state: AppState, controller: MusicController, trackId: String, dismiss: () -> Unit) {
