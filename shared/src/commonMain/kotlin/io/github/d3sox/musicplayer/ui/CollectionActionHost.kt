@@ -28,8 +28,12 @@ internal fun CollectionActionHost(entry: CollectionItem, tab: LibraryTab, state:
     var error by remember { mutableStateOf<String?>(null) }
     val playlist = state.playlists.firstOrNull { tab == LibraryTab.PLAYLISTS && it.id == entry.id }
     val saved = state.savedQueues.firstOrNull { tab == LibraryTab.HOME && it.id == entry.id }
-    val trackIds = remember(playlist, entry.trackIds, state.tracks) { playlist?.orderedTracks(state.tracks.associateBy { it.id })?.map { it.value.id } ?: entry.trackIds }
-    val tracks = remember(trackIds, state.tracks) { trackIds.mapNotNull { id -> state.tracks.firstOrNull { it.id == id } } }
+    // Resolving songs is costly for large playlists and folders, so only an open menu or picker does it.
+    @Composable fun rememberTracks() = remember(playlist, entry.trackIds, state.tracks) {
+        val catalog = state.tracks.associateBy { it.id }
+        val tracks = playlist?.orderedTracks(catalog)?.map { it.value } ?: entry.trackIds.mapNotNull(catalog::get)
+        (if (playlist != null) tracks.map { it.id } else entry.trackIds) to tracks
+    }
     val files = if (playlist != null) LocalPlaylistFiles.current else null
     val scope = rememberCoroutineScope()
     val openMenu = { menu = true }
@@ -47,6 +51,7 @@ internal fun CollectionActionHost(entry: CollectionItem, tab: LibraryTab, state:
     }) {
         content(openMenu)
         DropdownMenu(menu, { menu = false }) {
+            val (trackIds, tracks) = rememberTracks()
             AppMenuItem(text = { Text(if (saved != null) "Select queue" else "Play") }, leadingIcon = { Icon(AppIcon.PLAY.vector, null) },
                 enabled = trackIds.isNotEmpty(), onClick = { close {
                     if (saved != null) controller.loadSavedQueue(saved.id)
@@ -96,7 +101,7 @@ internal fun CollectionActionHost(entry: CollectionItem, tab: LibraryTab, state:
             AppMenuItem(text = { Text("Open") }, leadingIcon = { Icon(AppIcon.FORWARD.vector, null) }, onClick = { close(open) })
         }
     }
-    if (picker) PlaylistPicker(state, controller, trackIds) { picker = false }
+    if (picker) PlaylistPicker(state, controller, rememberTracks().first) { picker = false }
     if (editing && playlist != null) EditPlaylistDialog(playlist, state, controller) { editing = false }
     if (rules && playlist != null) SmartPlaylistDialog(state, controller, playlist) { rules = false }
     if (deleting && playlist != null) AlertDialog(onDismissRequest = { deleting = false }, title = { Text("Delete ${playlist.name}?") },
