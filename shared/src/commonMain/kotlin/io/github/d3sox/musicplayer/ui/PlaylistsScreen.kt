@@ -51,6 +51,16 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
     val files = LocalPlaylistFiles.current
     val scope = rememberCoroutineScope()
     val playlist = state.playlists.firstOrNull { it.id == selected }
+    val recentAt = remember(state.tracks) { state.tracks.associate { it.id to it.recentAt } }
+    val collections = remember(state.playlists, state.artwork, recentAt) {
+        state.playlists.map { collection ->
+            CollectionItem(collection.id, collection.name,
+                "${countLabel(collection.trackIds.size, "song")}${if (collection.rule != null) " · Smart playlist" else ""}${if (collection.autoDownload) " · Automatic downloads" else ""}",
+                collection.artworkPath(state), AppIcon.QUEUE,
+                songCount = collection.trackIds.size, recentAt = collection.trackIds.maxOfOrNull { recentAt[it] ?: 0 } ?: 0,
+                trackIds = collection.trackIds)
+        }
+    }
     AnimatedNavigation(selected, null, canGoBack = backEnabled && selected != null,
         onBack = { selected = null }, depth = { if (it == null) 0 else 1 }) { page ->
     val playlist = state.playlists.firstOrNull { it.id == page }
@@ -71,13 +81,7 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
                 }
                 }
             }
-            CollectionBrowser(state.playlists.map { collection ->
-                CollectionItem(collection.id, collection.name,
-                    "${countLabel(collection.trackIds.size, "song")}${if (collection.rule != null) " · Smart playlist" else ""}${if (collection.autoDownload) " · Automatic downloads" else ""}",
-                    collection.artworkPath(state), AppIcon.QUEUE,
-                    songCount = collection.trackIds.size, recentAt = collection.trackIds.mapNotNull { id -> state.tracks.firstOrNull { it.id == id }?.recentAt }.maxOrNull() ?: 0,
-                    trackIds = collection.trackIds)
-            }, io.github.d3sox.musicplayer.library.LibraryTab.PLAYLISTS, state, controller, Modifier.weight(1f)) { selected = it }
+            CollectionBrowser(collections, io.github.d3sox.musicplayer.library.LibraryTab.PLAYLISTS, state, controller, Modifier.weight(1f)) { selected = it }
         } else {
             val catalog = remember(state.tracks) { state.tracks.associateBy { it.id } }
             val ordered = remember(playlist, catalog) { playlist.orderedTracks(catalog) }
