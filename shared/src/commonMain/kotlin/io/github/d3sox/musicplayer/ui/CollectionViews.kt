@@ -56,12 +56,19 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
         }.thenBy { it.title.lowercase() }
         entries.sortedWith(if (layout.descending) comparator.reversed() else comparator)
     }
-    var dragged by remember(sorted) { mutableStateOf<List<CollectionItem>?>(null) }
-    val sortedEntries = dragged ?: sorted
+    // Library updates can replace the entries during a drag or before its order is saved, so the dragged order is kept by ID until then.
+    var dragged by remember(layout.sort, layout.descending, layout.order) { mutableStateOf<List<String>?>(null) }
+    val sortedEntries = remember(sorted, dragged) {
+        dragged?.let { ids ->
+            val rows = sorted.associateBy { it.id }
+            val kept = ids.toSet()
+            ids.mapNotNull(rows::get) + sorted.filter { it.id !in kept }
+        } ?: sorted
+    }
     fun move(from: Any, to: Any) {
-        val rows = sortedEntries.toMutableList()
-        val source = rows.indexOfFirst { it.id == from }
-        val target = rows.indexOfFirst { it.id == to }
+        val rows = sortedEntries.map { it.id }.toMutableList()
+        val source = rows.indexOf(from)
+        val target = rows.indexOf(to)
         if (source >= 0 && target >= 0) dragged = rows.apply { add(target, removeAt(source)) }
     }
     val rearrangeScroll = rememberLazyListState()
@@ -74,15 +81,12 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
         }
     }
     // Playlist folders are ordered separately, so keep the positions of entries this page does not show.
-    fun saveOrder(rows: List<CollectionItem>) = update { layout ->
-        val ids = rows.map(CollectionItem::id)
-        layout.copy(order = ids + (layout.order - ids.toSet()))
-    }
+    fun saveOrder(ids: List<String>) = update { layout -> layout.copy(order = ids + (layout.order - ids.toSet())) }
     @Composable
     fun ReorderableCollectionItemScope.DragHandle(entry: CollectionItem) {
         fun moveBy(offset: Int): Boolean {
-            val rows = sortedEntries.toMutableList()
-            val from = rows.indexOf(entry)
+            val rows = sortedEntries.map { it.id }.toMutableList()
+            val from = rows.indexOf(entry.id)
             if (from + offset !in rows.indices) return false
             rows.add(from + offset, rows.removeAt(from))
             dragged = rows
