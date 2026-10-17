@@ -2,6 +2,7 @@ package io.github.d3sox.musicplayer.downloads
 
 import io.github.d3sox.musicplayer.library.MusicLibrary
 import io.github.d3sox.musicplayer.library.SourceKind
+import io.github.d3sox.musicplayer.library.Track
 import io.github.d3sox.musicplayer.library.FileAudioAccess
 import io.github.d3sox.musicplayer.navidrome.NavidromeClient
 import io.github.d3sox.musicplayer.playlists.Playlists
@@ -92,6 +93,7 @@ class OfflineMusic(private val store: MusicStore, private val library: MusicLibr
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) {
                 store.list<OfflineRequest>("offline-requests").forEach { request ->
+                    if (library.findTrack(request.trackId)?.onDevice() == true) return@forEach
                     val previous = store.read<DownloadRecord>("download:${request.trackId}")
                     if (previous?.status != DownloadStatus.COMPLETE)
                         store.put("download:${request.trackId}", "downloads", DownloadRecord(request.trackId,
@@ -223,7 +225,8 @@ class OfflineMusic(private val store: MusicStore, private val library: MusicLibr
             downloads.enforceCacheBudget(preferences.load().cacheBytes, inUseTracks())
             return
         }
-        val requests = store.list<OfflineRequest>("offline-requests").filterNot { it.trackId in excluded }
+        val requests = store.list<OfflineRequest>("offline-requests")
+            .filterNot { it.trackId in excluded || library.findTrack(it.trackId)?.onDevice() == true }
         val songs = if (requests.isEmpty()) emptyMap() else connection.songs().associateBy { it.id }
         for (request in requests) {
             currentCoroutineContext().ensureActive()
@@ -247,11 +250,16 @@ class OfflineMusic(private val store: MusicStore, private val library: MusicLibr
         val tracks = library.tracks().associateBy { it.id }
         for (record in store.list<DownloadRecord>("downloads")) {
             val track = tracks[record.trackId] ?: continue
-            if (track.sources.none { it.kind == SourceKind.LOCAL && it.available && sourceAccessible(it.location) }) continue
-            store.database.records().delete("request:${track.id}")
+            if (!track.onDevice()) continue
+            // A manual download returns if the file leaves the device; playlist downloads follow their playlist instead.
+            if (store.read<OfflinePins>("pins:${track.id}")?.owners?.contains("manual") == true)
+                store.put("request:${track.id}", "offline-requests", OfflineRequest(track.id))
+            else store.database.records().delete("request:${track.id}")
             if (record.status != DownloadStatus.COMPLETE || track.id !in playing) downloads.remove(track.id, unpin = false)
         }
     }
+
+    private fun Track.onDevice() = sources.any { it.kind == SourceKind.LOCAL && it.available && sourceAccessible(it.location) }
 
     private suspend fun networkPermitted(): Boolean = network.value.let {
         it.connected && (!it.metered || preferences.load().downloadOnMetered)

@@ -540,7 +540,7 @@ class OfflineMusicTest {
     }
 
     @Test
-    fun songsLinkedToADeviceFileDropTheirDownloadsButKeepTheirProtection() = runBlocking {
+    fun songsLinkedToADeviceFileDropTheirDownloadsUntilTheFileLeavesTheDevice() = runBlocking {
         val directory = Files.createTempDirectory("device-file-downloads")
         val store = openMusicStore(directory.resolve("library.db").toString())
         val audio = Files.createDirectories(directory.resolve("audio"))
@@ -563,9 +563,13 @@ class OfflineMusicTest {
             offline.runPending()
             assertEquals(false, Files.exists(copy))
             assertEquals(emptyMap(), offline.state.value)
-            assertEquals(null, store.database.records().read("request:${requested.id}"))
             assertEquals(true, store.database.records().read("pins:${downloaded.id}") != null)
             assertEquals(setOf(SourceKind.LOCAL, SourceKind.SERVER), library.findTrack(downloaded.id)!!.sources.map { it.kind }.toSet())
+            // Manual downloads stay requested, so they return once the device file is gone.
+            assertEquals(true, listOf(downloaded, requested).all { store.database.records().read("request:${it.id}") != null })
+            library.setSourceAvailability(library.findTrack(downloaded.id)!!.sources.filter { it.kind == SourceKind.LOCAL }.map { it.id }.toSet(), false)
+            offline.runPending()
+            withTimeout(3_000) { offline.state.first { it.keys == setOf(downloaded.id) } }
         } finally { offline.closeAndJoin(); store.close(); directory.toFile().deleteRecursively() }
     }
 }
