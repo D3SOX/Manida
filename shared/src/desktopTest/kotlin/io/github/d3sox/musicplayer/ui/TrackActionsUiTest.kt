@@ -235,6 +235,18 @@ class TrackActionsUiTest {
     }
 
     @Test
+    fun hiddenOptionsButtonsStillLeaveLongPressMenus() = withLibrary { player ->
+        setContent { MusicPlayerApp(player) }
+        waitUntil(timeoutMillis = 3_000) { player.state.value.libraryReady }
+        onNodeWithContentDescription("Track options: First song").assertIsDisplayed()
+        runBlocking { player.updatePreferences { it.copy(showMoreButtons = false) }.join() }
+        onNodeWithContentDescription("Track options: First song").assertDoesNotExist()
+        val id = player.state.value.tracks.first { it.metadata.title == "First song" }.id
+        onNodeWithTag("track-row:$id").performTouchInput { longClick() }
+        waitUntil(timeoutMillis = 3_000) { onAllNodesWithTag("track-actions").fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    @Test
     fun openingTrackActionsMovesTheCoverFromItsRowAsTheMenuSlidesUp() = withLibrary { player ->
         setContent { MusicPlayerApp(player) }
         waitUntil(timeoutMillis = 3_000) { player.state.value.libraryReady }

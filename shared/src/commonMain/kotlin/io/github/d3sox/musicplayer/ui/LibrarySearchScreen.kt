@@ -101,7 +101,7 @@ internal fun LibrarySearchScreen(state: AppState, controller: MusicController, b
                                     headlineContent = { Text(collection.title) },
                                     supportingContent = { Text(listOf(collection.subtitle, countLabel(collection.tracks.size, "song")).filter { it.isNotBlank() }.joinToString(" · ")) },
                                     leadingContent = { CollectionArtwork(entry.artwork, collection.title, tab.icon(), Modifier.size(48.dp)) },
-                                    trailingContent = { AppIconButton(AppIcon.MORE, "${category.label.removeSuffix("s")} options: ${collection.title}", onClick = menu) })
+                                    trailingContent = { if (state.preferences.showMoreButtons) AppIconButton(AppIcon.MORE, "${category.label.removeSuffix("s")} options: ${collection.title}", onClick = menu) })
                                 }
                             }
                         }

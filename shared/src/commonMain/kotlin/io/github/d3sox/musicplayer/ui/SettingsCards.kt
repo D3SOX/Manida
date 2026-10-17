@@ -73,6 +73,7 @@ internal fun settingsIcon(label: String): AppIcon = when (label) {
     "Swipe right" -> AppIcon.SWIPE_RIGHT
     "Swipe left" -> AppIcon.SWIPE_LEFT
     "Quick action" -> AppIcon.QUICK_ACTION
+    "Show options buttons" -> AppIcon.MORE
     "Library tabs" -> AppIcon.TABS
     "Source priority" -> AppIcon.SOURCE_PRIORITY
     "Music sources" -> AppIcon.LIBRARY

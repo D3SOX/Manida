@@ -183,8 +183,8 @@ internal fun TrackRow(track: Track, controller: MusicController, contextTrackIds
                         }
                     }
                 }
-                if (!quickAction && track.metadata.durationMs > 0) Spacer(Modifier.width(16.dp))
-                Box {
+                if (!quickAction && track.metadata.durationMs > 0 && state.preferences.showMoreButtons) Spacer(Modifier.width(16.dp))
+                if (state.preferences.showMoreButtons) Box {
                     IconButton(onClick = openMenu, Modifier.semantics { contentDescription = "Track options: ${track.metadata.title}" }) {
                         Icon(AppIcon.MORE.vector, null)
                     }

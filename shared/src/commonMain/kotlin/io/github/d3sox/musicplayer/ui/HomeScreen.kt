@@ -193,7 +193,7 @@ private fun HomeSongs(title: String, songs: List<Track>, state: AppState, contro
                                     Text(track.metadata.artist.ifBlank { "Unknown artist" }, style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
-                                AppIconButton(AppIcon.MORE, "Track options: ${track.metadata.title}", onClick = menu)
+                                if (state.preferences.showMoreButtons) AppIconButton(AppIcon.MORE, "Track options: ${track.metadata.title}", onClick = menu)
                             }
                         }
                     }
@@ -237,7 +237,7 @@ private fun HomeCollectionCard(title: String, subtitle: String, tracks: List<Tra
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                AppIconButton(AppIcon.MORE, "Collection options: $title", onClick = menu)
+                if (state.preferences.showMoreButtons) AppIconButton(AppIcon.MORE, "Collection options: $title", onClick = menu)
             }
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
