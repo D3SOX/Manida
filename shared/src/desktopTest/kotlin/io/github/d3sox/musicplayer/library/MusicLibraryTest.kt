@@ -161,14 +161,14 @@ class MusicLibraryTest {
     }
 
     @Test
-    fun aLocalFileUploadedToTheServerIsFoundByItsSizeTitleAndLength() = runBlocking {
+    fun aLocalFileUploadedToTheServerIsFoundByItsSizeTitleArtistAndLength() = runBlocking {
         val directory = Files.createTempDirectory("same-file-copies")
         val store = openMusicStore(directory.resolve("library.db").toString())
         try {
             val library = MusicLibrary(store)
-            suspend fun song(kind: SourceKind, title: String, size: Long, durationMs: Long = 180_000) =
-                library.importTrack(TrackMetadata(title, durationMs = durationMs),
-                    TrackSource("${kind.name}:$title:$size:$durationMs", kind, "$title.mp3", indexedSize = size)).id
+            suspend fun song(kind: SourceKind, title: String, size: Long, durationMs: Long = 180_000, artist: String = "Fixture Artist") =
+                library.importTrack(TrackMetadata(title, artist, durationMs = durationMs),
+                    TrackSource("${kind.name}:$title:$artist:$size:$durationMs", kind, "$title.mp3", indexedSize = size)).id
             val local = song(SourceKind.LOCAL, "Northern Light", 1_000)
             val server = song(SourceKind.SERVER, " northern light", 1_000, 179_000)
             song(SourceKind.LOCAL, "Re-encoded", 2_000); song(SourceKind.SERVER, "Re-encoded", 2_001)
@@ -176,6 +176,8 @@ class MusicLibraryTest {
             song(SourceKind.LOCAL, "Twice on the server", 4_000)
             song(SourceKind.SERVER, "Twice on the server", 4_000); song(SourceKind.SERVER, "Twice on the server", 4_000, 180_500)
             song(SourceKind.LOCAL, "Unknown size", 0); song(SourceKind.SERVER, "Unknown size", 0)
+            song(SourceKind.LOCAL, "Unknown length", 5_000, 0); song(SourceKind.SERVER, "Unknown length", 5_000, 0)
+            song(SourceKind.LOCAL, "Intro", 6_000); song(SourceKind.SERVER, "Intro", 6_000, artist = "Another Artist")
             assertEquals(listOf(server to local), library.sameFileCopies())
             library.linkTracks(server, local)
             assertEquals(emptyList(), library.sameFileCopies())
