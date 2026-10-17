@@ -79,6 +79,35 @@ ET.ElementTree(suite).write(reports / 'TEST-example.xml')
         # A hang is retried once in a new Gradle run, like any other failure, and fails the shard when it repeats.
         self.assertEqual(2, len((self.root / "invocations").read_text().splitlines()))
 
+    def test_unresponsive_device_stops_the_shard_without_retrying_or_losing_diagnostics(self):
+        self.source("AndroidExampleTest")
+        self.executable("adb", "import sys\nprint('Device hang diagnostics' if 'logcat' in sys.argv else '36')\n")
+        # Reproduce the hosted failure at the subprocess boundary, without waiting 30 seconds for adb.
+        launcher = """
+import runpy
+import subprocess
+import sys
+from unittest.mock import patch
+original_run = subprocess.run
+def run(command, **kwargs):
+    if command[0] == 'adb' and 'force-stop' in command:
+        raise subprocess.TimeoutExpired(command, kwargs['timeout'])
+    return original_run(command, **kwargs)
+sys.argv = ['scripts/test-android-suite.py', '--class-timeout', '1']
+with patch('subprocess.run', side_effect=run):
+    runpy.run_path(sys.argv[0], run_name='__main__')
+"""
+        result = subprocess.run([sys.executable, "-c", launcher], cwd=self.root,
+                                env=dict(self.environment, STALL="true"),
+                                capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("emulator-5554 is unresponsive", result.stdout + result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertEqual(1, len((self.root / "invocations").read_text().splitlines()))
+        self.assertTrue((self.root / ".test-environment/android-class-results/AndroidExampleTest/device.log").is_file())
+        log = self.root / ".test-environment/android-class-results/AndroidExampleTest/device-logcat.txt"
+        self.assertEqual("Device hang diagnostics\n", log.read_text())
+
     def matrix(self):
         # Planning runs on a fresh runner with neither an Android SDK nor a device.
         self.environment.pop("ANDROID_SERIAL", None)

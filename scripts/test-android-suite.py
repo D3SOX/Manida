@@ -109,16 +109,30 @@ def run(name, attempt):
             os.killpg(process.pid, signal.SIGKILL)
             process.wait()
             timed_out = True
+    diagnostics = output / (name if attempt == 1 else f"{name}-attempt{attempt}")
     if reports.exists():
-        shutil.copytree(reports, output / (name if attempt == 1 else f"{name}-attempt{attempt}"))
+        shutil.copytree(reports, diagnostics)
     print(f"{name}: {time.monotonic() - started:.1f}s", flush=True)
     print("::endgroup::", flush=True)
     if timed_out:
         print(f"::warning title=Hung Android test::{name} timed out after {arguments.class_timeout} seconds", flush=True)
+        # Instrumentation reports can stop before the device hangs. Retain its final log as well.
+        diagnostics.mkdir(parents=True, exist_ok=True)
+        with (diagnostics / "device-logcat.txt").open("w") as log:
+            try:
+                subprocess.run(["adb", "-s", serial, "logcat", "-d", "-v", "threadtime"],
+                               stdout=log, stderr=subprocess.STDOUT, check=True, timeout=10)
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError) as error:
+                print(f"::warning::Could not capture device log for {name}: {error}", flush=True)
         # The killed run can leave its instrumentation on the device, so stop both packages before the next class
         # or the retry starts its own Gradle run.
         for package in ["me.d3sox.manida", "me.d3sox.manida.test"]:
-            subprocess.run(["adb", "-s", serial, "shell", "am", "force-stop", package], capture_output=True, timeout=30)
+            try:
+                subprocess.run(["adb", "-s", serial, "shell", "am", "force-stop", package],
+                               capture_output=True, check=True, timeout=30)
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError) as error:
+                raise SystemExit(f"Android suite failed: {serial} is unresponsive after {name} timed out; "
+                                 f"cannot stop {package}. Diagnostics: {diagnostics}. {error}")
         return None
     cases = [case for report in reports.glob("TEST-*.xml")
              for case in ET.parse(report).getroot().findall(".//testcase")]
