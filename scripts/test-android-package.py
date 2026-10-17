@@ -100,8 +100,9 @@ class AndroidPackageTest(unittest.TestCase):
                 click("About Manida")
                 click("View license")
                 self.assertIn("GNU AFFERO GENERAL PUBLIC LICENSE", ET.tostring(tree(), encoding="unicode"))
-                adb("shell", "input", "keyevent", "4")
-                adb("shell", "input", "keyevent", "4")
+                # Back presses can land before the previous page settles, so restart on the library instead.
+                adb("shell", "am", "force-stop", APP)
+                adb("shell", "am", "start", "-W", "--user", "0", "-n", APP + "/.MainActivity")
                 click("Settings")
                 click("Paired devices")
                 click("Create invitation")
