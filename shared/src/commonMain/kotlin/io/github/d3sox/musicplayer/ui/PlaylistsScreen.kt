@@ -46,7 +46,7 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
         if (destination?.tab == io.github.d3sox.musicplayer.library.LibraryTab.PLAYLISTS && destination.revision != handledDestination) {
             val id = destination.collectionId
             if (id?.startsWith(FOLDER_PREFIX) == true) { folder = id.removePrefix(FOLDER_PREFIX); selected = null }
-            else selected = id
+            else { selected = id; folder = null }
             handledDestination = destination.revision
         }
     }
