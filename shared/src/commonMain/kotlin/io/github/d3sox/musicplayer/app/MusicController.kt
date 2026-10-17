@@ -953,10 +953,10 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
         val connection = requireNotNull(navidrome) { "Server setup is unavailable" }
         val profile = connection.profile() ?: return@action operations.withLock { refresh() }
         if (serverFiles?.configuration()?.serverId == profile.serverId) serverFiles.disconnect()
-        connection.disconnect()
         library.setSourceAvailability(library.tracks().flatMap { track -> track.sources.filter {
             it.kind == SourceKind.SERVER && it.id.startsWith("server:${profile.serverId}:")
         }.map { it.id } }.toSet(), false)
+        connection.disconnect()
         operations.withLock {
             if (queueLoaded) engine.updateQueue(playableQueue(queue.snapshot()))
             refresh()
