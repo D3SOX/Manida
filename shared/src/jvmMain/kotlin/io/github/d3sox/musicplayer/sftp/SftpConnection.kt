@@ -21,7 +21,7 @@ class SftpConnection(private val store: MusicStore, private val library: MusicLi
     private val client: suspend () -> NavidromeClient?, private val vault: CredentialVault,
     private val backupDirectory: String,
     private val readLocal: (String) -> InputStream = { File(it).inputStream() },
-    private val changes: NavidromeChanges = NavidromeChanges(store, library, client),
+    private val changes: NavidromeChanges = NavidromeChanges(store, library, client = client),
     private val artwork: ArtworkLibrary? = null) : ServerFiles {
     private val work = Mutex()
     override suspend fun pendingUploads(): List<PendingServerUpload> = store.list("server-uploads")

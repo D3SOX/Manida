@@ -934,13 +934,6 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
                 catch (_: Exception) { /* A missing cover must not prevent importing its music. */ }
             }
         }
-        if (artwork != null) playlists?.all().orEmpty().filter { it.server?.serverId == client.serverId }.forEach { playlist ->
-            val key = "server-playlist-cover:${playlist.id}"
-            val cover = playlist.server?.coverArt
-            try { if (cover == null) artwork.remove(key) else artwork.fetch(key, client, cover) }
-            catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { /* A missing cover must not prevent importing the playlist. */ }
-        }
     }
 
     fun playTrack(trackId: String, contextTrackIds: List<String>? = null, contextIndex: Int? = null, contextName: String = "Library", shuffleContext: Boolean = false,

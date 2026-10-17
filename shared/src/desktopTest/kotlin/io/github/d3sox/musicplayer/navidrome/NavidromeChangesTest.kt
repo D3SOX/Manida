@@ -23,6 +23,51 @@ import kotlinx.coroutines.delay
 
 class NavidromeChangesTest {
     @Test
+    fun pullingPlaylistsImportsServerEditsAndDownloadsCoversOnlyWhenAPlaylistChanged() = runBlocking {
+        val directory = Files.createTempDirectory("manida-pull-playlists")
+        val store = openMusicStore(directory.resolve("library.db").toString())
+        fun png(rgb: Int) = java.io.ByteArrayOutputStream().also { output ->
+            javax.imageio.ImageIO.write(java.awt.image.BufferedImage(8, 8, java.awt.image.BufferedImage.TYPE_INT_RGB).apply {
+                for (x in 0..7) for (y in 0..7) setRGB(x, y, rgb) }, "png", output)
+        }.toByteArray()
+        var name = "Mix"
+        var changed = "t1"
+        var cover = png(0x00FF00)
+        var playlistRequests = 0
+        var coverRequests = 0
+        val http = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/rest/getPlaylists.view" -> respond("""{"subsonic-response":{"status":"ok","playlists":{"playlist":[{"id":"mix","changed":"$changed"}]}}}""")
+                "/rest/getPlaylist.view" -> { playlistRequests++; respond("""{"subsonic-response":{"status":"ok","playlist":{"id":"mix","name":"$name",""" +
+                    """"owner":"fixture","changed":"$changed","coverArt":"pl-mix","entry":[{"id":"song"}]}}}""") }
+                "/rest/getCoverArt.view" -> { coverRequests++; respond(cover, headers = io.ktor.http.headersOf(io.ktor.http.HttpHeaders.ContentType, "image/png")) }
+                else -> error("Unexpected request: ${request.url.encodedPath}")
+            }
+        })
+        try {
+            val library = MusicLibrary(store)
+            val artwork = io.github.d3sox.musicplayer.artwork.ArtworkLibrary(directory.resolve("artwork").toString())
+            val client = NavidromeClient(http, "https://music.example.test", ServerCredentials("fixture", "test"))
+            val changes = NavidromeChanges(store, library, artwork) { client }
+            val track = changes.importSong(client, ServerSong("song", TrackMetadata("Server song")))
+            changes.pullPlaylists()
+            val playlist = Playlists(store).all().single()
+            val key = "server-playlist-cover:${playlist.id}"
+            assertEquals(listOf(track.id), playlist.trackIds)
+            assertContentEquals(io.github.d3sox.musicplayer.artwork.artworkPreview(cover), artwork.read(key))
+            changes.pullPlaylists()
+            assertEquals(1, playlistRequests, "An unchanged playlist must not be downloaded again")
+            assertEquals(1, coverRequests, "An unchanged playlist cover must not be downloaded again")
+            name = "Evening mix"
+            changed = "t2"
+            cover = png(0xFF0000)
+            changes.pullPlaylists()
+            assertEquals("Evening mix", Playlists(store).get(playlist.id)!!.name)
+            assertContentEquals(io.github.d3sox.musicplayer.artwork.artworkPreview(cover), artwork.read(key))
+        } finally { http.close(); store.close(); directory.toFile().deleteRecursively() }
+    }
+
+    @Test
     fun refreshingADeletedServerSongKeepsItsLocalCopyAndReferencesAndRestoresItWhenItReturns() = runBlocking {
         val directory = Files.createTempDirectory("manida-deleted-server-song")
         val store = openMusicStore(directory.resolve("library.db").toString())

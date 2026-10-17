@@ -30,7 +30,7 @@ class ServerSetupUiTest {
         val vault = SecretServiceVault("io.github.d3sox.musicplayer.tests.${Uuid.random()}")
         val connection = NavidromeConnection(store, http, vault)
         val library = MusicLibrary(store)
-        val changes = NavidromeChanges(store, library, connection::client)
+        val changes = NavidromeChanges(store, library, client = connection::client)
         val address = System.getenv("MUSICPLAYER_TEST_NAVIDROME_URL") ?: "http://127.0.0.1:14533"
         val client = NavidromeClient(http, address, ServerCredentials("fixture", "fixture-password"))
         val original = runBlocking { client.songs().first { it.metadata.title == "Northern Light" } }
@@ -67,7 +67,7 @@ class ServerSetupUiTest {
         val vault = SecretServiceVault("io.github.d3sox.musicplayer.tests.${Uuid.random()}")
         val connection = NavidromeConnection(store, http, vault)
         val library = MusicLibrary(store)
-        val changes = NavidromeChanges(store, library, connection::client)
+        val changes = NavidromeChanges(store, library, client = connection::client)
         val client = NavidromeClient(http,
             System.getenv("MUSICPLAYER_TEST_NAVIDROME_URL") ?: "http://127.0.0.1:14533",
             ServerCredentials("fixture", "fixture-password"))

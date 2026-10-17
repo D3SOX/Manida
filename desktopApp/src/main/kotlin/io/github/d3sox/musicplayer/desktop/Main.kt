@@ -46,9 +46,9 @@ fun main(arguments: Array<String>) {
     val http = HttpClient(OkHttp)
     val credentials = SecretServiceVault()
     val connection = NavidromeConnection(store, http, credentials)
-    val serverChanges = NavidromeChanges(store, library, connection::client)
-    val playlists = Playlists(store)
     val artwork = ArtworkLibrary(File(directory, "artwork").path)
+    val serverChanges = NavidromeChanges(store, library, artwork, connection::client)
+    val playlists = Playlists(store)
     val downloadNetwork = try { LinuxDownloadNetwork() }
         catch (error: Exception) { System.err.println("NetworkManager monitoring unavailable: ${error.message}"); null }
     val offline = OfflineMusic(store, library, connection::client, File(directory, "audio").path, playlists,

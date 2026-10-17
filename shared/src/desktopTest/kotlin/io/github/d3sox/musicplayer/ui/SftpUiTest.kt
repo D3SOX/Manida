@@ -503,7 +503,7 @@ class SftpUiTest {
         runBlocking { navidrome.connect("http://127.0.0.1:14536", ServerCredentials("fixture", "fixture-password")) }
         val files = SftpConnection(store, library, navidrome::client, vault, directory.resolve("server-edits").toString())
         val controller = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"), navidrome,
-            serverChanges = NavidromeChanges(store, library, navidrome::client), serverFiles = files)
+            serverChanges = NavidromeChanges(store, library, client = navidrome::client), serverFiles = files)
         try {
             runComposeUiTest {
                 setContent { MusicPlayerApp(controller) }

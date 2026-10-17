@@ -59,7 +59,7 @@ class MusicApplication : Application() {
         val credentials = AndroidCredentialVault(this)
         val artwork = ArtworkLibrary(File(filesDir, "artwork").path)
         connection = NavidromeConnection(store, http, credentials)
-        serverChanges = NavidromeChanges(store, library, connection::client)
+        serverChanges = NavidromeChanges(store, library, artwork, connection::client)
         serverFiles = SftpConnection(store, library, connection::client, credentials, File(filesDir, "server-edits").path,
             readLocal = { location ->
                 if (location.startsWith("content:")) requireNotNull(contentResolver.openInputStream(Uri.parse(location))) { "The local music file is unavailable" }
