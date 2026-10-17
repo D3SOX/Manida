@@ -186,6 +186,11 @@ class CollectionSortingUiTest {
                 onNodeWithContentDescription("Finish rearranging").performClick()
                 onNodeWithTag("collection-reorder:$alpha", useUnmergedTree = true).assertDoesNotExist()
                 onNodeWithContentDescription("Collection view").assertIsDisplayed()
+                onNodeWithContentDescription("Collection order").performClick()
+                onNodeWithText("Rearrange").performClick()
+                onNodeWithContentDescription("Finish rearranging").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus) { it() }
+                onRoot().performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Escape) }
+                onNodeWithTag("collection-reorder:$alpha", useUnmergedTree = true).assertDoesNotExist()
             }
         } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
     }

@@ -15,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
@@ -91,7 +92,10 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
             .draggableHandle(onDragStopped = { dragged?.let { rows -> update { it.copy(order = rows.map(CollectionItem::id)) } } }),
             contentAlignment = Alignment.Center) { Icon(AppIcon.DRAG.vector, null) }
     }
-    Column(modifier.fillMaxSize()) {
+    val navigationActive = LocalNavigationActive.current
+    Column(modifier.fillMaxSize().onKeyEvent {
+        if (navigationActive && rearranging && it.key == Key.Escape && it.type == KeyEventType.KeyUp) { finishRearranging(); true } else false
+    }) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(countLabel(entries.size, tab.label.lowercase().removeSuffix("s"), tab.label.lowercase()), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
