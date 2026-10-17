@@ -160,6 +160,7 @@ class CollectionSortingUiTest {
                 onNodeWithContentDescription("Collection order").performClick()
                 onNodeWithText("Rearrange").performClick()
                 onNodeWithContentDescription("Collection view").assertDoesNotExist()
+                onNodeWithContentDescription("Collection order").assertDoesNotExist()
                 val handle = onNodeWithTag("collection-reorder:$charlie", useUnmergedTree = true)
                 val target = onNodeWithTag("collection-reorder:$alpha", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center.y
                 val start = handle.fetchSemanticsNode().boundsInRoot.center.y

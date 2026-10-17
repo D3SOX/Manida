@@ -130,7 +130,7 @@ internal fun LibraryScreens(state: AppState, controller: MusicController, modifi
                         onClick = { controller.updatePreferences { it.copy(songOrderReversed = !reversed) }; sortMenu = false })
                 }
             }
-            if (activeSongLists == 0 && currentTab in setOf(LibraryTab.ALBUMS, LibraryTab.ARTISTS, LibraryTab.ALBUM_ARTISTS,
+            if (activeSongLists == 0 && !rearrangingPlaylists && currentTab in setOf(LibraryTab.ALBUMS, LibraryTab.ARTISTS, LibraryTab.ALBUM_ARTISTS,
                     LibraryTab.GENRES, LibraryTab.FOLDERS, LibraryTab.PLAYLISTS))
                 CollectionOrder(currentTab, state.preferences.collectionLayouts[currentTab] ?: io.github.d3sox.musicplayer.settings.CollectionLayout(), controller,
                     rearrange = if (currentTab == LibraryTab.PLAYLISTS) ({ rearrangingPlaylists = true }) else null)
