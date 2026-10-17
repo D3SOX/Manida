@@ -55,7 +55,8 @@ class AndroidSftpEditingUiTest {
             assertNull(app.controller.state.value.error)
             val uploaded = app.controller.state.value.tracks.single { it.id == track.id }
             assertTrue(uploaded.favorite)
-            assertEquals(relative, uploaded.sources.single { it.kind == SourceKind.SERVER }.filePath)
+            // The fixture file is already on the server, so the song can also link that identical server copy.
+            assertEquals(1, uploaded.sources.count { it.kind == SourceKind.SERVER && it.filePath == relative })
             assertEquals(uri.toString(), uploaded.sources.single { it.kind == SourceKind.LOCAL }.location)
             remote.download(relative, received)
             assertArrayEquals(bytes, received.readBytes())

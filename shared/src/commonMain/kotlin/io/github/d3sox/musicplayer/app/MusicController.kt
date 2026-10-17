@@ -507,16 +507,42 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
     fun linkTracks(keepId: String, otherId: String) = action {
         mutableState.update { it.copy(error = null) }
         suspend fun link() {
-            val cover = if (artwork?.path(keepId) == null) artwork?.read(otherId) else null
-            if (cover != null) artwork?.save(keepId, cover)
-            val linked = fileEdits?.linkTracks(keepId, otherId) ?: library.linkTracks(keepId, otherId)
+            val linked = mergeTracks(keepId, otherId)
             serverChanges?.setFavorite(linked.id, linked.favorite)
             serverChanges?.setRating(linked.id, linked.rating)
-            if (state.value.playback.trackId == otherId || state.value.playback.trackId == keepId) offline?.useTrack(keepId)
             if (queueLoaded) engine.updateQueue(playableQueue(queue.snapshot()))
             refresh()
         }
         if (offline != null) offline.withLibraryChanges { link() } else link()
+    }
+    private suspend fun mergeTracks(keepId: String, otherId: String): Track {
+        val cover = if (artwork?.path(keepId) == null) artwork?.read(otherId) else null
+        if (cover != null) artwork?.save(keepId, cover)
+        val linked = fileEdits?.linkTracks(keepId, otherId) ?: library.linkTracks(keepId, otherId)
+        if (state.value.playback.trackId == otherId || state.value.playback.trackId == keepId) offline?.useTrack(keepId)
+        return linked
+    }
+    // Local files that were also uploaded to the server become one song, so they are not downloaded a second time.
+    suspend fun linkSameFiles() {
+        val pairs = library.sameFileCopies()
+        if (pairs.isEmpty()) return
+        // One pair per lock keeps playback responsive during the first pass over a large library.
+        for ((serverId, localId) in pairs) operations.withLock {
+            suspend fun link() {
+                val server = library.findTrack(serverId) ?: return
+                if (library.findTrack(localId) == null) return
+                val queued = queueLoaded && queue.snapshot().entries.any { it.trackId == serverId || it.trackId == localId }
+                // The local song keeps its identity, so references to the file stay valid.
+                val linked = try { mergeTracks(localId, serverId) }
+                    // A song with a running download or file edit is linked on a later pass.
+                    catch (_: IllegalStateException) { return }
+                if (linked.favorite != server.favorite) serverChanges?.setFavorite(linked.id, linked.favorite)
+                if (linked.rating != server.rating) serverChanges?.setRating(linked.id, linked.rating)
+                if (queued) engine.updateQueue(playableQueue(queue.snapshot()))
+            }
+            if (offline != null) offline.withLibraryChanges { link() } else link()
+        }
+        operations.withLock { refresh() }
     }
     fun editTags(trackId: String, metadata: TrackMetadata, target: FileEditTarget = FileEditTarget.LOCAL) = action(serialized = false) {
         mutableState.update { it.copy(error = null) }
@@ -896,6 +922,7 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
                         mutableState.update { it.copy(localScan = progress) }
                     }
                 })
+                linkSameFiles()
                 operations.withLock { refresh() }
                 mutableState.update { it.copy(lastLocalScanCount = songs.size) }
             } finally { mutableState.update { it.copy(localScan = null) } }
@@ -925,7 +952,7 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
         val paths = serverFiles?.configuration()?.serverId == client.serverId
         val catalogue = serverChanges?.refreshLibrary(client, includeFilePaths = paths) ?: client.songs(includeFilePaths = paths).map { song ->
             library.importTrack(song.metadata, TrackSource("server:${client.serverId}:${song.id}", SourceKind.SERVER, song.id,
-                filePath = song.filePath, fileLibraryId = song.fileLibraryId)) to song
+                filePath = song.filePath, fileLibraryId = song.fileLibraryId, indexedSize = song.sizeBytes)) to song
         }
         catalogue.forEach { (track, song) ->
             if (artwork != null && song.coverArt != null) {
@@ -934,6 +961,7 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
                 catch (_: Exception) { /* A missing cover must not prevent importing its music. */ }
             }
         }
+        linkSameFiles()
     }
 
     fun playTrack(trackId: String, contextTrackIds: List<String>? = null, contextIndex: Int? = null, contextName: String = "Library", shuffleContext: Boolean = false,

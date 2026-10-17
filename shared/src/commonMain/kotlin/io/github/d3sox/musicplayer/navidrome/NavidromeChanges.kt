@@ -118,7 +118,7 @@ class NavidromeChanges(private val store: MusicStore, private val library: Music
         val known = owner != null
         if (linkTo != null && owner != null && owner.id != linkTo) library.linkTracks(linkTo, owner.id)
         val track = library.importTrack(song.metadata, TrackSource(sourceId, SourceKind.SERVER, song.id, filePath = song.filePath,
-            fileLibraryId = song.fileLibraryId), linkTo = linkTo)
+            fileLibraryId = song.fileLibraryId, indexedSize = song.sizeBytes), linkTo = linkTo)
         if (store.read<FavoriteChange>("favorite-change:$sourceId") == null) {
             if ((!known || linkTo != null) && track.favorite && !song.favorite && track.sources.any { it.kind == SourceKind.LOCAL }) setFavorite(track.id, true)
             else library.setFavorite(track.id, song.favorite)

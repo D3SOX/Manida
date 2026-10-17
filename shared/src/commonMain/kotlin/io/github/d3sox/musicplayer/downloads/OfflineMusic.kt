@@ -2,6 +2,7 @@ package io.github.d3sox.musicplayer.downloads
 
 import io.github.d3sox.musicplayer.library.MusicLibrary
 import io.github.d3sox.musicplayer.library.SourceKind
+import io.github.d3sox.musicplayer.library.Track
 import io.github.d3sox.musicplayer.library.FileAudioAccess
 import io.github.d3sox.musicplayer.navidrome.NavidromeClient
 import io.github.d3sox.musicplayer.playlists.Playlists
@@ -92,6 +93,7 @@ class OfflineMusic(private val store: MusicStore, private val library: MusicLibr
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) {
                 store.list<OfflineRequest>("offline-requests").forEach { request ->
+                    if (library.findTrack(request.trackId)?.onDevice() == true) return@forEach
                     val previous = store.read<DownloadRecord>("download:${request.trackId}")
                     if (previous?.status != DownloadStatus.COMPLETE)
                         store.put("download:${request.trackId}", "downloads", DownloadRecord(request.trackId,
@@ -213,6 +215,7 @@ class OfflineMusic(private val store: MusicStore, private val library: MusicLibr
     }
 
     private suspend fun process() {
+        dropDeviceFileDownloads()
         val paused = preferences.load().downloadsPaused || !networkPermitted()
         val connection = if (paused) null else client()
         val downloads = AudioDownloads(store, library, connection, directory, availableSpace)
@@ -222,7 +225,8 @@ class OfflineMusic(private val store: MusicStore, private val library: MusicLibr
             downloads.enforceCacheBudget(preferences.load().cacheBytes, inUseTracks())
             return
         }
-        val requests = store.list<OfflineRequest>("offline-requests").filterNot { it.trackId in excluded }
+        val requests = store.list<OfflineRequest>("offline-requests")
+            .filterNot { it.trackId in excluded || library.findTrack(it.trackId)?.onDevice() == true }
         val songs = if (requests.isEmpty()) emptyMap() else connection.songs().associateBy { it.id }
         for (request in requests) {
             currentCoroutineContext().ensureActive()
@@ -237,6 +241,28 @@ class OfflineMusic(private val store: MusicStore, private val library: MusicLibr
         }
         PlaylistDownloads(playlists, library, downloads, connection, sourceAccessible).synchronize(excluded)
         downloads.enforceCacheBudget(preferences.load().cacheBytes, inUseTracks())
+    }
+
+    // A song whose server file is on the device needs no download; this also drops copies made before it was linked to that file.
+    private suspend fun dropDeviceFileDownloads() {
+        val downloads = AudioDownloads(store, library, null, directory)
+        val playing = inUseTracks()
+        val tracks = library.tracks().associateBy { it.id }
+        for (record in store.list<DownloadRecord>("downloads")) {
+            val track = tracks[record.trackId] ?: continue
+            if (!track.onDevice()) continue
+            // A manual download returns if the file leaves the device; playlist downloads follow their playlist instead.
+            if (store.read<OfflinePins>("pins:${track.id}")?.owners?.contains("manual") == true)
+                store.put("request:${track.id}", "offline-requests", OfflineRequest(track.id))
+            else store.database.records().delete("request:${track.id}")
+            if (record.status != DownloadStatus.COMPLETE || track.id !in playing) downloads.remove(track.id, unpin = false)
+        }
+    }
+
+    // The device holds this song's server file when a readable local copy has the same byte size.
+    private fun Track.onDevice(): Boolean {
+        val sizes = sources.filter { it.kind == SourceKind.SERVER && it.indexedSize > 0 }.map { it.indexedSize }.toSet()
+        return sources.any { it.kind == SourceKind.LOCAL && it.indexedSize in sizes && it.available && sourceAccessible(it.location) }
     }
 
     private suspend fun networkPermitted(): Boolean = network.value.let {

@@ -538,4 +538,47 @@ class OfflineMusicTest {
             assertContentEquals(Files.readAllBytes(original), Files.readAllBytes(Path.of(complete.path!!)))
         } finally { offline?.closeAndJoin(); store.close(); http.close(); failedHttp.close(); directory.toFile().deleteRecursively() }
     }
+
+    @Test
+    fun songsLinkedToTheirServerFileOnTheDeviceDropTheirDownloadsUntilTheFileLeavesTheDevice() = runBlocking {
+        val directory = Files.createTempDirectory("device-file-downloads")
+        val store = openMusicStore(directory.resolve("library.db").toString())
+        val audio = Files.createDirectories(directory.resolve("audio"))
+        val library = MusicLibrary(store)
+        val offline = OfflineMusic(store, library, { error("Unlock your credential store") }, audio.toString(), Playlists(store),
+            sourceAccessible = { Files.exists(Path.of(it)) }, scheduleWork = {})
+        try {
+            suspend fun server(title: String) = library.importTrack(TrackMetadata(title),
+                TrackSource("server:fixture:$title", SourceKind.SERVER, title, indexedSize = 3))
+            suspend fun downloadedCopy(track: Track) = Files.write(audio.resolve("${track.metadata.title}.mp3"), byteArrayOf(1, 2, 3)).also { copy ->
+                store.put("download:${track.id}", "downloads", DownloadRecord(track.id, DownloadStatus.COMPLETE, copy.toString(), 3, 3))
+                library.importTrack(track.metadata, TrackSource("download:${track.id}", SourceKind.DOWNLOAD, copy.toString()), linkTo = track.id)
+            }
+            val downloaded = server("Downloaded")
+            val copy = downloadedCopy(downloaded)
+            AudioDownloads(store, library, null, audio.toString()).pin(downloaded.id, "manual")
+            // A local file that differs from the server file, such as a damaged copy, keeps its downloaded fallback.
+            val different = server("Different")
+            val fallback = downloadedCopy(different)
+            val requested = server("Requested")
+            offline.request(listOf(requested.id))
+            for ((track, bytes) in listOf(downloaded to 3, requested to 3, different to 5)) {
+                val file = Files.write(directory.resolve("${track.metadata.title}.mp3"), ByteArray(bytes)).toString()
+                val local = library.importTrack(track.metadata, TrackSource("local:$file", SourceKind.LOCAL, file, indexedSize = bytes.toLong()))
+                library.linkTracks(track.id, local.id)
+            }
+            offline.runPending()
+            assertEquals(false, Files.exists(copy))
+            assertEquals(true, Files.exists(fallback))
+            assertEquals(setOf(different.id), offline.state.value.keys)
+            assertEquals(true, store.database.records().read("pins:${downloaded.id}") != null)
+            assertEquals(setOf(SourceKind.LOCAL, SourceKind.SERVER), library.findTrack(downloaded.id)!!.sources.map { it.kind }.toSet())
+            // Manual downloads stay requested, so they return once the device file is gone.
+            assertEquals(true, listOf(downloaded, requested).all { store.database.records().read("request:${it.id}") != null })
+            library.setSourceAvailability(library.findTrack(downloaded.id)!!.sources.filter { it.kind == SourceKind.LOCAL }.map { it.id }.toSet(), false)
+            offline.runPending()
+            val restored = withTimeout(3_000) { offline.state.first { downloaded.id in it } }
+            assertEquals(DownloadStatus.FAILED, restored.getValue(downloaded.id).status)
+        } finally { offline.closeAndJoin(); store.close(); directory.toFile().deleteRecursively() }
+    }
 }
