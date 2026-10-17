@@ -178,6 +178,9 @@ class MusicLibraryTest {
             song(SourceKind.LOCAL, "Unknown size", 0); song(SourceKind.SERVER, "Unknown size", 0)
             song(SourceKind.LOCAL, "Unknown length", 5_000, 0); song(SourceKind.SERVER, "Unknown length", 5_000, 0)
             song(SourceKind.LOCAL, "Intro", 6_000); song(SourceKind.SERVER, "Intro", 6_000, artist = "Another Artist")
+            song(SourceKind.SERVER, "Deleted file", 7_000)
+            library.importTrack(TrackMetadata("Deleted file", "Fixture Artist", durationMs = 180_000),
+                TrackSource("local:deleted", SourceKind.LOCAL, "deleted.mp3", available = false, indexedSize = 7_000))
             assertEquals(listOf(server to local), library.sameFileCopies())
             library.linkTracks(server, local)
             assertEquals(emptyList(), library.sameFileCopies())

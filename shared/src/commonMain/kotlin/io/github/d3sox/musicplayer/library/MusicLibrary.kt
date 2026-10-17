@@ -201,12 +201,12 @@ class MusicLibrary(private val store: MusicStore) {
     }
 
     // A server song with the byte size, title, artist and length of a separate local song is the same file uploaded to the server.
-    // Returns (server track, local track) pairs; a file with several possible copies on either side stays separate.
+    // Returns (server track, local track) pairs of available copies; a file with several possible copies on either side stays separate.
     internal suspend fun sameFileCopies(): List<Pair<String, String>> {
         val tracks = tracks()
         fun files(kind: SourceKind, other: SourceKind) = tracks.filter { track -> track.sources.none { it.kind == other } }
             .filter { it.metadata.durationMs > 0 }
-            .mapNotNull { track -> track.sources.firstOrNull { it.kind == kind && it.indexedSize > 0 }?.let {
+            .mapNotNull { track -> track.sources.firstOrNull { it.kind == kind && it.available && it.indexedSize > 0 }?.let {
                 Triple(it.indexedSize, track.metadata.title.trim().lowercase(), track.metadata.artist.trim().lowercase()) to track } }
             .groupBy({ it.first }, { it.second })
         val local = files(SourceKind.LOCAL, SourceKind.SERVER)
