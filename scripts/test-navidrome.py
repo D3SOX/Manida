@@ -16,8 +16,8 @@ from test_containers import image
 
 ROOT = Path(__file__).resolve().parent.parent
 ENVIRONMENT = ROOT / ".test-environment"
-NAME = "musicplayer-navidrome-test"
-LABEL = "io.github.d3sox.musicplayer.test"
+NAME = "nevumi-navidrome-test"
+LABEL = "me.d3sox.nevumi.test"
 ADDRESS = "http://127.0.0.1:14533"
 PORT = 14533
 MUSIC_FOLDER = "music"
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     parser.add_argument("--sftp", action="store_true", help="Use the separate fixture for remote file changes")
     arguments = parser.parse_args()
     if arguments.sftp:
-        NAME = "manida-sftp-navidrome-test"
+        NAME = "nevumi-sftp-navidrome-test"
         PORT = 14536
         ADDRESS = "http://127.0.0.1:14536"
         MUSIC_FOLDER = "sftp-music"

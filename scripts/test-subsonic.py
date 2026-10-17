@@ -13,8 +13,8 @@ from test_containers import image
 
 ROOT = Path(__file__).resolve().parent.parent
 DIRECTORY = ROOT / ".test-environment/subsonic"
-NAME = "musicplayer-subsonic-test"
-LABEL = "io.github.d3sox.musicplayer.subsonic-test"
+NAME = "nevumi-subsonic-test"
+LABEL = "me.d3sox.nevumi.subsonic-test"
 ADDRESS = "http://127.0.0.1:14537"
 
 def owned():
@@ -34,9 +34,9 @@ def owned():
     return container
 
 def request(endpoint, **extra):
-    salt = "manida-subsonic-fixture"
+    salt = "nevumi-subsonic-fixture"
     parameters = dict(u="admin", t=hashlib.md5(("admin" + salt).encode()).hexdigest(), s=salt,
-                      v="1.13.0", c="Manida-test", f="json", **extra)
+                      v="1.13.0", c="Nevumi-test", f="json", **extra)
     with urllib.request.urlopen(ADDRESS + "/rest/" + endpoint + ".view?" + urllib.parse.urlencode(parameters), timeout=2) as response:
         return json.load(response)["subsonic-response"]
 

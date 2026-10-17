@@ -2,6 +2,9 @@
     android:width="108dp" android:height="108dp"
     android:viewportWidth="512" android:viewportHeight="512">
     <group android:pivotX="256" android:pivotY="256" android:scaleX="0.82" android:scaleY="0.82">
-    <path android:fillColor="#FFFFFF" android:pathData="M128,338V182q0,-28 28,-28h24q20,0 28,22l48,120 48,-120q8,-22 28,-22h24q28,0 28,28v156q0,20 -20,20t-20,-20V224l-52,124q-10,24 -36,24t-36,-24l-52,-124v114q0,20 -20,20t-20,-20zM256,96a20,20 0,1 0,0 40a20,20 0,1 0,0 -40z" />
+        <path android:fillColor="#00000000" android:strokeColor="#FFFFFF"
+            android:strokeWidth="48" android:strokeLineCap="round" android:strokeLineJoin="round"
+            android:pathData="M160,352V184L352,352V184" />
+        <path android:fillColor="#FFFFFF" android:pathData="M256,96a20,20 0,1 0,0 40a20,20 0,1 0,0 -40z" />
     </group>
 </vector>

@@ -26,7 +26,7 @@ selected = arguments.classes
 shard = re.fullmatch(r"([1-9][0-9]*)/([1-9][0-9]*)", arguments.shard)
 if shard is None or int(shard[1]) > int(shard[2]):
     raise SystemExit("Use a shard such as 2/4")
-sources = ROOT / "androidApp/src/androidTest/kotlin/me/d3sox/manida"
+sources = ROOT / "androidApp/src/androidTest/kotlin/me/d3sox/nevumi"
 classes = [path.stem for path in sorted(sources.glob("Android*Test.kt"))
            if "@ColdStartupCheck" not in path.read_text()]
 if selected:
@@ -100,7 +100,7 @@ def run(name, attempt):
                              "-Dorg.gradle.jvmargs=-Xmx1g", "--max-workers=2",
                              "-Pkotlin.compiler.execution.strategy=in-process",
                              "-Pandroid.injected.device.serial=" + serial,
-                             "-Pandroid.testInstrumentationRunnerArguments.class=me.d3sox.manida." + name,
+                             "-Pandroid.testInstrumentationRunnerArguments.class=me.d3sox.nevumi." + name,
                              "--console=plain"], cwd=ROOT, start_new_session=True) as process:
         try:
             process.wait(timeout=arguments.class_timeout)
@@ -126,7 +126,7 @@ def run(name, attempt):
                 print(f"::warning::Could not capture device log for {name}: {error}", flush=True)
         # The killed run can leave its instrumentation on the device, so stop both packages before the next class
         # or the retry starts its own Gradle run.
-        for package in ["me.d3sox.manida", "me.d3sox.manida.test"]:
+        for package in ["me.d3sox.nevumi", "me.d3sox.nevumi.test"]:
             try:
                 subprocess.run(["adb", "-s", serial, "shell", "am", "force-stop", package],
                                capture_output=True, check=True, timeout=30)
@@ -145,7 +145,7 @@ def run(name, attempt):
     if not complete:
         print(f"{name}: expected {sorted(expected)}, received {reported}", flush=True)
     ok = (process.returncode == 0 and complete
-          and all(case.get("classname") == "me.d3sox.manida." + name
+          and all(case.get("classname") == "me.d3sox.nevumi." + name
                   and case.find("failure") is None and case.find("error") is None for case in cases))
     return completed if ok else None
 

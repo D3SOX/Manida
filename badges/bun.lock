@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "manida-badges",
+      "name": "nevumi-badges",
       "devDependencies": {
         "wrangler": "4.151.0",
       },

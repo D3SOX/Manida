@@ -9,4 +9,4 @@
 -dontwarn javax.imageio.**
 -dontwarn javax.swing.**
 # JNI entry points retain their Kotlin class and method names.
--keep class io.github.d3sox.musicplayer.visualizer.ProjectMNative { *; }
+-keep class me.d3sox.nevumi.visualizer.ProjectMNative { *; }

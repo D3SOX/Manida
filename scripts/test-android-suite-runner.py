@@ -10,12 +10,12 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCES = Path("androidApp/src/androidTest/kotlin/me/d3sox/manida")
+SOURCES = Path("androidApp/src/androidTest/kotlin/me/d3sox/nevumi")
 
 
 class AndroidSuiteRunnerTest(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="manida-suite-")
+        self.temporary = tempfile.TemporaryDirectory(prefix="nevumi-suite-")
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         (self.root / "scripts").mkdir()
@@ -41,7 +41,7 @@ attempt = Path('invocations').read_text().splitlines().count(name)
 retry = os.environ.get('RETRY') == 'true' and attempt == 1
 suite = ET.Element('testsuite')
 if not retry:
-    source = Path('androidApp/src/androidTest/kotlin/me/d3sox/manida') / (name.split('.')[-1] + '.kt')
+    source = Path('androidApp/src/androidTest/kotlin/me/d3sox/nevumi') / (name.split('.')[-1] + '.kt')
     count = 1 if os.environ.get('PARTIAL') == 'true' else source.read_text().count('@Test')
     for index in range(count):
         case = ET.SubElement(suite, 'testcase', classname=name, name=f'example{index}')
@@ -117,7 +117,7 @@ with patch('subprocess.run', side_effect=run):
 
     def test_dynamic_shards_cover_each_class_once_and_exclude_cold_start(self):
         shutil.copytree(ROOT / SOURCES, self.root / SOURCES, dirs_exist_ok=True)
-        expected = {"me.d3sox.manida." + path.stem for path in (ROOT / SOURCES).glob("Android*Test.kt")
+        expected = {"me.d3sox.nevumi." + path.stem for path in (ROOT / SOURCES).glob("Android*Test.kt")
                     if "@ColdStartupCheck" not in path.read_text()}
         for name in expected:
             self.source(name.split(".")[-1])

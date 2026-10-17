@@ -25,13 +25,13 @@ python scripts/test-listenbrainz.py > .test-environment/listenbrainz.log 2>&1 &
 services+=("$!")
 if [[ "$mode" == desktop ]]; then
     # Hosted runners have no desktop session or unlocked credential collection.
-    keyring_environment="$(printf 'manida-ci-only' | gnome-keyring-daemon --unlock --components=secrets)"
+    keyring_environment="$(printf 'nevumi-ci-only' | gnome-keyring-daemon --unlock --components=secrets)"
     export GNOME_KEYRING_CONTROL
     GNOME_KEYRING_CONTROL="$(printf '%s\n' "$keyring_environment" | sed -n 's/^GNOME_KEYRING_CONTROL=//p')"
     gnome-keyring-daemon --start --components=secrets
-    printf 'fixture-password' | secret-tool store --label='Manida CI check' application manida-ci
-    [[ "$(secret-tool lookup application manida-ci)" == fixture-password ]]
-    secret-tool clear application manida-ci
+    printf 'fixture-password' | secret-tool store --label='Nevumi CI check' application nevumi-ci
+    [[ "$(secret-tool lookup application nevumi-ci)" == fixture-password ]]
+    secret-tool clear application nevumi-ci
     if ! pactl info >/dev/null 2>&1; then
         pulseaudio --daemonize=no --exit-idle-time=-1 > .test-environment/pulseaudio.log 2>&1 &
         services+=("$!")
@@ -41,8 +41,8 @@ if [[ "$mode" == desktop ]]; then
         done
     fi
     # PulseAudio removes its automatic dummy sink when a test creates a real sink.
-    pactl load-module module-null-sink sink_name=manida_ci_audio >/dev/null
-    pactl set-default-sink manida_ci_audio
+    pactl load-module module-null-sink sink_name=nevumi_ci_audio >/dev/null
+    pactl set-default-sink nevumi_ci_audio
     xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24 -nolisten tcp' ./gradlew --configure-on-demand :shared:desktopTest --console=plain
 else
     export ANDROID_SERIAL=emulator-5554
@@ -58,13 +58,13 @@ else
     for port in 14533 14534 14535 14536 14537 "$(cat .test-environment/paired-fixture/port)" "$(cat .test-environment/paired-fixture/control-port)"; do
         adb -s "$ANDROID_SERIAL" reverse "tcp:$port" "tcp:$port"
     done
-    adb -s "$ANDROID_SERIAL" push .test-environment/sftp-fixture/client /data/local/tmp/manida-sftp-client
-    adb -s "$ANDROID_SERIAL" push .test-environment/sftp-fixture/android-fixture.properties /data/local/tmp/manida-sftp-fixture.properties
-    adb -s "$ANDROID_SERIAL" push .test-environment/paired-fixture/control-port /data/local/tmp/manida-sync-control-port
-    shard="${MANIDA_ANDROID_SHARD:-1/1}"
+    adb -s "$ANDROID_SERIAL" push .test-environment/sftp-fixture/client /data/local/tmp/nevumi-sftp-client
+    adb -s "$ANDROID_SERIAL" push .test-environment/sftp-fixture/android-fixture.properties /data/local/tmp/nevumi-sftp-fixture.properties
+    adb -s "$ANDROID_SERIAL" push .test-environment/paired-fixture/control-port /data/local/tmp/nevumi-sync-control-port
+    shard="${NEVUMI_ANDROID_SHARD:-1/1}"
     python3 scripts/test-android-suite.py --shard "$shard"
     # The cold-start check runs once per device, on the first shard.
     if [[ "${shard%%/*}" == 1 ]]; then
-        MANIDA_TEST_SERIAL="$ANDROID_SERIAL" python3 scripts/test-android-startup.py
+        NEVUMI_TEST_SERIAL="$ANDROID_SERIAL" python3 scripts/test-android-startup.py
     fi
 fi

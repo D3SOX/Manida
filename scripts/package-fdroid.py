@@ -16,13 +16,13 @@ import yaml
 from loguru import logger
 
 ROOT = Path(__file__).resolve().parent.parent
-REPO_URL = "https://manida.d3sox.me/fdroid/repo"
-REPO_DEEP_LINK = "fdroidrepos://manida.d3sox.me/fdroid/repo"
-APP_ID = "me.d3sox.manida"
+REPO_URL = "https://nevumi.app/fdroid/repo"
+REPO_DEEP_LINK = "fdroidrepos://nevumi.app/fdroid/repo"
+APP_ID = "me.d3sox.nevumi"
 
 
 def fingerprint():
-    certificate = x509.load_pem_x509_certificate((ROOT / "packaging/manida-fdroid.pem").read_bytes())
+    certificate = x509.load_pem_x509_certificate((ROOT / "packaging/nevumi-fdroid.pem").read_bytes())
     return hashlib.sha256(certificate.public_bytes(serialization.Encoding.DER)).hexdigest().upper()
 
 
@@ -35,7 +35,7 @@ def verify_repository(repository: Path):
         raise ValueError("The signed repository index has an invalid digest")
     versions = json.loads(contents)["packages"][APP_ID]["versions"]
     if not versions:
-        raise ValueError("The repository contains no Manida release")
+        raise ValueError("The repository contains no Nevumi release")
     for version in versions.values():
         package = repository / version["file"]["name"].lstrip("/")
         if hashlib.sha256(package.read_bytes()).hexdigest() != version["file"]["sha256"]:
@@ -46,19 +46,19 @@ def repository(apk: Path, output: Path, keystore: Path):
     logger.disable("androguard")
     certificate = subprocess.run(
         ["keytool", "-exportcert", "-keystore", str(keystore), "-alias", "manida-fdroid",
-         "-storepass:env", "MANIDA_FDROID_KEYSTORE_PASSWORD"],
+         "-storepass:env", "NEVUMI_FDROID_KEYSTORE_PASSWORD"],
         check=True, capture_output=True, timeout=30,
     ).stdout
-    expected = x509.load_pem_x509_certificate((ROOT / "packaging/manida-fdroid.pem").read_bytes())
+    expected = x509.load_pem_x509_certificate((ROOT / "packaging/nevumi-fdroid.pem").read_bytes())
     if certificate != expected.public_bytes(serialization.Encoding.DER):
         raise ValueError("The repository key does not match the published certificate")
     fingerprint = hashlib.sha256(certificate).hexdigest().upper()
     package = APK(str(apk))
     if package.get_package() != APP_ID:
-        raise ValueError("Only the production Manida APK belongs in the release repository")
+        raise ValueError("Only the production Nevumi APK belongs in the release repository")
     if output.exists():
         raise ValueError("Choose a new repository output directory")
-    with tempfile.TemporaryDirectory(prefix="manida-fdroid-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="nevumi-fdroid-") as temporary:
         directory = Path(temporary)
         (directory / "repo").mkdir()
         (directory / "metadata").mkdir()
@@ -68,22 +68,22 @@ def repository(apk: Path, output: Path, keystore: Path):
         for position, name in enumerate(["home", "now-playing", "queue", "audio-effects"], start=1):
             shutil.copyfile(ROOT / "packaging/screenshots" / f"{name}.png",
                             screenshots / f"{position}-{name}.png")
-        shutil.copyfile(ROOT / "packaging/manida.png", directory / "icon.png")
+        shutil.copyfile(ROOT / "packaging/nevumi.png", directory / "icon.png")
         metadata = yaml.safe_load((ROOT / ".fdroid.yml").read_text())
         for field in ["Builds", "RepoType", "Repo", "AutoUpdateMode", "UpdateCheckMode"]:
             metadata.pop(field, None)
-        metadata.update(Name="Manida", WebSite="https://manida.d3sox.me",
+        metadata.update(Name="Nevumi", WebSite="https://nevumi.app",
                         Summary="Local music, Navidrome and Subsonic in one library",
                         CurrentVersion=package.get_androidversion_name(),
                         CurrentVersionCode=int(package.get_androidversion_code()))
         (directory / "metadata" / (APP_ID + ".yml")).write_text(yaml.safe_dump(metadata))
         config = {
-            "repo_url": REPO_URL, "repo_name": "Manida",
-            "repo_description": "Manida alpha releases for Android. Local music, Navidrome and Subsonic.",
+            "repo_url": REPO_URL, "repo_name": "Nevumi",
+            "repo_description": "Nevumi alpha releases for Android. Local music, Navidrome and Subsonic.",
             "repo_icon": "icon.png", "archive_older": 0,
             "keystore": str(keystore), "repo_keyalias": "manida-fdroid",
-            "keystorepass": {"env": "MANIDA_FDROID_KEYSTORE_PASSWORD"},
-            "keypass": {"env": "MANIDA_FDROID_KEYSTORE_PASSWORD"},
+            "keystorepass": {"env": "NEVUMI_FDROID_KEYSTORE_PASSWORD"},
+            "keypass": {"env": "NEVUMI_FDROID_KEYSTORE_PASSWORD"},
             "sdk_path": os.environ.get("ANDROID_HOME", os.environ.get("ANDROID_SDK_ROOT", "")),
         }
         (directory / "config.yml").write_text(yaml.safe_dump(config))
@@ -97,13 +97,13 @@ def repository(apk: Path, output: Path, keystore: Path):
         shutil.copyfile(ROOT / "packaging/fdroid-qr.png", output / "fdroid-qr.png")
         (output / "index.html").write_text(f'''<!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Manida F-Droid repository</title>
+<title>Nevumi F-Droid repository</title>
 <style>body{{font:18px system-ui;line-height:1.6;max-width:48rem;margin:3rem auto;padding:0 1rem;background:#19151e;color:#f4edf9}}a{{color:#d8baff}}code{{overflow-wrap:anywhere}}</style>
-<h1>Manida for Android</h1><p>Manida is in alpha. Add this repository to F-Droid for signed releases and updates.</p>
-<p><a href="{REPO_DEEP_LINK}?fingerprint={fingerprint}">Add the Manida repository to F-Droid</a></p>
-<a href="{REPO_DEEP_LINK}?fingerprint={fingerprint}"><img src="fdroid-qr.png" width="280" height="280" alt="Scan to add Manida to F-Droid"></a>
+<h1>Nevumi for Android</h1><p>Nevumi is in alpha. Add this repository to F-Droid for signed releases and updates.</p>
+<p><a href="{REPO_DEEP_LINK}?fingerprint={fingerprint}">Add the Nevumi repository to F-Droid</a></p>
+<a href="{REPO_DEEP_LINK}?fingerprint={fingerprint}"><img src="fdroid-qr.png" width="280" height="280" alt="Scan to add Nevumi to F-Droid"></a>
 <p>Repository: <code>{REPO_URL}</code><br>SHA-256 fingerprint: <code>{fingerprint}</code></p>
-<p><a href="https://github.com/D3SOX/Manida#android">APK downloads and Obtainium</a> · <a href="/">Linux installation</a></p>
+<p><a href="https://github.com/D3SOX/Nevumi#android">APK downloads and Obtainium</a> · <a href="/">Linux installation</a></p>
 </html>''')
     print(f"Created F-Droid repository at {output}; SHA-256 fingerprint {fingerprint}")
 

@@ -45,7 +45,7 @@ void presetFailed(const char*, const char* message, void* data) {
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_create(JNIEnv* env, jobject, jint width, jint height, jboolean desktop, jstring textures) {
+Java_me_d3sox_nevumi_visualizer_ProjectMNative_create(JNIEnv* env, jobject, jint width, jint height, jboolean desktop, jstring textures) {
     try {
         auto visualizer = std::make_unique<Visualizer>();
 #ifndef __ANDROID__
@@ -55,7 +55,7 @@ Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_create(JNIEnv* env, j
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
         SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-        visualizer->window = SDL_CreateWindow("Manida MilkDrop | N/P presets | F fullscreen | Esc close",
+        visualizer->window = SDL_CreateWindow("Nevumi MilkDrop | N/P presets | F fullscreen | Esc close",
             SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height,
             SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
         if (!visualizer->window) throw std::runtime_error(SDL_GetError());
@@ -86,7 +86,7 @@ Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_create(JNIEnv* env, j
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_load(JNIEnv* env, jobject, jlong handle, jstring path, jboolean smooth) {
+Java_me_d3sox_nevumi_visualizer_ProjectMNative_load(JNIEnv* env, jobject, jlong handle, jstring path, jboolean smooth) {
     try {
         auto& visualizer = instance(handle);
         const char* value = env->GetStringUTFChars(path, nullptr);
@@ -100,7 +100,7 @@ Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_load(JNIEnv* env, job
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_loadData(JNIEnv* env, jobject, jlong handle, jbyteArray preset, jboolean smooth) {
+Java_me_d3sox_nevumi_visualizer_ProjectMNative_loadData(JNIEnv* env, jobject, jlong handle, jbyteArray preset, jboolean smooth) {
     try {
         auto& visualizer = instance(handle);
         std::string data(static_cast<size_t>(env->GetArrayLength(preset)), '\0');
@@ -112,7 +112,7 @@ Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_loadData(JNIEnv* env,
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_render(JNIEnv* env, jobject, jlong handle, jfloatArray pcm, jint width, jint height, jboolean animate) {
+Java_me_d3sox_nevumi_visualizer_ProjectMNative_render(JNIEnv* env, jobject, jlong handle, jfloatArray pcm, jint width, jint height, jboolean animate) {
     try {
         auto& visualizer = instance(handle);
         int commands = 0;
@@ -160,7 +160,7 @@ Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_render(JNIEnv* env, j
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_pixels(JNIEnv* env, jobject, jlong handle) {
+Java_me_d3sox_nevumi_visualizer_ProjectMNative_pixels(JNIEnv* env, jobject, jlong handle) {
     try {
         auto& visualizer = instance(handle);
         const auto size = static_cast<size_t>(visualizer.width) * visualizer.height * 4;
@@ -182,6 +182,6 @@ Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_pixels(JNIEnv* env, j
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_io_github_d3sox_musicplayer_visualizer_ProjectMNative_destroy(JNIEnv*, jobject, jlong handle) {
+Java_me_d3sox_nevumi_visualizer_ProjectMNative_destroy(JNIEnv*, jobject, jlong handle) {
     delete reinterpret_cast<Visualizer*>(handle);
 }

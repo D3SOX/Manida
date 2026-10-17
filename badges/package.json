@@ -1,5 +1,5 @@
 {
-  "name": "manida-badges",
+  "name": "nevumi-badges",
   "private": true,
   "scripts": {
     "check": "wrangler deploy --dry-run",

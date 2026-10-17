@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ship the exact, verified source archives used by the projectM build, with Manida's patch to projectM."""
+"""Ship the exact, verified source archives used by the projectM build, with Nevumi's patch to projectM."""
 import argparse
 import hashlib
 from pathlib import Path

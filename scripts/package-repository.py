@@ -11,7 +11,7 @@ import subprocess
 def repository(release: Path, output: Path, signing_key: str):
     if not re.fullmatch(r"[0-9A-Fa-f]{40,64}", signing_key):
         raise ValueError("Use the full fingerprint of the release signing key")
-    packages = sorted(release.glob("manida-*-x86_64.pkg.tar.zst"))
+    packages = sorted(release.glob("nevumi-*-x86_64.pkg.tar.zst"))
     if not packages:
         raise ValueError("Create the Arch release package first")
     output.mkdir(parents=True, exist_ok=True)
@@ -20,7 +20,7 @@ def repository(release: Path, output: Path, signing_key: str):
     target = output / "arch/x86_64"
     target.mkdir(parents=True)
     copies = []
-    passphrase = os.environ.get("MANIDA_ARCH_SIGNING_PASSPHRASE")
+    passphrase = os.environ.get("NEVUMI_ARCH_SIGNING_PASSPHRASE")
     for package in packages:
         copied = target / package.name
         shutil.copyfile(package, copied)
@@ -31,7 +31,7 @@ def repository(release: Path, output: Path, signing_key: str):
                        input=(passphrase + "\n").encode() if passphrase is not None else None, check=True, timeout=30)
         copies.append(copied)
     subprocess.run(["repo-add", "--sign", "--key", signing_key, "--include-sigs",
-                    str(target / "manida.db.tar.gz"), *map(str, copies)], check=True)
+                    str(target / "nevumi.db.tar.gz"), *map(str, copies)], check=True)
     # upload-pages-artifact does not accept symlinks, including repo-add's aliases.
     for path in target.iterdir():
         if path.is_symlink():
@@ -42,7 +42,7 @@ def repository(release: Path, output: Path, signing_key: str):
                               check=True, capture_output=True)
     if not exported.stdout:
         raise ValueError("The release signing key is unavailable")
-    (output / "manida.asc").write_bytes(exported.stdout)
+    (output / "nevumi.asc").write_bytes(exported.stdout)
     (output / ".nojekyll").touch()
     print(f"Created signed repository at {output}")
 

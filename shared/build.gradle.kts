@@ -13,10 +13,10 @@ val generateAppVersion = tasks.register("generateAppVersion") {
     inputs.property("appVersion", appVersion)
     outputs.dir(output)
     doLast {
-        output.get().file("io/github/d3sox/musicplayer/ui/AppVersion.desktop.kt").asFile.apply {
+        output.get().file("me/d3sox/nevumi/ui/AppVersion.desktop.kt").asFile.apply {
             parentFile.mkdirs()
             writeText("""
-                package io.github.d3sox.musicplayer.ui
+                package me.d3sox.nevumi.ui
 
                 import androidx.compose.runtime.Composable
 
@@ -30,7 +30,7 @@ val generateAppVersion = tasks.register("generateAppVersion") {
 kotlin {
     jvmToolchain(21)
     android {
-        namespace = "io.github.d3sox.musicplayer.shared"
+        namespace = "me.d3sox.nevumi.shared"
         compileSdk = 37
         minSdk = 31
         withHostTest {}
@@ -105,10 +105,10 @@ dependencies {
 
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 
-compose.resources { packageOfResClass = "io.github.d3sox.musicplayer.resources" }
+compose.resources { packageOfResClass = "me.d3sox.nevumi.resources" }
 
 val visualizerNative = tasks.register<Exec>("buildVisualizerNative") {
-    inputs.property("buildType", providers.environmentVariable("MANIDA_NATIVE_BUILD_TYPE").orElse("Release"))
+    inputs.property("buildType", providers.environmentVariable("NEVUMI_NATIVE_BUILD_TYPE").orElse("Release"))
     inputs.dir(rootProject.file("native"))
     inputs.file(rootProject.file("scripts/build-visualizer.py"))
     outputs.dir(layout.buildDirectory.dir("native/runtime"))
@@ -117,7 +117,7 @@ val visualizerNative = tasks.register<Exec>("buildVisualizerNative") {
 }
 
 tasks.withType<Test>().configureEach {
-    systemProperty("musicplayer.testRoot", rootDir.absolutePath)
+    systemProperty("nevumi.testRoot", rootDir.absolutePath)
     if (name == "desktopTest") {
         dependsOn(visualizerNative)
         systemProperty("java.library.path", layout.buildDirectory.dir("native/runtime").get().asFile.absolutePath)
@@ -130,6 +130,6 @@ tasks.register<JavaExec>("pairedFixture") {
     val compilation = kotlin.targets.getByName("desktop").compilations.getByName("test")
     dependsOn(compilation.compileTaskProvider)
     classpath(compilation.output.allOutputs, compilation.runtimeDependencyFiles)
-    mainClass.set("io.github.d3sox.musicplayer.sync.PairedFixtureKt")
+    mainClass.set("me.d3sox.nevumi.sync.PairedFixtureKt")
     args(rootProject.file(".test-environment/paired-fixture").absolutePath)
 }

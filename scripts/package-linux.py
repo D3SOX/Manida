@@ -22,19 +22,19 @@ def package(image: Path, output: Path, version: str, pkgrel: str = "1", release_
     tag = release_tag or f"v{version}"
     if not re.fullmatch(r"[A-Za-z0-9._-]+", tag):
         raise ValueError("Invalid release tag")
-    if not (image / "bin/manida").is_file():
+    if not (image / "bin/nevumi").is_file():
         raise ValueError("Run :desktopApp:createDistributable first")
     output.mkdir(parents=True, exist_ok=True)
-    archive_name = f"manida-{version}-linux-x86_64.tar.gz"
+    archive_name = f"nevumi-{version}-linux-x86_64.tar.gz"
     archive = output / archive_name
     if archive.exists():
         raise FileExistsError(f"Release archive already exists: {archive}")
-    with tempfile.TemporaryDirectory(prefix="manida-release-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="nevumi-release-") as temporary:
         work = Path(temporary)
-        portable = work / "manida"
+        portable = work / "nevumi"
         shutil.copytree(image, portable)
         shutil.copyfile(ROOT / "LICENSE", portable / "LICENSE")
-        for name in ["manida.desktop", "manida.svg"]:
+        for name in ["nevumi.desktop", "nevumi.svg"]:
             shutil.copyfile(ROOT / "packaging" / name, portable / name)
         epoch = int(os.environ.get("SOURCE_DATE_EPOCH", "0"))
         with archive.open("xb") as raw, gzip.GzipFile(fileobj=raw, filename="", mtime=epoch) as compressed:
@@ -44,31 +44,31 @@ def package(image: Path, output: Path, version: str, pkgrel: str = "1", release_
                     entry.uname = entry.gname = "root"
                     entry.mtime = epoch
                     return entry
-                tar.add(portable, arcname="manida", filter=normalize)
+                tar.add(portable, arcname="nevumi", filter=normalize)
         checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
         build = work / "arch"
         build.mkdir()
         shutil.copyfile(archive, build / archive_name)
-        recipe = f'''pkgname=manida
+        recipe = f'''pkgname=nevumi
 pkgver={version}
 pkgrel={pkgrel}
 pkgdesc='Local music and Subsonic servers in one library'
 arch=('x86_64')
-url='https://github.com/D3SOX/Manida'
+url='https://github.com/D3SOX/Nevumi'
 license=('AGPL-3.0-only')
 depends=('mpv>=0.40' 'ffmpeg' 'libsecret' 'libpulse' 'sdl2' 'glib2' 'fontconfig' 'libxrender' 'libxtst' 'xdg-desktop-portal' 'xdg-desktop-portal-impl')
 optdepends=('networkmanager: automatic metered-network detection')
 options=('!strip' '!debug')
-source=('{archive_name}::https://github.com/D3SOX/Manida/releases/download/{tag}/{archive_name}')
+source=('{archive_name}::https://github.com/D3SOX/Nevumi/releases/download/{tag}/{archive_name}')
 sha256sums=('{checksum}')
 
 package() {{
     install -d "$pkgdir/opt" "$pkgdir/usr/bin"
-    cp -a "$srcdir/manida" "$pkgdir/opt/manida"
-    ln -s /opt/manida/bin/manida "$pkgdir/usr/bin/manida"
-    install -Dm644 "$srcdir/manida/manida.desktop" "$pkgdir/usr/share/applications/io.github.d3sox.musicplayer.desktop"
-    install -Dm644 "$srcdir/manida/manida.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/io.github.d3sox.musicplayer.svg"
-    install -Dm644 "$srcdir/manida/LICENSE" "$pkgdir/usr/share/licenses/manida/LICENSE"
+    cp -a "$srcdir/nevumi" "$pkgdir/opt/nevumi"
+    ln -s /opt/nevumi/bin/nevumi "$pkgdir/usr/bin/nevumi"
+    install -Dm644 "$srcdir/nevumi/nevumi.desktop" "$pkgdir/usr/share/applications/me.d3sox.nevumi.desktop"
+    install -Dm644 "$srcdir/nevumi/nevumi.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/me.d3sox.nevumi.svg"
+    install -Dm644 "$srcdir/nevumi/LICENSE" "$pkgdir/usr/share/licenses/nevumi/LICENSE"
 }}
 '''
         (build / "PKGBUILD").write_text(recipe)
@@ -76,7 +76,7 @@ package() {{
         configuration.write_text("source /etc/makepkg.conf\nPKGEXT='.pkg.tar.zst'\nCOMPRESSZST=(zstd -c -T2 -6 -)\n")
         subprocess.run(["makepkg", "--config", str(configuration), "--nodeps", "--nocheck", "--nosign", "--noconfirm"],
                        cwd=build, check=True)
-        packages = list(build.glob(f"manida-{version}-{pkgrel}-x86_64.pkg.tar.*"))
+        packages = list(build.glob(f"nevumi-{version}-{pkgrel}-x86_64.pkg.tar.*"))
         if len(packages) != 1:
             raise RuntimeError("Expected one Arch package")
         shutil.copyfile(packages[0], output / packages[0].name)

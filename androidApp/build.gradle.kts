@@ -4,21 +4,21 @@ plugins {
 }
 
 android {
-    namespace = "me.d3sox.manida"
+    namespace = "me.d3sox.nevumi"
     compileSdk = 37
     ndkVersion = "28.2.13676358"
     defaultConfig {
-        applicationId = "me.d3sox.manida"
+        applicationId = "me.d3sox.nevumi"
         minSdk = 31
         targetSdk = 37
-        versionCode = 8
+        versionCode = 9
         versionName = providers.gradleProperty("appVersion").get()
-        manifestPlaceholders["appLabel"] = "Manida"
+        manifestPlaceholders["appLabel"] = "Nevumi"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild { cmake { arguments += listOf("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON", "-DANDROID_STL=c++_shared") } }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
-        testInstrumentationRunnerArguments["notAnnotation"] = "me.d3sox.manida.ColdStartupCheck"
+        testInstrumentationRunnerArguments["notAnnotation"] = "me.d3sox.nevumi.ColdStartupCheck"
     }
     buildFeatures { compose = true }
     packaging.resources.merges += "META-INF/LICENSE.md"
@@ -45,7 +45,7 @@ android {
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
             signingConfig = signingConfigs.getByName("development")
-            manifestPlaceholders["appLabel"] = "Manida dev"
+            manifestPlaceholders["appLabel"] = "Nevumi dev"
             matchingFallbacks += "debug"
         }
     }

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Nevumi
+Comment=Local music and your music server in one library
+Exec=nevumi
+Icon=me.d3sox.nevumi
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+StartupWMClass=Nevumi

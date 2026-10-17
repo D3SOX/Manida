@@ -1,0 +1,92 @@
+package me.d3sox.nevumi
+
+import android.app.Application
+import me.d3sox.nevumi.app.MusicController
+import me.d3sox.nevumi.library.MusicLibrary
+import me.d3sox.nevumi.history.ListeningHistory
+import me.d3sox.nevumi.history.Scrobbling
+import me.d3sox.nevumi.library.AndroidLocalSources
+import me.d3sox.nevumi.library.AndroidFileEdits
+import me.d3sox.nevumi.navidrome.NavidromeConnection
+import me.d3sox.nevumi.navidrome.NavidromeChanges
+import me.d3sox.nevumi.playback.AndroidPlaybackEngine
+import me.d3sox.nevumi.queue.PlaybackQueue
+import me.d3sox.nevumi.security.AndroidCredentialVault
+import me.d3sox.nevumi.storage.MusicStore
+import me.d3sox.nevumi.storage.openMusicStore
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import me.d3sox.nevumi.downloads.OfflineMusic
+import me.d3sox.nevumi.downloads.AndroidDownloadNetwork
+import me.d3sox.nevumi.playlists.Playlists
+import java.io.File
+import me.d3sox.nevumi.library.AndroidAudioAccess
+import me.d3sox.nevumi.settings.MusicPreferences
+import me.d3sox.nevumi.artwork.ArtworkLibrary
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import me.d3sox.nevumi.sftp.SftpConnection
+import android.net.Uri
+
+class MusicApplication : Application() {
+    lateinit var controller: MusicController
+        private set
+    lateinit var store: MusicStore
+        private set
+    lateinit var offline: OfflineMusic
+        private set
+    private lateinit var http: HttpClient
+    private lateinit var downloadNetwork: AndroidDownloadNetwork
+    private lateinit var connection: NavidromeConnection
+    private lateinit var serverChanges: NavidromeChanges
+    private lateinit var downloadJobs: AndroidDownloadJobs
+    private lateinit var serverFiles: SftpConnection
+    lateinit var mediaWriteRequests: MediaWriteRequests
+        private set
+    lateinit var localNetworkRequests: LocalNetworkRequests
+        private set
+    private val mutableDownloadNotifications = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val downloadNotificationsRequested = mutableDownloadNotifications.asSharedFlow()
+
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    override fun onCreate() {
+        super.onCreate()
+        mediaWriteRequests = MediaWriteRequests(this)
+        localNetworkRequests = LocalNetworkRequests(this)
+        store = openMusicStore(this)
+        http = HttpClient(OkHttp)
+        val library = MusicLibrary(store)
+        val credentials = AndroidCredentialVault(this)
+        val artwork = ArtworkLibrary(File(filesDir, "artwork").path)
+        connection = NavidromeConnection(store, http, credentials)
+        serverChanges = NavidromeChanges(store, library, artwork, connection::client)
+        serverFiles = SftpConnection(store, library, connection::client, credentials, File(filesDir, "server-edits").path,
+            readLocal = { location ->
+                if (location.startsWith("content:")) requireNotNull(contentResolver.openInputStream(Uri.parse(location))) { "The local music file is unavailable" }
+                else File(location).inputStream()
+            }, changes = serverChanges, artwork = artwork)
+        val playlists = Playlists(store)
+        downloadNetwork = AndroidDownloadNetwork(this)
+        downloadJobs = AndroidDownloadJobs(this, MusicPreferences(store), playlists) { mutableDownloadNotifications.tryEmit(Unit) }
+        offline = OfflineMusic(store, library, connection::client, File(filesDir, "audio").path, playlists, downloadNetwork.state,
+            sourceAccessible = AndroidAudioAccess(this)::available, scheduleWork = downloadJobs::schedule)
+        controller = MusicController(library, PlaybackQueue(store),
+            AndroidPlaybackEngine(this, PlaybackService::class.java),
+            connection, AndroidLocalSources(this, library, artwork), offline, playlists, AndroidAudioAccess(this)::available,
+            MusicPreferences(store), artwork, serverChanges,
+            AndroidFileEdits(this, store, library, File(filesDir, "file-edits").path, mediaWriteRequests::request, artwork),
+            listeningHistory = ListeningHistory(store, library),
+            scrobbling = Scrobbling(store, library, http, credentials, downloadNetwork.state, connection::client),
+            equalizerProfiles = me.d3sox.nevumi.playback.AutoEqProfiles(store, http), serverFiles = serverFiles,
+            pairedDevices = me.d3sox.nevumi.sync.JvmPairedDevices(store,
+                me.d3sox.nevumi.sync.LibrarySync(store, library, serverChanges, AndroidAudioAccess(this)::contentId), credentials, "Android phone",
+                networkAccess = localNetworkRequests::request),
+            networkAccess = localNetworkRequests::request)
+    }
+
+    suspend fun refreshOfflinePlaylists() {
+        connection.client()?.let { serverChanges.refreshLibrary(it, includeFilePaths = serverFiles.configuration()?.serverId == it.serverId) }
+    }
+
+    fun retryUserDownloads() { downloadJobs.schedule(userInitiated = true) }
+}

@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Manida"
+rootProject.name = "Nevumi"
 include(":shared", ":androidApp", ":desktopApp")

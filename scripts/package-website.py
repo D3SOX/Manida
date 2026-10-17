@@ -11,7 +11,7 @@ def copy_website(output: Path, signing_key: str):
     shutil.copytree(root / "website", output, dirs_exist_ok=True)
     assets = output / "assets"
     assets.mkdir(exist_ok=True)
-    for name in ["manida.svg", "fdroid-qr-dark.png", "fdroid-qr-light.png"]:
+    for name in ["nevumi.svg", "fdroid-qr-dark.png", "fdroid-qr-light.png"]:
         shutil.copyfile(root / "packaging" / name, assets / name)
     shutil.copytree(root / "packaging/screenshots", assets / "screenshots", dirs_exist_ok=True)
     index = output / "index.html"

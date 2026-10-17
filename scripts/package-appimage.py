@@ -18,7 +18,7 @@ def elf(path):
     with path.open("rb") as file: return file.read(4) == b"\x7fELF"
 
 def package(image, output, version, tool, mpv_library=None):
-    if not (image / "bin/manida").is_file(): raise ValueError("Run :desktopApp:createDistributable first")
+    if not (image / "bin/nevumi").is_file(): raise ValueError("Run :desktopApp:createDistributable first")
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-dev-[a-f0-9]+)?", version): raise ValueError("Invalid package version")
     if not tool.is_file():
         tool.parent.mkdir(parents=True, exist_ok=True)
@@ -27,11 +27,11 @@ def package(image, output, version, tool, mpv_library=None):
     if hashlib.sha256(tool.read_bytes()).hexdigest() != TOOL_SHA256: raise RuntimeError("AppImage tool checksum mismatch")
     tool.chmod(0o755)
     output.mkdir(parents=True, exist_ok=True)
-    destination = output / f"manida-{version}-x86_64.AppImage"
+    destination = output / f"nevumi-{version}-x86_64.AppImage"
     if destination.exists(): raise FileExistsError(destination)
-    with tempfile.TemporaryDirectory(prefix="manida-appimage-") as temporary:
-        app = Path(temporary) / "Manida.AppDir"
-        shutil.copytree(image, app / "opt/manida")
+    with tempfile.TemporaryDirectory(prefix="nevumi-appimage-") as temporary:
+        app = Path(temporary) / "Nevumi.AppDir"
+        shutil.copytree(image, app / "opt/nevumi")
         binaries, libraries = app / "usr/bin", app / "usr/lib"
         binaries.mkdir(parents=True); libraries.mkdir(parents=True)
         for name in ["ffmpeg", "secret-tool", "pactl", "parec"]:
@@ -52,7 +52,7 @@ def package(image, output, version, tool, mpv_library=None):
             binary = pending.pop()
             if binary in visited: continue
             visited.add(binary)
-            runtime = app / "opt/manida/lib/runtime/lib"
+            runtime = app / "opt/nevumi/lib/runtime/lib"
             paths = [libraries, runtime, runtime / "server"]
             result = subprocess.run(["ldd", str(binary)], capture_output=True, text=True,
                                     env=dict(os.environ, LD_LIBRARY_PATH=":".join(map(str, paths))))
@@ -64,7 +64,7 @@ def package(image, output, version, tool, mpv_library=None):
                 if source.is_relative_to(app) or target.exists(): continue
                 shutil.copyfile(source, target)
                 pending.append(source); origins.add(source)
-        licenses = app / "usr/share/licenses/manida"
+        licenses = app / "usr/share/licenses/nevumi"
         licenses.mkdir(parents=True)
         shutil.copyfile(ROOT / "LICENSE", licenses / "LICENSE")
         mpv_licenses = mpv.parent.parent / "share/licenses/mpv"
@@ -81,15 +81,15 @@ def package(image, output, version, tool, mpv_library=None):
                 for name in result.stdout.splitlines() if result.returncode == 0 else []:
                     directory = Path("/usr/share/licenses") / name
                     if directory.is_dir(): shutil.copytree(directory, licenses / name, dirs_exist_ok=True)
-        shutil.copyfile(ROOT / "packaging/manida.desktop", app / "manida.desktop")
-        shutil.copyfile(ROOT / "packaging/manida.svg", app / "io.github.d3sox.musicplayer.svg")
-        (app / ".DirIcon").symlink_to("io.github.d3sox.musicplayer.svg")
+        shutil.copyfile(ROOT / "packaging/nevumi.desktop", app / "nevumi.desktop")
+        shutil.copyfile(ROOT / "packaging/nevumi.svg", app / "me.d3sox.nevumi.svg")
+        (app / ".DirIcon").symlink_to("me.d3sox.nevumi.svg")
         launcher = app / "AppRun"
         launcher.write_text('''#!/bin/sh
-manida_appdir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-export PATH="$manida_appdir/usr/bin:$PATH"
-export LD_LIBRARY_PATH="$manida_appdir/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-exec "$manida_appdir/opt/manida/bin/manida" "$@"
+nevumi_appdir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+export PATH="$nevumi_appdir/usr/bin:$PATH"
+export LD_LIBRARY_PATH="$nevumi_appdir/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+exec "$nevumi_appdir/opt/nevumi/bin/nevumi" "$@"
 ''')
         launcher.chmod(0o755)
         # Reuse the verified tool's embedded runtime rather than fetching a moving nightly runtime.

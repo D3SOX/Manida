@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location("repository", ROOT / "scripts/package-fdroid.py")
 repository = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(repository)
-REPO = Path(os.environ.get("MANIDA_FDROID_REPO", ROOT / ".test-environment/pages/fdroid/repo"))
+REPO = Path(os.environ.get("NEVUMI_FDROID_REPO", ROOT / ".test-environment/pages/fdroid/repo"))
 
 
 class FdroidRepositoryTest(unittest.TestCase):
@@ -37,7 +37,7 @@ class FdroidRepositoryTest(unittest.TestCase):
                     self.assertEqual(actual.convert("RGB").tobytes(), expected.convert("RGB").tobytes())
 
     def test_modified_index_and_apk_are_rejected(self):
-        with tempfile.TemporaryDirectory(prefix="manida-fdroid-test-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="nevumi-fdroid-test-") as temporary:
             copy = Path(temporary) / "repo"
             shutil.copytree(REPO, copy)
             index = copy / "index-v2.json"

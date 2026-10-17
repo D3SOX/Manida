@@ -10,7 +10,7 @@ import time
 import unittest
 
 ROOT = Path(__file__).resolve().parent.parent
-APP = Path(os.environ.get("MANIDA_TEST_APP", str(ROOT / "desktopApp/build/compose/binaries/main/app/manida/bin/manida")))
+APP = Path(os.environ.get("NEVUMI_TEST_APP", str(ROOT / "desktopApp/build/compose/binaries/main/app/nevumi/bin/nevumi")))
 JAVA = Path(os.environ.get("JAVA_HOME", "/usr/lib/jvm/java-21-openjdk")) / "bin"
 
 
@@ -39,18 +39,18 @@ def stop(process):
 class LinuxPlayerTest(unittest.TestCase):
     def test_packaged_visualizer_loads_its_native_libraries_and_renders_audio(self):
         self.assertTrue(APP.is_file(), "Run :desktopApp:createDistributable first")
-        with tempfile.TemporaryDirectory(prefix="manida-packaged-visualizer-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="nevumi-packaged-visualizer-") as temporary:
             directory = Path(temporary)
-            image = directory / "manida"
+            image = directory / "nevumi"
             shutil.copytree(APP.parent.parent, image)
             source = directory / "VisualizerProbe.java"
             source.write_text('''
-import io.github.d3sox.musicplayer.visualizer.ProjectMNative;
+import me.d3sox.nevumi.visualizer.ProjectMNative;
 import java.nio.file.Files;
 import java.nio.file.Path;
 public class VisualizerProbe {
     public static void main(String[] args) throws Exception {
-        var preset = Files.createTempFile("manida-visualizer-", ".milk");
+        var preset = Files.createTempFile("nevumi-visualizer-", ".milk");
         Files.writeString(preset, "[preset00]\\nfDecay=0.9\\nnWaveMode=1\\nfWaveAlpha=1\\nwave_r=1\\nwave_g=0.5\\nwave_b=0.2\\n");
         var nativeApi = ProjectMNative.INSTANCE;
         nativeApi.initialize();
@@ -78,10 +78,10 @@ public class VisualizerProbe {
             probe = image / "lib/app/visualizer-probe.jar"
             subprocess.run([str(JAVA / "jar"), "--create", "--file", str(probe),
                             "-C", str(directory), "VisualizerProbe.class"], check=True, capture_output=True)
-            configuration = image / "lib/app/manida.cfg"
-            text = configuration.read_text().replace("app.mainclass=io.github.d3sox.musicplayer.desktop.MainKt", "app.mainclass=VisualizerProbe")
+            configuration = image / "lib/app/nevumi.cfg"
+            text = configuration.read_text().replace("app.mainclass=me.d3sox.nevumi.desktop.MainKt", "app.mainclass=VisualizerProbe")
             configuration.write_text(text.replace("[Application]", "[Application]\napp.classpath=$APPDIR/visualizer-probe.jar"))
-            result = subprocess.run(["xvfb-run", "--auto-servernum", str(image / "bin/manida")],
+            result = subprocess.run(["xvfb-run", "--auto-servernum", str(image / "bin/nevumi")],
                                     capture_output=True, text=True, timeout=30)
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
             self.assertIn("Packaged MilkDrop ready", result.stdout)
@@ -89,9 +89,9 @@ public class VisualizerProbe {
 
     def test_packaged_runtime_supports_pinned_tls_and_server_certificates(self):
         self.assertTrue(APP.is_file(), "Run :desktopApp:createDistributable first")
-        with tempfile.TemporaryDirectory(prefix="manida-runtime-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="nevumi-runtime-") as temporary:
             directory = Path(temporary)
-            image = directory / "manida"
+            image = directory / "nevumi"
             shutil.copytree(APP.parent.parent, image)
             source = directory / "TlsProbe.java"
             source.write_text('''
@@ -123,12 +123,12 @@ public class TlsProbe {
             probe = image / "lib/app/probe.jar"
             subprocess.run([str(JAVA / "jar"), "--create", "--file", str(probe),
                             "-C", str(directory), "TlsProbe.class"], check=True, capture_output=True)
-            configuration = image / "lib/app/manida.cfg"
+            configuration = image / "lib/app/nevumi.cfg"
             original = configuration.read_text()
-            original = original.replace("app.mainclass=io.github.d3sox.musicplayer.desktop.MainKt", "app.mainclass=TlsProbe")
+            original = original.replace("app.mainclass=me.d3sox.nevumi.desktop.MainKt", "app.mainclass=TlsProbe")
             configuration.write_text(original.replace("[Application]", "[Application]\napp.classpath=$APPDIR/probe.jar"))
-            launcher = image / "bin/manida"
-            link = directory / "manida-link"
+            launcher = image / "bin/nevumi"
+            link = directory / "nevumi-link"
             link.symlink_to(launcher)
             for command in [launcher, link]:
                 with self.subTest(launcher=command.name):
@@ -204,17 +204,17 @@ public class TlsProbe {
                             log.seek(0)
                             self.fail("Desktop player exited: " + log.read())
                         owner = call("org.freedesktop.DBus", "/org/freedesktop/DBus",
-                                     "org.freedesktop.DBus.NameHasOwner", "org.mpris.MediaPlayer2.musicplayer")
+                                     "org.freedesktop.DBus.NameHasOwner", "org.mpris.MediaPlayer2.nevumi")
                         if "true" in owner:
                             break
                         time.sleep(0.1)
                     else:
                         log.seek(0)
                         self.fail("Desktop media session was not registered: " + log.read())
-                    root = call("org.mpris.MediaPlayer2.musicplayer", "/org/mpris/MediaPlayer2",
+                    root = call("org.mpris.MediaPlayer2.nevumi", "/org/mpris/MediaPlayer2",
                                 "org.freedesktop.DBus.Properties.GetAll", "org.mpris.MediaPlayer2")
-                    self.assertIn("'Identity': <'Manida'>", root)
-                    player = call("org.mpris.MediaPlayer2.musicplayer", "/org/mpris/MediaPlayer2",
+                    self.assertIn("'Identity': <'Nevumi'>", root)
+                    player = call("org.mpris.MediaPlayer2.nevumi", "/org/mpris/MediaPlayer2",
                                   "org.freedesktop.DBus.Properties.GetAll", "org.mpris.MediaPlayer2.Player")
                     self.assertIn("'PlaybackStatus': <'Stopped'>", player)
                     self.assertIn("'Volume': <1.0>", player)

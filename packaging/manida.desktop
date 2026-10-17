@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Manida
-Comment=Local music and your music server in one library
-Exec=manida
-Icon=io.github.d3sox.musicplayer
-Terminal=false
-Categories=AudioVideo;Audio;Player;
-StartupWMClass=Manida

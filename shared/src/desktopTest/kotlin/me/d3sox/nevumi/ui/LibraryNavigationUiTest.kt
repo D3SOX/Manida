@@ -1,0 +1,109 @@
+package me.d3sox.nevumi.ui
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.v2.runComposeUiTest
+import androidx.compose.ui.test.v2.runSkikoComposeUiTest
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.geometry.Size
+import me.d3sox.nevumi.library.LibraryTab
+import me.d3sox.nevumi.settings.MusicSettings
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+@OptIn(ExperimentalTestApi::class)
+class LibraryNavigationUiTest {
+    private val tabs = listOf(LibraryTab.HOME) + LibraryTab.entries.filter { it != LibraryTab.HOME }
+    private val navigationItem = hasClickAction() and hasAnyAncestor(hasTestTag("library-navigation"))
+
+    @Test fun resizingRevealsMorePagesAndPreservesSelectionAcrossOverflow() = runSkikoComposeUiTest(size = Size(2400f, 900f)) {
+        var width by mutableStateOf(360.dp)
+        var current by mutableStateOf(LibraryTab.SONGS)
+        setContent { MusicTheme(MusicSettings(), null) {
+            Box(Modifier.width(width)) { LibraryNavigation(tabs, current) { current = it } }
+        } }
+        onAllNodes(navigationItem).assertCountEquals(5)
+        onNodeWithText("Folders").assertDoesNotExist()
+        onNodeWithText("More").performClick()
+        onNodeWithTag("library-more-pages").performScrollToNode(hasText("Folders"))
+        onNodeWithText("Folders").performClick()
+        onNodeWithText("More").assertIsSelected()
+
+        runOnIdle { width = 720.dp }
+        assertTrue(onAllNodes(navigationItem).fetchSemanticsNodes().size > 5)
+        onNodeWithContentDescription("Folders").assertIsSelected()
+        onNodeWithText("More").performClick()
+        onNode(hasText("Folders") and hasAnyAncestor(hasTestTag("library-more-pages"))).assertDoesNotExist()
+        onNodeWithTag("library-more-pages").performScrollToNode(hasText("Recommendations"))
+        onNodeWithText("Recommendations").assertIsDisplayed()
+
+        runOnIdle { width = 2400.dp }
+        onNodeWithTag("library-more-pages").assertDoesNotExist()
+        onNodeWithText("More").assertDoesNotExist()
+        onAllNodes(navigationItem).assertCountEquals(tabs.size)
+        captureNavigation("navigation-wide")
+        onNodeWithContentDescription("Folders").assertIsSelected()
+        onNodeWithContentDescription("Recommendations").performClick().assertIsSelected()
+
+        runOnIdle { width = 360.dp }
+        onNodeWithTag("library-more-pages").assertDoesNotExist()
+        onNodeWithText("More").assertIsSelected()
+        assertEquals(LibraryTab.RECOMMENDATIONS, current)
+        runOnIdle { width = 2400.dp }
+        onNodeWithContentDescription("Recommendations").assertIsSelected()
+    }
+
+    @Test fun enlargedTextReducesCapacityWithoutChangingTheSelectedPage() = runComposeUiTest {
+        var fontScale by mutableStateOf(1f)
+        var current by mutableStateOf(LibraryTab.GENRES)
+        setContent {
+            val density = LocalDensity.current.density
+            CompositionLocalProvider(LocalDensity provides Density(density, fontScale)) {
+                MusicTheme(MusicSettings(), null) {
+                    Box(Modifier.width(720.dp)) { LibraryNavigation(tabs, current) { current = it } }
+                }
+            }
+        }
+        val original = onAllNodes(navigationItem).fetchSemanticsNodes().size
+        onNodeWithContentDescription("Genres").assertIsSelected()
+        runOnIdle { fontScale = 2f }
+        assertTrue(onAllNodes(navigationItem).fetchSemanticsNodes().size < original)
+        onNodeWithText("More").assertIsSelected()
+        onAllNodes(navigationItem).fetchSemanticsNodes().forEach { assertTrue(it.boundsInRoot.width >= 48) }
+        captureNavigation("navigation-large-text")
+        assertEquals(LibraryTab.GENRES, current)
+        runOnIdle { fontScale = 1f }
+        onNodeWithContentDescription("Genres").assertIsSelected()
+    }
+
+    @Test fun configuredOrderIsKeptAndEverySlotIsAvailableWhenAllPagesFit() = runComposeUiTest {
+        val configured = listOf(LibraryTab.HOME, LibraryTab.SONGS, LibraryTab.RECENT, LibraryTab.PLAYLISTS,
+            LibraryTab.HISTORY, LibraryTab.FAVORITES, LibraryTab.ARTISTS)
+        setContent { MusicTheme(MusicSettings(), null) {
+            Box(Modifier.width(720.dp)) { LibraryNavigation(configured, LibraryTab.HISTORY) {} }
+        } }
+        onNodeWithText("More").assertDoesNotExist()
+        onAllNodes(navigationItem).assertCountEquals(configured.size)
+        val positions = configured.map { onNodeWithContentDescription(it.label).fetchSemanticsNode().boundsInRoot.left }
+        assertEquals(positions.sorted(), positions)
+        onNodeWithContentDescription("History").assertIsSelected()
+    }
+
+    private fun ComposeUiTest.captureNavigation(name: String) {
+        System.getenv("NEVUMI_UI_SNAPSHOTS")?.let { directory ->
+            val pixels = onNodeWithTag("library-navigation").captureToImage().toPixelMap()
+            val image = java.awt.image.BufferedImage(pixels.width, pixels.height, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+            for (y in 0 until pixels.height) for (x in 0 until pixels.width) image.setRGB(x, y, pixels[x, y].toArgb())
+            val target = java.nio.file.Path.of(directory).also(java.nio.file.Files::createDirectories).resolve("$name.png")
+            javax.imageio.ImageIO.write(image, "png", target.toFile())
+        }
+    }
+}

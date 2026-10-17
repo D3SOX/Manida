@@ -14,7 +14,7 @@ def build(output: Path, build_type: str):
                     f"-DCMAKE_BUILD_TYPE={build_type}"], check=True)
     subprocess.run(["cmake", "--build", str(directory), "--parallel", str(min(os.cpu_count() or 1, 4))], check=True)
     output.mkdir(parents=True, exist_ok=True)
-    libraries = [directory / "libmanida_visualizer.so"] + list(directory.glob("_deps/projectm-build/src/libprojectM/libprojectM-4.so*"))
+    libraries = [directory / "libnevumi_visualizer.so"] + list(directory.glob("_deps/projectm-build/src/libprojectM/libprojectM-4.so*"))
     if len(libraries) < 2:
         raise RuntimeError("The visualizer's shared libraries were not built")
     for library in libraries:
@@ -32,6 +32,6 @@ def build(output: Path, build_type: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--build-type", choices=["Release", "RelWithDebInfo"], default=os.environ.get("MANIDA_NATIVE_BUILD_TYPE", "Release"))
+    parser.add_argument("--build-type", choices=["Release", "RelWithDebInfo"], default=os.environ.get("NEVUMI_NATIVE_BUILD_TYPE", "Release"))
     args = parser.parse_args()
     build(args.output.resolve(), args.build_type)

@@ -1,0 +1,56 @@
+package me.d3sox.nevumi.ui
+
+import me.d3sox.nevumi.history.*
+import me.d3sox.nevumi.library.Track
+import me.d3sox.nevumi.library.recentAt
+import kotlin.random.Random
+
+internal data class HomeMix(val id: String, val title: String, val description: String, val tracks: List<Track>)
+internal data class HomeFeed(val recent: List<Track>, val top: List<Track>, val rediscover: List<Track>,
+    val added: List<Track>, val recentAlbums: List<TrackCollection>, val recentArtists: List<TrackCollection>,
+    val topAlbums: List<TrackCollection>, val topArtists: List<TrackCollection>, val mixes: List<HomeMix>)
+
+internal fun homeFeed(tracks: List<Track>, listens: List<Listen>, now: Long, randomSeed: Int): HomeFeed {
+    val playable = tracks.filter { track -> track.sources.any { it.available } }
+    val catalog = playable.associateBy { it.id }
+    val events = listens.filter { it.trackId in catalog && it.startedAt <= now }
+    val statistics = listeningStatistics(events)
+    val recent = events.sortedByDescending { it.startedAt }.distinctBy { it.trackId }.map { catalog.getValue(it.trackId) }.take(20)
+    val report = listeningReport(events, playable, ListeningPeriod.LAST_30_DAYS, now)
+    val top = report.songs.filter { it.playCount > 0 }.map { catalog.getValue(it.trackIds.single()) }.take(20)
+    val rediscover = playable.filter { track -> statistics[track.id]?.let { it.playCount > 0 && it.lastPlayedAt < now - 30 * 86_400_000L } == true }
+        .sortedWith(compareByDescending<Track> { statistics.getValue(it.id).playCount }.thenBy { statistics.getValue(it.id).lastPlayedAt }).take(20)
+    val added = playable.sortedWith(compareByDescending<Track> { it.recentAt }.thenBy { it.metadata.title.lowercase() }).take(20)
+    val albums = playable.groupBy { albumCollectionId(it.metadata) }.mapValues { (id, songs) ->
+        val first = songs.first().metadata
+        TrackCollection(id, first.album.ifBlank { "Unknown album" },
+            songs.sortedWith(compareBy<Track> { it.metadata.discNumber }.thenBy { it.metadata.trackNumber }.thenBy { it.metadata.title }),
+            first.albumArtist.ifBlank { first.artist })
+    }
+    val artists = playable.groupBy { it.metadata.artist }.mapValues { (artist, songs) ->
+        TrackCollection(artist, artist.ifBlank { "Unknown artist" }, songs)
+    }
+    val recentAlbums = recent.mapNotNull { albums[albumCollectionId(it.metadata)] }.distinctBy { it.id }.take(12)
+    val recentArtists = recent.mapNotNull { artists[it.metadata.artist] }.distinctBy { it.id }.take(12)
+    val topAlbums = report.albums.filter { it.playCount > 0 }.mapNotNull { rank ->
+        rank.trackIds.firstOrNull()?.let(catalog::get)?.let { albums[albumCollectionId(it.metadata)] }
+    }.distinctBy { it.id }.take(12)
+    val topArtists = report.artists.filter { it.playCount > 0 }.mapNotNull { rank ->
+        rank.trackIds.firstOrNull()?.let(catalog::get)?.let { artists[it.metadata.artist] }
+    }.distinctBy { it.id }.take(12)
+    val discovery = playable.filter { (statistics[it.id]?.playCount ?: 0) == 0 }.shuffled(Random(randomSeed)).take(50)
+    val recommendations = listeningRecommendations(events, playable, limit = 50, now = now).map { it.track }
+    val favorites = playable.filter { it.favorite }.shuffled(Random(randomSeed)).take(50)
+    val mixes = buildList {
+        fun mix(id: String, title: String, description: String, songs: List<Track>) {
+            if (songs.isNotEmpty()) add(HomeMix(id, title, description, songs))
+        }
+        mix("random", "Random mix", "A shuffle of your library", playable.shuffled(Random(randomSeed)).take(50))
+        mix("favorites", "Favorites mix", "The songs you love", favorites)
+        mix("discovery", "Discovery mix", "Songs you haven’t played yet", discovery)
+        mix("recommendations", "For you", "From your listening history", recommendations)
+        mix("rediscover", "Rediscover mix", "Songs you haven’t heard in a while", rediscover)
+        mix("top", "Top listens mix", "Your most played in the last 30 days", top)
+    }
+    return HomeFeed(recent, top, rediscover, added, recentAlbums, recentArtists, topAlbums, topArtists, mixes)
+}

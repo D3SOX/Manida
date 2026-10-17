@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
@@ -41,7 +41,7 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - run: bash scripts/sdkmanager-retry.sh 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
       - run: ./gradlew :androidApp:lintDevelopment :androidApp:assembleDevelopment --console=plain
-      - run: mkdir -p .test-environment/development && cp androidApp/build/outputs/apk/development/androidApp-development.apk .test-environment/development/manida-dev.apk
+      - run: mkdir -p .test-environment/development && cp androidApp/build/outputs/apk/development/androidApp-development.apk .test-environment/development/nevumi-dev.apk
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: development-android
@@ -51,11 +51,11 @@ jobs:
     needs: acceptance
     runs-on: ubuntu-24.04
     env:
-      MANIDA_NATIVE_BUILD_TYPE: RelWithDebInfo
+      NEVUMI_NATIVE_BUILD_TYPE: RelWithDebInfo
       LD_LIBRARY_PATH: ${{ github.workspace }}/.test-environment/mpv-runtime/lib
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: |
@@ -69,24 +69,24 @@ jobs:
         run: |
           version=$(sed -n 's/^appVersion=//p' gradle.properties)
           docker compose -f scripts/compose.yaml run --rm -T -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \
-            -e "MANIDA_BUILD_UID=$(id -u)" -e "MANIDA_VERSION=$version" -e GITHUB_RUN_NUMBER -e GITHUB_RUN_ID \
+            -e "NEVUMI_BUILD_UID=$(id -u)" -e "NEVUMI_VERSION=$version" -e GITHUB_RUN_NUMBER -e GITHUB_RUN_ID \
             arch \
             bash -euc 'pacman -Syu --noconfirm base-devel python
-              useradd --uid "$MANIDA_BUILD_UID" --create-home builder
-              runuser -u builder -- python3 scripts/package-linux.py --image desktopApp/build/compose/binaries/main/app/manida \
-                --output .test-environment/development --version "$MANIDA_VERSION" --pkgrel "0.$GITHUB_RUN_NUMBER" --release-tag "development-$GITHUB_RUN_ID"'
+              useradd --uid "$NEVUMI_BUILD_UID" --create-home builder
+              runuser -u builder -- python3 scripts/package-linux.py --image desktopApp/build/compose/binaries/main/app/nevumi \
+                --output .test-environment/development --version "$NEVUMI_VERSION" --pkgrel "0.$GITHUB_RUN_NUMBER" --release-tag "development-$GITHUB_RUN_ID"'
       - name: Create the AppImage
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version=$(sed -n 's/^appVersion=//p' gradle.properties)
-          python3 scripts/package-appimage.py --image desktopApp/build/compose/binaries/main/app/manida \
+          python3 scripts/package-appimage.py --image desktopApp/build/compose/binaries/main/app/nevumi \
             --output .test-environment/development --version "$version-dev-${GITHUB_SHA:0:12}" \
             --mpv-library .test-environment/mpv-runtime/lib/libmpv.so.2
       - name: Check the AppImage without FUSE
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
-        run: MANIDA_TEST_APP="$(find "$GITHUB_WORKSPACE/.test-environment/development" -name '*.AppImage' -print -quit)" python3 scripts/test-linux-player.py LinuxPlayerTest.test_packaged_player_registers_desktop_media_controls
+        run: NEVUMI_TEST_APP="$(find "$GITHUB_WORKSPACE/.test-environment/development" -name '*.AppImage' -print -quit)" python3 scripts/test-linux-player.py LinuxPlayerTest.test_packaged_player_registers_desktop_media_controls
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: development-linux
@@ -112,7 +112,7 @@ jobs:
         run: |
           set -euo pipefail
           cd development
-          printf 'Development build from commit %s. Android installs as Manida dev. Linux packages replace Manida.\n' "$GITHUB_SHA" > notes.txt
+          printf 'Development build from commit %s. Android installs as Nevumi dev. Linux packages replace Nevumi.\n' "$GITHUB_SHA" > notes.txt
           tag="development-$GITHUB_RUN_ID"
           assets=(./*.apk ./*.pkg.tar.zst ./*.AppImage)
           if draft=$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null); then
@@ -123,7 +123,7 @@ jobs:
             fi
           else
             gh release create "$tag" --draft --prerelease --target "$GITHUB_SHA" \
-              --title "Manida development ${GITHUB_SHA:0:12}" --notes-file notes.txt
+              --title "Nevumi development ${GITHUB_SHA:0:12}" --notes-file notes.txt
           fi
           gh release upload "$tag" --clobber "${assets[@]}"
           gh release edit "$tag" --draft=false

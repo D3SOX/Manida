@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sign and install the release on an owned Manida emulator with its lab locks held."""
+"""Sign and install the release on an owned Nevumi emulator with its lab locks held."""
 import os
 from pathlib import Path
 import re
@@ -13,14 +13,14 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 APK = ROOT / "androidApp/build/outputs/apk/release/androidApp-release-unsigned.apk"
-APP = "me.d3sox.manida"
+APP = "me.d3sox.nevumi"
 SDK = Path(os.environ.get("ANDROID_HOME", "/home/nico/Android/Sdk"))
 JAVA = Path(os.environ.get("JAVA_HOME", "/usr/lib/jvm/java-21-openjdk")) / "bin"
 
 
 class AndroidPackageTest(unittest.TestCase):
     def test_signed_release_installs_and_includes_the_offline_license(self):
-        serial = os.environ["MANIDA_TEST_SERIAL"]
+        serial = os.environ["NEVUMI_TEST_SERIAL"]
         self.assertRegex(serial, r"^emulator-[0-9]{4}$")
         allowed_ports = range(5560, 5684, 2)
         if os.environ.get("GITHUB_ACTIONS") == "true": allowed_ports = [5554, *allowed_ports]
@@ -30,21 +30,21 @@ class AndroidPackageTest(unittest.TestCase):
                                     capture_output=True, text=True, timeout=60)
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
             return result.stdout
-        self.assertIn("manida_", adb("emu", "avd", "name"))
+        self.assertIn("nevumi_", adb("emu", "avd", "name"))
         self.assertEqual("0", adb("shell", "am", "get-current-user").strip())
         self.assertTrue(APK.is_file(), "Run :androidApp:assembleRelease first")
-        with tempfile.TemporaryDirectory(prefix="manida-android-package-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="nevumi-android-package-") as temporary:
             directory = Path(temporary)
             keys = directory / "test.jks"
             subprocess.run([str(JAVA / "keytool"), "-genkeypair", "-noprompt", "-keystore", str(keys),
-                            "-alias", "manida-test", "-storepass", "test-password", "-keypass", "test-password",
+                            "-alias", "nevumi-test", "-storepass", "test-password", "-keypass", "test-password",
                             "-keyalg", "RSA", "-keysize", "3072", "-validity", "1",
-                            "-dname", "CN=Manida installation test"], check=True, capture_output=True, timeout=30)
-            signed = directory / "manida.apk"
+                            "-dname", "CN=Nevumi installation test"], check=True, capture_output=True, timeout=30)
+            signed = directory / "nevumi.apk"
             result = subprocess.run(
                 ["python", str(ROOT / "scripts/sign-android.py"), "--input", str(APK), "--output", str(signed),
-                 "--keystore", str(keys), "--alias", "manida-test"],
-                env=dict(os.environ, MANIDA_ANDROID_KEYSTORE_PASSWORD="test-password"),
+                 "--keystore", str(keys), "--alias", "nevumi-test"],
+                env=dict(os.environ, NEVUMI_ANDROID_KEYSTORE_PASSWORD="test-password"),
                 capture_output=True, text=True, timeout=45,
             )
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
@@ -60,17 +60,17 @@ class AndroidPackageTest(unittest.TestCase):
                 self.assertRegex(package, r"(?m)^\s*flags=\[ (?![^\n]*DEBUGGABLE)")
                 adb("shell", "am", "start", "-W", "--user", "0", "-n", APP + "/.MainActivity")
                 def tree():
-                    adb("shell", "uiautomator", "dump", "/data/local/tmp/manida-package-ui.xml")
-                    return ET.fromstring(adb("shell", "cat", "/data/local/tmp/manida-package-ui.xml"))
+                    adb("shell", "uiautomator", "dump", "/data/local/tmp/nevumi-package-ui.xml")
+                    return ET.fromstring(adb("shell", "cat", "/data/local/tmp/nevumi-package-ui.xml"))
                 def click(label, last=False):
                     deadline = time.monotonic() + 15
                     while time.monotonic() < deadline:
                         root = tree()
                         # Answer permission prompts, and "isn't responding" dialogs that slow emulators show for system apps.
-                        # Manida's own dialog is a failure, not something to wait out.
+                        # Nevumi's own dialog is a failure, not something to wait out.
                         title = next((n.get("text", "") for n in root.iter("node") if n.get("resource-id") == "android:id/alertTitle"), "")
-                        if "Manida" in title:
-                            self.fail("Manida stopped responding: " + title)
+                        if "Nevumi" in title:
+                            self.fail("Nevumi stopped responding: " + title)
                         dialog = next((n for n in root.iter("node") if n.get("resource-id", "").endswith(":id/permission_deny_button")
                                        or n.get("resource-id") == "android:id/aerr_wait"), None)
                         if dialog is not None:
@@ -88,7 +88,7 @@ class AndroidPackageTest(unittest.TestCase):
                             x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds")))
                             adb("shell", "input", "tap", str((x1+x2)//2), str((y1+y2)//2))
                             return
-                        if label in ["About Manida", "Paired devices"]:
+                        if label in ["About Nevumi", "Paired devices"]:
                             size = adb("shell", "wm", "size").strip().split(":")[-1].strip()
                             width, height = map(int, size.split("x"))
                             adb("shell", "input", "swipe", str(width//2), str(height*3//4),
@@ -97,7 +97,7 @@ class AndroidPackageTest(unittest.TestCase):
                     crashes = adb("logcat", "-d", "-b", "crash")
                     self.fail("Could not select " + label + ": " + ET.tostring(root, encoding="unicode") + "\nCrash log:\n" + crashes)
                 click("Settings")
-                click("About Manida")
+                click("About Nevumi")
                 click("View license")
                 self.assertIn("GNU AFFERO GENERAL PUBLIC LICENSE", ET.tostring(tree(), encoding="unicode"))
                 # Back presses can land before the previous page settles, so restart on the library instead.
@@ -112,7 +112,7 @@ class AndroidPackageTest(unittest.TestCase):
                     pairing_tree = tree()
                     pairing_xml = ET.tostring(pairing_tree, encoding="unicode")
                     qr_visible = qr_visible or "Pairing QR code" in pairing_xml
-                    if "manida://pair/" in pairing_xml and qr_visible:
+                    if "nevumi://pair/" in pairing_xml and qr_visible:
                         break
                     size = adb("shell", "wm", "size").strip().split(":")[-1].strip()
                     width, height = map(int, size.split("x"))
@@ -126,10 +126,10 @@ class AndroidPackageTest(unittest.TestCase):
                 fixture = directory / "native.flac"
                 subprocess.run(["ffmpeg", "-v", "error", "-stream_loop", "19", "-i",
                                 str(ROOT / "androidApp/src/androidTest/assets/fixture.wav"), "-t", "60",
-                                "-metadata", "title=Native package fixture", "-metadata", "artist=Manida",
+                                "-metadata", "title=Native package fixture", "-metadata", "artist=Nevumi",
                                 "-c:a", "flac", str(fixture)], check=True, timeout=30)
-                remote = "/sdcard/Music/ManidaPackageChecks/native.flac"
-                adb("shell", "mkdir", "-p", "/sdcard/Music/ManidaPackageChecks")
+                remote = "/sdcard/Music/NevumiPackageChecks/native.flac"
+                adb("shell", "mkdir", "-p", "/sdcard/Music/NevumiPackageChecks")
                 adb("push", str(fixture), remote)
                 # Current Android ignores the old scan-file broadcast, so index the volume and wait for the file.
                 adb("shell", "content", "call", "--uri", "content://media", "--method", "scan_volume", "--arg", "external_primary")
@@ -149,7 +149,7 @@ class AndroidPackageTest(unittest.TestCase):
                 deadline = time.monotonic() + 30
                 while "Scan complete" not in ET.tostring(tree(), encoding="unicode"):
                     if time.monotonic() > deadline:
-                        self.fail("Manida did not finish scanning the device's music")
+                        self.fail("Nevumi did not finish scanning the device's music")
                     time.sleep(0.5)
                 for _ in range(2): adb("shell", "input", "keyevent", "4")
                 click("Songs"); click("Native package fixture"); click("Native package fixture", last=True)
@@ -157,8 +157,8 @@ class AndroidPackageTest(unittest.TestCase):
                 deadline = time.monotonic() + 15
                 screenshot = directory / "milkdrop.png"
                 while time.monotonic() < deadline:
-                    adb("shell", "screencap", "-p", "/data/local/tmp/manida-package-milkdrop.png")
-                    adb("pull", "/data/local/tmp/manida-package-milkdrop.png", str(screenshot))
+                    adb("shell", "screencap", "-p", "/data/local/tmp/nevumi-package-milkdrop.png")
+                    adb("pull", "/data/local/tmp/nevumi-package-milkdrop.png", str(screenshot))
                     with Image.open(screenshot) as pixels:
                         region = pixels.convert("RGB").crop((pixels.width // 8, pixels.height // 4,
                                                              pixels.width * 7 // 8, pixels.height * 2 // 3))
@@ -172,8 +172,8 @@ class AndroidPackageTest(unittest.TestCase):
                 shutil.copyfile(screenshot, output)
                 click("Close visualizer")
             finally:
-                adb("shell", "rm", "-f", "/data/local/tmp/manida-package-ui.xml")
-                adb("shell", "rm", "-f", "/data/local/tmp/manida-package-milkdrop.png", "/sdcard/Music/ManidaPackageChecks/native.flac")
+                adb("shell", "rm", "-f", "/data/local/tmp/nevumi-package-ui.xml")
+                adb("shell", "rm", "-f", "/data/local/tmp/nevumi-package-milkdrop.png", "/sdcard/Music/NevumiPackageChecks/native.flac")
                 adb("shell", "am", "force-stop", APP)
                 adb("uninstall", APP)
 

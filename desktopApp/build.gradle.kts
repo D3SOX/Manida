@@ -21,7 +21,7 @@ val visualizerResources = tasks.register<Sync>("visualizerResources") {
 tasks.matching { it.name == "prepareAppResources" || it.name == "createDistributable" || it.name == "run" }.configureEach { dependsOn(visualizerResources) }
 compose.desktop {
     application {
-        mainClass = "io.github.d3sox.musicplayer.desktop.MainKt"
+        mainClass = "me.d3sox.nevumi.desktop.MainKt"
         // The JDK 21 native launcher aborts during library shutdown on current Arch.
         javaHome = javaToolchains.launcherFor {
             languageVersion.set(JavaLanguageVersion.of(25))
@@ -30,9 +30,9 @@ compose.desktop {
         nativeDistributions {
             appResourcesRootDir.set(layout.buildDirectory.dir("visualizer-resources"))
             targetFormats(TargetFormat.Deb)
-            packageName = "manida"
+            packageName = "nevumi"
             packageVersion = providers.gradleProperty("appVersion").get()
-            linux { iconFile.set(rootProject.file("packaging/manida.png")) }
+            linux { iconFile.set(rootProject.file("packaging/nevumi.png")) }
             modules("java.sql", "java.net.http", "jdk.unsupported", "jdk.security.auth")
         }
     }

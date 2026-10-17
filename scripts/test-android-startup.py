@@ -6,9 +6,9 @@ import re
 import shutil
 import subprocess
 
-APP = "me.d3sox.manida"
+APP = "me.d3sox.nevumi"
 ROOT = Path(__file__).resolve().parent.parent
-SERIAL = os.environ["MANIDA_TEST_SERIAL"]
+SERIAL = os.environ["NEVUMI_TEST_SERIAL"]
 if not re.fullmatch(r"emulator-[0-9]{4}", SERIAL):
     raise SystemExit("This check clears synthetic data and requires an owned emulator")
 ADB = str(Path(os.environ["ANDROID_HOME"]) / "platform-tools/adb") if os.environ.get("ANDROID_HOME") else shutil.which("adb")
@@ -21,8 +21,8 @@ def adb(*arguments, timeout=60):
     return result.stdout
 
 
-if os.environ.get("GITHUB_ACTIONS") != "true" and not adb("emu", "avd", "name").startswith("manida_"):
-    raise SystemExit("Use a dedicated Manida test emulator")
+if os.environ.get("GITHUB_ACTIONS") != "true" and not adb("emu", "avd", "name").startswith("nevumi_"):
+    raise SystemExit("Use a dedicated Nevumi test emulator")
 assert adb("shell", "am", "get-current-user").strip() == "0"
 # The connected-test runner removes its installed APKs when it finishes.
 for apk in ["androidApp/build/outputs/apk/debug/androidApp-debug.apk",
@@ -35,7 +35,7 @@ adb("shell", "pm", "grant", APP, permission)
 try:
     for method in ["seedCachedLibraryAndQueueForColdRestart", "coldOpenShowsTheCachedArtistsPageWithoutASongsFrame"]:
         result = adb("shell", "am", "instrument", "--user", "0", "-w", "-r", "-e", "class",
-                     "me.d3sox.manida.AndroidStartupTest#" + method,
+                     "me.d3sox.nevumi.AndroidStartupTest#" + method,
                      APP + ".test/androidx.test.runner.AndroidJUnitRunner", timeout=300)
         if not re.search(r"OK\s*\(1 test\)", result):
             raise RuntimeError(result)
