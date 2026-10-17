@@ -27,6 +27,10 @@ import io.github.d3sox.musicplayer.library.recentAt
 import io.github.d3sox.musicplayer.playlists.Playlist
 import io.github.d3sox.musicplayer.playlists.PlaylistImport
 import io.github.d3sox.musicplayer.playlists.folder
+import io.github.d3sox.musicplayer.playlists.folderPath
+import io.github.d3sox.musicplayer.playlists.folderSegments
+import io.github.d3sox.musicplayer.playlists.isInFolder
+import io.github.d3sox.musicplayer.playlists.parentFolder
 import io.github.d3sox.musicplayer.playlists.title
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
@@ -59,27 +63,31 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
     val scope = rememberCoroutineScope()
     val playlist = state.playlists.firstOrNull { it.id == selected }
     val recentAt = remember(state.tracks) { state.tracks.associate { it.id to it.recentAt } }
-    val openFolder = folder?.takeIf { name -> state.playlists.any { it.folder == name } }
+    // A folder disappears once its last playlist moves out, so fall back to the closest folder that still exists.
+    val openFolder = generateSequence(folder, ::parentFolder).firstOrNull { name -> state.playlists.any { isInFolder(it.folder, name) } }
     fun collections(page: String?) = state.playlists.filter { it.folder == page }.map { collection ->
         CollectionItem(collection.id, collection.title,
             "${countLabel(collection.trackIds.size, "song")}${if (collection.rule != null) " · Smart playlist" else ""}${if (collection.autoDownload) " · Automatic downloads" else ""}",
             collection.artworkPath(state), AppIcon.QUEUE,
             songCount = collection.trackIds.size, recentAt = collection.trackIds.maxOfOrNull { recentAt[it] ?: 0 } ?: 0,
             trackIds = collection.trackIds)
-    } + if (page != null) emptyList() else state.playlists.groupBy { it.folder }.mapNotNull { (name, contents) ->
-        name?.let {
-            val trackIds = contents.flatMap(Playlist::trackIds).distinct()
-            CollectionItem(FOLDER_PREFIX + name, name, countLabel(contents.size, "playlist"), null, AppIcon.FOLDER,
-                songCount = trackIds.size, recentAt = trackIds.maxOfOrNull { recentAt[it] ?: 0 } ?: 0, trackIds = trackIds)
-        }
+    } + state.playlists.mapNotNull { playlist ->
+        // Group everything below this page by the subfolder it sits in.
+        val path = playlist.folder?.takeIf { it != page && (page == null || isInFolder(it, page)) } ?: return@mapNotNull null
+        folderPath(folderSegments(path).take((page?.let(::folderSegments)?.size ?: 0) + 1)) to playlist
+    }.groupBy({ it.first }, { it.second }).map { (name, contents) ->
+        val trackIds = contents.flatMap(Playlist::trackIds).distinct()
+        CollectionItem(FOLDER_PREFIX + name, folderSegments(name).last(), countLabel(contents.size, "playlist"), null, AppIcon.FOLDER,
+            songCount = trackIds.size, recentAt = trackIds.maxOfOrNull { recentAt[it] ?: 0 } ?: 0, trackIds = trackIds)
     }
+    fun open(id: String) { if (id.startsWith(FOLDER_PREFIX)) folder = id.removePrefix(FOLDER_PREFIX) else selected = id }
     if (rearranging && backEnabled && selected == null) PlatformBackHandler(finishRearranging)
     val current = selected ?: openFolder?.let { FOLDER_PREFIX + it }
     AnimatedNavigation(current, null, canGoBack = backEnabled && current != null,
-        onBack = { if (selected != null) selected = null else folder = null }, depth = { page -> when {
+        onBack = { if (selected != null) selected = null else folder = openFolder?.let(::parentFolder) }, depth = { page -> when {
             page == null -> 0
-            page.startsWith(FOLDER_PREFIX) -> 1
-            else -> if (state.playlists.firstOrNull { it.id == page }?.folder == null) 1 else 2
+            page.startsWith(FOLDER_PREFIX) -> folderSegments(page.removePrefix(FOLDER_PREFIX)).size
+            else -> 1 + (state.playlists.firstOrNull { it.id == page }?.folder?.let(::folderSegments)?.size ?: 0)
         } }) { page ->
     val playlist = state.playlists.firstOrNull { it.id == page }
     val pageFolder = page?.takeIf { playlist == null && it.startsWith(FOLDER_PREFIX) }?.removePrefix(FOLDER_PREFIX)
@@ -88,13 +96,13 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
         fileMessage?.let { Text(it, Modifier.padding(horizontal = 24.dp)) }
         if (pageFolder != null) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                AppIconButton(AppIcon.BACK, "Back") { folder = null }
+                AppIconButton(AppIcon.BACK, "Back") { folder = parentFolder(pageFolder) }
                 Text(pageFolder, style = MaterialTheme.typography.titleLarge)
             }
             val entries = remember(state.playlists, state.artwork, recentAt, pageFolder) { collections(pageFolder) }
             CompositionLocalProvider(LocalLibraryScrollKey provides "${LocalLibraryScrollKey.current}:folder:$pageFolder") {
                 CollectionBrowser(entries, io.github.d3sox.musicplayer.library.LibraryTab.PLAYLISTS, state, controller, Modifier.weight(1f),
-                    rearranging = rearranging, finishRearranging = finishRearranging) { selected = it }
+                    rearranging = rearranging, finishRearranging = finishRearranging, open = ::open)
             }
         } else if (playlist == null) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -112,9 +120,7 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
             }
             val entries = remember(state.playlists, state.artwork, recentAt) { collections(null) }
             CollectionBrowser(entries, io.github.d3sox.musicplayer.library.LibraryTab.PLAYLISTS, state, controller, Modifier.weight(1f), total = state.playlists.size,
-                rearranging = rearranging, finishRearranging = finishRearranging) {
-                if (it.startsWith(FOLDER_PREFIX)) folder = it.removePrefix(FOLDER_PREFIX) else selected = it
-            }
+                rearranging = rearranging, finishRearranging = finishRearranging, open = ::open)
         } else {
             val catalog = remember(state.tracks) { state.tracks.associateBy { it.id } }
             val ordered = remember(playlist, catalog) { playlist.orderedTracks(catalog) }

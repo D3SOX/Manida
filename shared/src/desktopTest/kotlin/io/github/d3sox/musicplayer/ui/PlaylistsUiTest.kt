@@ -487,7 +487,7 @@ class PlaylistsUiTest {
         val library = MusicLibrary(store)
         val playlists = Playlists(store)
         val preferences = io.github.d3sox.musicplayer.settings.MusicPreferences(store)
-        val (morning, night) = runBlocking { listOf("Road ▸ Morning", "Road▸Night", "AC/DC").map { playlists.create(it, emptyList()).id } }
+        val (morning, night) = runBlocking { listOf("Road ▸ Morning", "Road▸Night", "AC/DC", "Road ▸ Coast ▸ Dawn").map { playlists.create(it, emptyList()).id } }
         val controller = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"), preferences = preferences, playlists = playlists)
         try {
             runComposeUiTest {
@@ -495,24 +495,49 @@ class PlaylistsUiTest {
                 waitUntil(timeoutMillis = 3_000) { controller.state.value.libraryReady }
                 openLibraryPage("Playlists")
                 onNodeWithText("AC/DC").assertIsDisplayed()
-                onNodeWithText("3 playlists").assertIsDisplayed()
+                onNodeWithText("4 playlists").assertIsDisplayed()
                 onNodeWithText("Road").assertIsDisplayed()
                 onNodeWithText("Morning").assertDoesNotExist()
                 onNodeWithText("Road").performClick()
                 onNodeWithText("AC/DC").assertDoesNotExist()
                 onNodeWithText("Night").assertIsDisplayed()
+                onNodeWithText("Dawn").assertDoesNotExist()
+                onNodeWithText("Coast").performClick()
+                onNodeWithText("Dawn").performClick()
+                onNodeWithText("Playlist in Road ▸ Coast · 0 songs").assertIsDisplayed()
+                onNodeWithContentDescription("Playlist options").performClick()
+                onNodeWithText("Edit playlist").performClick()
+                onNodeWithContentDescription("Playlist folder").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Road ▸ Coast"))
+                onNodeWithContentDescription("Playlist folder").performClick()
+                onNodeWithText("New folder").performClick()
+                onNodeWithText("Inside Road ▸ Coast").assertIsDisplayed()
+                onNodeWithText("Folder name").performTextInput("Cliffs")
+                onNodeWithText("Create").performClick()
+                onNodeWithText("Save").performClick()
+                waitUntil(timeoutMillis = 3_000) { controller.state.value.playlists.any { it.name == "Road ▸ Coast ▸ Cliffs ▸ Dawn" } }
+                onNodeWithContentDescription("Back").performClick()
+                onNodeWithText("Cliffs").assertIsDisplayed()
+                onNodeWithContentDescription("Back").performClick()
+                onNodeWithText("Coast").assertIsDisplayed()
                 onNodeWithContentDescription("Collection order").performClick()
                 onNodeWithText("Rearrange").performClick()
                 onNodeWithTag("collection-reorder:$night", useUnmergedTree = true).performCustomAccessibilityActionWithLabel("Move up")
                 waitUntil(timeoutMillis = 3_000) {
-                    controller.state.value.preferences.collectionLayouts[LibraryTab.PLAYLISTS]?.order?.take(2) == listOf(night, morning)
+                    controller.state.value.preferences.collectionLayouts[LibraryTab.PLAYLISTS]?.order?.let { it.indexOf(night) in 0 until it.indexOf(morning) } == true
                 }
                 onNodeWithContentDescription("Finish rearranging").performClick()
                 onNodeWithText("Morning").performClick()
                 onNodeWithText("Playlist in Road · 0 songs").assertIsDisplayed()
                 onNodeWithContentDescription("Playlist options").performClick()
                 onNodeWithText("Edit playlist").performClick()
-                onNodeWithContentDescription("Playlist folder").performTextReplacement("Trips")
+                onNodeWithContentDescription("Playlist folder").performClick()
+                onNodeWithText("Road ▸ Coast ▸ Cliffs").assertIsDisplayed()
+                onNodeWithText("No folder").performClick()
+                onNodeWithContentDescription("Playlist folder").performClick()
+                onNodeWithText("New folder").performClick()
+                onNodeWithText("Inside", substring = true).assertDoesNotExist()
+                onNodeWithText("Folder name").performTextInput("Trips")
+                onNodeWithText("Create").performClick()
                 onNodeWithText("Save").performClick()
                 waitUntil(timeoutMillis = 3_000) { controller.state.value.playlists.single { it.id == morning }.name == "Trips ▸ Morning" }
                 onNodeWithContentDescription("Back").performClick()

@@ -24,12 +24,15 @@ import io.github.d3sox.musicplayer.library.Track
 import io.github.d3sox.musicplayer.library.recentAt
 import kotlin.random.Random
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import com.materialkolor.ktx.themeColor
 import io.github.d3sox.musicplayer.app.AppState
 import io.github.d3sox.musicplayer.app.MusicController
 import io.github.d3sox.musicplayer.playlists.Playlist
 import io.github.d3sox.musicplayer.playlists.PLAYLIST_FOLDER_SEPARATOR
 import io.github.d3sox.musicplayer.playlists.folder
+import io.github.d3sox.musicplayer.playlists.folderPath
+import io.github.d3sox.musicplayer.playlists.folderSegments
 import io.github.d3sox.musicplayer.playlists.playlistName
 import io.github.d3sox.musicplayer.playlists.title
 import kotlinx.coroutines.Dispatchers
@@ -139,7 +142,7 @@ internal fun PlaylistHero(playlist: Playlist, state: AppState, controller: Music
 @Composable
 internal fun EditPlaylistDialog(playlist: Playlist, state: AppState, controller: MusicController, dismiss: () -> Unit) {
     var name by remember(playlist.id) { mutableStateOf(playlist.title) }
-    var folder by remember(playlist.id) { mutableStateOf(playlist.folder.orEmpty()) }
+    var folder by remember(playlist.id) { mutableStateOf(playlist.folder) }
     var description by remember(playlist.id) { mutableStateOf(playlist.description) }
     var cover by remember { mutableStateOf<ByteArray?>(null) }
     var removeCover by remember { mutableStateOf(false) }
@@ -172,14 +175,54 @@ internal fun EditPlaylistDialog(playlist: Playlist, state: AppState, controller:
             pickerError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             OutlinedTextField(name, { name = it }, label = { Text("Title") }, singleLine = true,
                 modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Playlist title" })
-            OutlinedTextField(folder, { folder = it.filter { c -> c != PLAYLIST_FOLDER_SEPARATOR } }, label = { Text("Folder") }, singleLine = true,
-                                modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Playlist folder" })
+            PlaylistFolderPicker(state, folder) { folder = it }
             OutlinedTextField(description, { description = it }, label = { Text("Description") }, minLines = 2, maxLines = 4,
                 modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Playlist description" })
         }
-    }, confirmButton = { Button(onClick = { controller.editPlaylist(playlist.id, playlistName(folder, name), description, cover, removeCover); dismiss() },
+    }, confirmButton = { Button(onClick = { controller.editPlaylist(playlist.id, playlistName(folder?.let(::folderSegments).orEmpty(), name), description, cover, removeCover); dismiss() },
         enabled = name.isNotBlank() && !picking) { Icon(AppIcon.CHECK.vector, null); Spacer(Modifier.width(8.dp)); Text("Save") } },
         dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } })
+}
+
+@Composable
+private fun PlaylistFolderPicker(state: AppState, folder: String?, choose: (String?) -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    var creating by remember { mutableStateOf(false) }
+    // Offer every existing folder and its parents, plus a new folder that has no playlists yet.
+    val folders = remember(state.playlists, folder) {
+        (state.playlists.mapNotNull { it.folder } + listOfNotNull(folder)).flatMap { path ->
+            folderSegments(path).let { segments -> segments.indices.map { folderPath(segments.take(it + 1)) } }
+        }.distinct().sortedBy { it.lowercase() }
+    }
+    Box {
+        OutlinedButton(onClick = { menu = true }, modifier = Modifier.fillMaxWidth().semantics {
+            contentDescription = "Playlist folder"; stateDescription = folder ?: "No folder"
+        }) {
+            Icon(AppIcon.FOLDER.vector, null); Spacer(Modifier.width(8.dp))
+            Text(folder ?: "No folder", Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        DropdownMenu(menu, { menu = false }) {
+            (listOf(null) + folders).forEach { option ->
+                AppMenuItem({ Text(option ?: "No folder") }, { choose(option); menu = false },
+                    leadingIcon = { Icon((if (option == null) AppIcon.CLOSE else AppIcon.FOLDER).vector, null) },
+                    trailingIcon = if (option == folder) ({ Icon(AppIcon.CHECK.vector, null) }) else null)
+            }
+            HorizontalDivider()
+            AppMenuItem({ Text("New folder") }, { menu = false; creating = true }, leadingIcon = { Icon(AppIcon.PLUS.vector, null) })
+        }
+    }
+    if (creating) {
+        var name by remember { mutableStateOf("") }
+        AlertDialog(onDismissRequest = { creating = false }, title = { Text("New folder") }, text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (folder != null) Text("Inside $folder")
+                OutlinedTextField(name, { name = it.filter { c -> c != PLAYLIST_FOLDER_SEPARATOR } }, label = { Text("Folder name") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
+            }
+        }, confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = {
+            choose(folderPath(folder?.let(::folderSegments).orEmpty() + name.trim())); creating = false
+        }) { Text("Create") } }, dismissButton = { TextButton(onClick = { creating = false }) { Text("Cancel") } })
+    }
 }
 
 internal fun PlaylistSort.label() = when (this) {

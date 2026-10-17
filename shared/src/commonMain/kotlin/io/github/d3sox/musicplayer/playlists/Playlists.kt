@@ -38,11 +38,16 @@ data class Playlist(val id: String, val name: String, val trackIds: List<String>
 // Navidrome has no playlist folders, so names like "Folder ▸ Playlist" group playlists. Keyboards cannot type the
 // separator, so existing names with slashes or other punctuation are left alone.
 const val PLAYLIST_FOLDER_SEPARATOR = '▸'
-private fun Playlist.folderSplit() = name.indexOf(PLAYLIST_FOLDER_SEPARATOR).takeIf { it >= 0 }
-    ?.let { name.substring(0, it).trim() to name.substring(it + 1).trim() }?.takeIf { (folder, title) -> folder.isNotEmpty() && title.isNotEmpty() }
-val Playlist.folder: String? get() = folderSplit()?.first
-val Playlist.title: String get() = folderSplit()?.second ?: name
-fun playlistName(folder: String, title: String) = if (folder.isBlank()) title.trim() else "${folder.trim()} $PLAYLIST_FOLDER_SEPARATOR ${title.trim()}"
+private const val FOLDER_JOINER = " $PLAYLIST_FOLDER_SEPARATOR "
+private fun Playlist.segments() = name.split(PLAYLIST_FOLDER_SEPARATOR).map(String::trim).takeIf { it.size > 1 && it.none(String::isEmpty) }
+/** The folder path, such as "Music ▸ Road", or null when the playlist is not in a folder. */
+val Playlist.folder: String? get() = segments()?.dropLast(1)?.let(::folderPath)
+val Playlist.title: String get() = segments()?.last() ?: name
+fun playlistName(folders: List<String>, title: String) = folderPath(folders.map(String::trim).filter(String::isNotEmpty) + title.trim())
+fun folderPath(segments: List<String>) = segments.joinToString(FOLDER_JOINER)
+fun folderSegments(folder: String) = folder.split(FOLDER_JOINER)
+fun parentFolder(folder: String) = folder.substringBeforeLast(FOLDER_JOINER, "").ifEmpty { null }
+fun isInFolder(playlistFolder: String?, folder: String) = playlistFolder == folder || playlistFolder?.startsWith(folder + FOLDER_JOINER) == true
 
 @Serializable
 internal data class PlaylistRemoval(val playlist: Playlist, val revision: String = Uuid.random().toString())
