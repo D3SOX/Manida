@@ -28,7 +28,8 @@ internal fun SettingsSearch(query: String, onQuery: (String) -> Unit, back: () -
                 "Colors" to "system artwork material you dynamic")
             listOf("On launch" to "startup start page last opened",
                 "Swipe right" to "gesture play next after favorite rate none", "Swipe left" to "gesture add queue none",
-                "Quick action" to "song list button favorite rate playlist play next after none").forEach { (title, keywords) ->
+                "Quick action" to "song list button favorite rate playlist play next after none",
+                "Show options buttons" to "three dots more menu overflow long press hold hide").forEach { (title, keywords) ->
                 add(SettingResult(title, "Library & gestures", settingsIcon(title), keywords))
             }
             add(SettingResult("Customize Home", "Library & gestures", AppIcon.HOME, "reorder home sections", "Customize Home"))

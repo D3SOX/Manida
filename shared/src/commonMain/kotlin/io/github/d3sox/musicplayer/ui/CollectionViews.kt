@@ -148,7 +148,7 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
                     headlineContent = { Text(entry.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                     leadingContent = { CollectionArtwork(entry.artwork, entry.title, entry.icon, Modifier.size(48.dp)) },
                     supportingContent = { Text(entry.subtitle, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-                    trailingContent = { AppIconButton(AppIcon.MORE, "${tab.label.removeSuffix("s")} options: ${entry.title}", onClick = menu) })
+                    trailingContent = { if (state.preferences.showMoreButtons) AppIconButton(AppIcon.MORE, "${tab.label.removeSuffix("s")} options: ${entry.title}", onClick = menu) })
                 }
             }
         } else LazyVerticalGrid(gridCells, Modifier.fillMaxSize(), state = gridScroll,
@@ -161,7 +161,7 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
                         CollectionArtwork(entry.artwork, entry.title, entry.icon, Modifier.fillMaxWidth().aspectRatio(1f))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(entry.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            AppIconButton(AppIcon.MORE, "${tab.label.removeSuffix("s")} options: ${entry.title}", onClick = menu)
+                            if (state.preferences.showMoreButtons) AppIconButton(AppIcon.MORE, "${tab.label.removeSuffix("s")} options: ${entry.title}", onClick = menu)
                         }
                         Text(entry.subtitle, style = MaterialTheme.typography.bodySmall, maxLines = 2,
                             overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)

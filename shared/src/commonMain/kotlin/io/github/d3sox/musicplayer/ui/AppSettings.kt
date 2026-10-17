@@ -139,6 +139,9 @@ internal fun AppSettings(state: AppState, controller: MusicController, server: (
             SettingChoice("Quick action", settings.quickAction, trackActions) { action ->
                 controller.updatePreferences { it.copy(quickAction = action) }
             }
+            SettingsToggle("Show options buttons", AppIcon.MORE, "Show ⋮ on songs and collections. Long press opens the same menu.", settings.showMoreButtons) {
+                enabled -> controller.updatePreferences { it.copy(showMoreButtons = enabled) }
+            }
                 SettingsLink("Customize Home", AppIcon.HOME, "Reorder sections on your Home page") { customizeHome = true }
                 SettingsLink("Library tabs", AppIcon.TABS, "Choose and reorder library pages") { libraryTabs = true }
                         }

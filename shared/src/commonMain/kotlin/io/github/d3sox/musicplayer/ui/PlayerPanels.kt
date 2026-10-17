@@ -513,7 +513,7 @@ internal fun PlayerPanels(state: AppState, controller: MusicController, sheet: A
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     if (track != null && track.metadata.durationMs > 0) Text(playbackTime(track.metadata.durationMs),
                                         style = MaterialTheme.typography.labelMedium, color = supporting)
-                                    if (openMenu != null) AppIconButton(AppIcon.MORE, "Track options: ${track?.metadata?.title}", onClick = openMenu)
+                                    if (openMenu != null && state.preferences.showMoreButtons) AppIconButton(AppIcon.MORE, "Track options: ${track?.metadata?.title}", onClick = openMenu)
                                 }
                             },
                                 colors = ListItemDefaults.colors(headlineColor = foreground, supportingColor = supporting,
