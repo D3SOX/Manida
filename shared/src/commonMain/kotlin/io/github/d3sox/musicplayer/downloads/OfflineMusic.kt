@@ -243,7 +243,7 @@ class OfflineMusic(private val store: MusicStore, private val library: MusicLibr
         downloads.enforceCacheBudget(preferences.load().cacheBytes, inUseTracks())
     }
 
-    // A song whose file is on the device needs no download; this also drops copies made before it was linked to that file.
+    // A song whose server file is on the device needs no download; this also drops copies made before it was linked to that file.
     private suspend fun dropDeviceFileDownloads() {
         val downloads = AudioDownloads(store, library, null, directory)
         val playing = inUseTracks()
@@ -259,7 +259,11 @@ class OfflineMusic(private val store: MusicStore, private val library: MusicLibr
         }
     }
 
-    private fun Track.onDevice() = sources.any { it.kind == SourceKind.LOCAL && it.available && sourceAccessible(it.location) }
+    // The device holds this song's server file when a readable local copy has the same byte size.
+    private fun Track.onDevice(): Boolean {
+        val sizes = sources.filter { it.kind == SourceKind.SERVER && it.indexedSize > 0 }.map { it.indexedSize }.toSet()
+        return sources.any { it.kind == SourceKind.LOCAL && it.indexedSize in sizes && it.available && sourceAccessible(it.location) }
+    }
 
     private suspend fun networkPermitted(): Boolean = network.value.let {
         it.connected && (!it.metered || preferences.load().downloadOnMetered)
