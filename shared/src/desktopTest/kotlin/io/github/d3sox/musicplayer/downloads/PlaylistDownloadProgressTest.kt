@@ -11,17 +11,17 @@ import kotlin.test.assertEquals
 class PlaylistDownloadProgressTest {
     @Test
     fun countsOfflineSongsAndTheActiveTransferOfAutomaticPlaylists() {
-        fun track(id: String, vararg kinds: SourceKind) = Track(id, TrackMetadata(id), kinds.map { TrackSource("$it:$id", it, id) })
+        fun track(id: String, vararg kinds: SourceKind) = Track(id, TrackMetadata(id), kinds.map { TrackSource(if (it == SourceKind.SERVER) "server:home:$id" else "$it:$id", it, id) })
         val tracks = listOf(track("done", SourceKind.SERVER), track("local", SourceKind.LOCAL), track("active", SourceKind.SERVER, SourceKind.LOCAL),
-            track("queued", SourceKind.SERVER), track("removed", SourceKind.SERVER), track("unreachable"),
-            Track("deleted", TrackMetadata("deleted"), listOf(TrackSource("server:deleted", SourceKind.SERVER, "deleted", available = false))))
+            track("queued", SourceKind.SERVER), track("removed", SourceKind.SERVER), track("unreachable"), Track("elsewhere", TrackMetadata("elsewhere"), listOf(TrackSource("server:other:elsewhere", SourceKind.SERVER, "elsewhere"))),
+            Track("deleted", TrackMetadata("deleted"), listOf(TrackSource("server:home:deleted", SourceKind.SERVER, "deleted", available = false))))
         val downloads = mapOf(
             "done" to DownloadRecord("done", DownloadStatus.COMPLETE),
             "active" to DownloadRecord("active", DownloadStatus.DOWNLOADING, bytesDownloaded = 50, sizeBytes = 100))
         val playlists = listOf(Playlist("auto", "Road trip", tracks.map { it.id }, autoDownload = true),
             Playlist("manual", "Ignored", tracks.map { it.id }))
 
-        val progress = playlistDownloadProgress(playlists, tracks, downloads, excluded = setOf("removed")).single()
+        val progress = playlistDownloadProgress(playlists, tracks, downloads, "home", excluded = setOf("removed")).single()
 
         assertEquals("Road trip", progress.playlist.name)
         assertEquals(2, progress.downloaded)

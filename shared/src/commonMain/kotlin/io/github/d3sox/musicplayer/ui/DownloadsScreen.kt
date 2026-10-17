@@ -19,7 +19,7 @@ import io.github.d3sox.musicplayer.downloads.playlistDownloadProgress
 internal fun DownloadsScreen(state: AppState, controller: MusicController, dismiss: () -> Unit) {
     val paused = state.preferences.downloadsPaused
     val waiting = state.downloads.values.any { it.status != DownloadStatus.COMPLETE }
-    val playlists = playlistDownloadProgress(state.playlists, state.tracks, state.downloads, state.excludedDownloads)
+    val playlists = playlistDownloadProgress(state.playlists, state.tracks, state.downloads, state.server?.serverId, state.excludedDownloads)
     SettingsScreen(onDismissRequest = dismiss, title = { Text("Downloads") }, text = {
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(when {

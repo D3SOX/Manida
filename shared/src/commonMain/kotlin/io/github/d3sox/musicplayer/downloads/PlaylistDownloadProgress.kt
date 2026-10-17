@@ -9,9 +9,9 @@ data class PlaylistDownloadProgress(val playlist: Playlist, val downloaded: Int,
 }
 
 // Counts the songs of each automatically downloaded playlist that can play offline.
-// Songs without a server copy cannot be downloaded, and removed songs stay excluded.
+// Only songs on the connected server can be downloaded, and removed songs stay excluded.
 fun playlistDownloadProgress(playlists: List<Playlist>, tracks: List<Track>,
-    downloads: Map<String, DownloadRecord>, excluded: Set<String> = emptySet()): List<PlaylistDownloadProgress> {
+    downloads: Map<String, DownloadRecord>, serverId: String?, excluded: Set<String> = emptySet()): List<PlaylistDownloadProgress> {
     val byId = tracks.associateBy { it.id }
     return playlists.filter { it.autoDownload }.map { playlist ->
         var downloaded = 0
@@ -28,7 +28,7 @@ fun playlistDownloadProgress(playlists: List<Playlist>, tracks: List<Track>,
                 record?.status == DownloadStatus.COMPLETE || track.sources.any { it.kind == SourceKind.LOCAL && it.available } -> {
                     downloaded++; true
                 }
-                else -> id !in excluded && track.sources.any { it.kind == SourceKind.SERVER && it.available }
+                else -> id !in excluded && track.sources.any { it.kind == SourceKind.SERVER && it.available && it.id.startsWith("server:$serverId:") }
             }
         }
         PlaylistDownloadProgress(playlist, downloaded, total,
