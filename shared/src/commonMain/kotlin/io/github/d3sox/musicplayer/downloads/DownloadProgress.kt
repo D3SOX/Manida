@@ -50,6 +50,7 @@ fun nextDownloadBatch(previous: Set<String>, downloads: Map<String, DownloadReco
 
 private val QUEUED = setOf(DownloadStatus.PENDING, DownloadStatus.DOWNLOADING, DownloadStatus.PAUSED)
 
+// A paused transfer keeps its partial file and resumes from it.
 private fun partial(record: DownloadRecord?): Double =
-    if (record?.status == DownloadStatus.DOWNLOADING && record.sizeBytes > 0)
+    if ((record?.status == DownloadStatus.DOWNLOADING || record?.status == DownloadStatus.PAUSED) && record.sizeBytes > 0)
         (record.bytesDownloaded.toDouble() / record.sizeBytes).coerceIn(0.0, 1.0) else 0.0

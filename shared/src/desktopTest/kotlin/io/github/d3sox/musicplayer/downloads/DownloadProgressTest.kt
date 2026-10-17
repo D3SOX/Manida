@@ -42,6 +42,8 @@ class DownloadProgressTest {
             record("album-2", DownloadStatus.DOWNLOADING, bytes = 50)), listOf(playlist))
         assertEquals(1, running.downloaded)
         assertEquals(1.5f / 3, running.fraction)
+        assertEquals(1.5f / 3, nextDownloadBatch(running.trackIds, mapOf(record("album-1", DownloadStatus.COMPLETE),
+            record("album-2", DownloadStatus.PAUSED, bytes = 50)), listOf(playlist)).fraction)
 
         // A cancelled song leaves the batch, and the batch ends once nothing is queued.
         val cancelled = nextDownloadBatch(running.trackIds, mapOf(record("album-1", DownloadStatus.COMPLETE)), listOf(playlist))
