@@ -83,7 +83,8 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
     fun open(id: String) { if (id.startsWith(FOLDER_PREFIX)) folder = id.removePrefix(FOLDER_PREFIX) else selected = id }
     if (rearranging && backEnabled && selected == null) PlatformBackHandler(finishRearranging)
     val current = selected ?: openFolder?.let { FOLDER_PREFIX + it }
-    AnimatedNavigation(current, null, canGoBack = backEnabled && current != null,
+    val parent = (if (selected != null) openFolder else openFolder?.let(::parentFolder))?.let { FOLDER_PREFIX + it }
+    AnimatedNavigation(current, parent, canGoBack = backEnabled && current != null,
         onBack = { if (selected != null) selected = null else folder = openFolder?.let(::parentFolder) }, depth = { page -> when {
             page == null -> 0
             page.startsWith(FOLDER_PREFIX) -> folderSegments(page.removePrefix(FOLDER_PREFIX)).size
