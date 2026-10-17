@@ -170,6 +170,10 @@ internal fun PlaylistPicker(state: AppState, controller: MusicController, trackI
 internal fun PlaylistPicker(state: AppState, controller: MusicController, trackIds: List<String>, dismiss: () -> Unit) {
     var creating by remember { mutableStateOf(false) }
     var choices by remember(trackIds) { mutableStateOf(emptyMap<String, Boolean>()) }
+    var query by remember { mutableStateOf("") }
+    val playlists = remember(state.playlists, query) {
+        state.playlists.filter { it.name.contains(query.trim(), ignoreCase = true) }.sortedBy { it.name.lowercase() }
+    }
     val selected = remember(trackIds) { trackIds.distinct() }
     val catalog = remember(state.tracks) { state.tracks.associateBy { it.id } }
     ModalBottomSheet(onDismissRequest = dismiss, containerColor = MaterialTheme.colorScheme.surface,
@@ -177,8 +181,11 @@ internal fun PlaylistPicker(state: AppState, controller: MusicController, trackI
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp)
             .testTag("playlist-membership-sheet"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Manage playlists", style = MaterialTheme.typography.titleLarge)
+            if (state.playlists.isNotEmpty()) OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(),
+                label = { Text("Search playlists") }, singleLine = true,
+                trailingIcon = { if (query.isNotEmpty()) AppIconButton(AppIcon.CLOSE, "Clear search") { query = "" } })
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
-                items(state.playlists.sortedBy { it.name.lowercase() }, key = { it.id }) { playlist ->
+                items(playlists, key = { it.id }) { playlist ->
                     val contained = selected.count { it in playlist.trackIds }
                     val checked = choices[playlist.id]?.let { if (it) ToggleableState.On else ToggleableState.Off }
                         ?: when (contained) { 0 -> ToggleableState.Off; selected.size -> ToggleableState.On; else -> ToggleableState.Indeterminate }
@@ -207,6 +214,7 @@ internal fun PlaylistPicker(state: AppState, controller: MusicController, trackI
                     }
                 }
                 if (state.playlists.isEmpty()) item { Text("Create a playlist to keep these songs together.") }
+                else if (playlists.isEmpty()) item { Text("No playlists match \"${query.trim()}\".") }
             }
             OutlinedButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth()) {
                 Icon(AppIcon.PLUS.vector, null); Spacer(Modifier.width(8.dp)); Text("New playlist")

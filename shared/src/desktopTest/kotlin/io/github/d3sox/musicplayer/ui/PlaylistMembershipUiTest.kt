@@ -104,4 +104,37 @@ class PlaylistMembershipUiTest {
             }
         } finally { runBlocking { player.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
     }
+
+    @Test
+    fun searchFiltersPlaylistsAndKeepsChoicesMadeBeforeFiltering() {
+        val directory = Files.createTempDirectory("playlist-membership-search")
+        val store = openMusicStore(directory.resolve("music.db").toString())
+        val library = MusicLibrary(store)
+        val playlists = Playlists(store)
+        val song = runBlocking {
+            library.importTrack(TrackMetadata("Song"), TrackSource("song", SourceKind.LOCAL, "/music/song.flac")).also {
+                playlists.create("Evening", emptyList())
+                playlists.create("Morning", emptyList())
+            }
+        }
+        val player = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"), playlists = playlists)
+        try {
+            runComposeUiTest {
+                setContent { MusicPlayerApp(player) }
+                waitUntil(timeoutMillis = 3_000) { !player.state.value.loading }
+                onNodeWithContentDescription("Track options: Song").performClick()
+                onNodeWithText("Select song").performClick()
+                onNodeWithContentDescription("Selection actions").performClick()
+                onNodeWithText("Add to playlist").performClick()
+                onNodeWithContentDescription("Playlist membership: Evening").performClick()
+                onNodeWithText("Search playlists").performTextInput("morn")
+                onAllNodesWithContentDescription("Playlist membership: Evening").assertCountEquals(0)
+                onNodeWithContentDescription("Playlist membership: Morning").performClick()
+                onNodeWithText("Search playlists").performTextReplacement("x")
+                onNodeWithText("No playlists match \"x\".").assertIsDisplayed()
+                onNodeWithText("Apply").performClick()
+                waitUntil(timeoutMillis = 3_000) { player.state.value.playlists.all { it.trackIds == listOf(song.id) } }
+            }
+        } finally { runBlocking { player.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
+    }
 }
