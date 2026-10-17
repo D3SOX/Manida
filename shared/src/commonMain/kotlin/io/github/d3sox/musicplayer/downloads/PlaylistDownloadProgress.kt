@@ -20,15 +20,15 @@ fun playlistDownloadProgress(playlists: List<Playlist>, tracks: List<Track>,
             val track = byId[id] ?: return@count false
             val record = downloads[id]
             when {
+                // An indexed local file can be gone; synchronization then downloads a replacement.
+                record?.status == DownloadStatus.DOWNLOADING -> {
+                    if (record.sizeBytes > 0) partial += (record.bytesDownloaded.toFloat() / record.sizeBytes).coerceIn(0f, 1f)
+                    true
+                }
                 record?.status == DownloadStatus.COMPLETE || track.sources.any { it.kind == SourceKind.LOCAL && it.available } -> {
                     downloaded++; true
                 }
-                id in excluded || track.sources.none { it.kind == SourceKind.SERVER } -> false
-                else -> {
-                    if (record?.status == DownloadStatus.DOWNLOADING && record.sizeBytes > 0)
-                        partial += (record.bytesDownloaded.toFloat() / record.sizeBytes).coerceIn(0f, 1f)
-                    true
-                }
+                else -> id !in excluded && track.sources.any { it.kind == SourceKind.SERVER && it.available }
             }
         }
         PlaylistDownloadProgress(playlist, downloaded, total,
