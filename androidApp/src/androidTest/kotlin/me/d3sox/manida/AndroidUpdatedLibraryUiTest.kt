@@ -34,6 +34,9 @@ class AndroidUpdatedLibraryUiTest {
     @Test fun settingsSlidersAndPlaylistControlsWorkOnAPhoneLayout() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val app = instrumentation.targetContext.applicationContext as MusicApplication
+        // Enabling playlist downloads asks for notification access, whose dialog would cover the activity.
+        if (android.os.Build.VERSION.SDK_INT >= 33) instrumentation.uiAutomation.grantRuntimePermission(
+            app.packageName, android.Manifest.permission.POST_NOTIFICATIONS)
         val audio = File(app.cacheDir, "updated-library.flac")
         instrumentation.context.assets.open("fixture.flac").use { input -> audio.outputStream().use { input.copyTo(it) } }
         try {
