@@ -102,7 +102,7 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
             val entries = remember(state.playlists, state.artwork, recentAt, pageFolder) { collections(pageFolder) }
             CompositionLocalProvider(LocalLibraryScrollKey provides "${LocalLibraryScrollKey.current}:folder:$pageFolder") {
                 CollectionBrowser(entries, io.github.d3sox.musicplayer.library.LibraryTab.PLAYLISTS, state, controller, Modifier.weight(1f),
-                    rearranging = rearranging, finishRearranging = finishRearranging, open = ::open)
+                    total = state.playlists.count { isInFolder(it.folder, pageFolder) }, rearranging = rearranging, finishRearranging = finishRearranging, open = ::open)
             }
         } else if (playlist == null) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

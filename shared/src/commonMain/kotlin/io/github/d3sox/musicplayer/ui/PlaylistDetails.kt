@@ -173,7 +173,7 @@ internal fun EditPlaylistDialog(playlist: Playlist, state: AppState, controller:
                 Text(if (playlist.server != null) "Use generated cover" else "Use song artwork")
             }
             pickerError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            OutlinedTextField(name, { name = it }, label = { Text("Title") }, singleLine = true,
+            OutlinedTextField(name, { name = it.filter { c -> c != PLAYLIST_FOLDER_SEPARATOR } }, label = { Text("Title") }, singleLine = true,
                 modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Playlist title" })
             PlaylistFolderPicker(state, folder) { folder = it }
             OutlinedTextField(description, { description = it }, label = { Text("Description") }, minLines = 2, maxLines = 4,
