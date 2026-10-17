@@ -487,7 +487,7 @@ class PlaylistsUiTest {
         val library = MusicLibrary(store)
         val playlists = Playlists(store)
         val preferences = io.github.d3sox.musicplayer.settings.MusicPreferences(store)
-        val (morning, night) = runBlocking { listOf("Road ▸ Morning", "Road▸Night", "AC/DC", "Road ▸ Coast ▸ Dawn").map { playlists.create(it, emptyList()).id } }
+        val (morning, night, slash, dawn) = runBlocking { listOf("Road ▸ Morning", "Road▸Night", "AC/DC", "Road ▸ Coast ▸ Dawn").map { playlists.create(it, emptyList()).id } }
         val controller = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"), preferences = preferences, playlists = playlists)
         try {
             runComposeUiTest {
@@ -498,6 +498,8 @@ class PlaylistsUiTest {
                 onNodeWithText("4 playlists").assertIsDisplayed()
                 onNodeWithText("Road").assertIsDisplayed()
                 onNodeWithText("Morning").assertDoesNotExist()
+                runBlocking { controller.updatePreferences { settings -> settings.copy(collectionLayouts = mapOf(LibraryTab.PLAYLISTS to
+                    io.github.d3sox.musicplayer.settings.CollectionLayout(order = listOf(slash, morning, night, dawn)))) }.join() }
                 onNodeWithText("Road").performClick()
                 onNodeWithText("AC/DC").assertDoesNotExist()
                 onNodeWithText("Night").assertIsDisplayed()
@@ -529,7 +531,7 @@ class PlaylistsUiTest {
                 onNodeWithText("Rearrange").performClick()
                 onNodeWithTag("collection-reorder:$night", useUnmergedTree = true).performCustomAccessibilityActionWithLabel("Move up")
                 waitUntil(timeoutMillis = 3_000) {
-                    controller.state.value.preferences.collectionLayouts[LibraryTab.PLAYLISTS]?.order?.let { it.indexOf(night) in 0 until it.indexOf(morning) } == true
+                    controller.state.value.preferences.collectionLayouts[LibraryTab.PLAYLISTS]?.order?.let { it.indexOf(night) in 0 until it.indexOf(morning) && it.containsAll(listOf(slash, dawn)) } == true
                 }
                 onNodeWithContentDescription("Finish rearranging").performClick()
                 onNodeWithText("Morning").performClick()
