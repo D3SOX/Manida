@@ -15,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
@@ -31,7 +32,6 @@ import io.github.d3sox.musicplayer.settings.CollectionView
 import io.github.d3sox.musicplayer.settings.CollectionSort
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
-import sh.calvin.reorderable.rememberReorderableLazyGridState
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
 internal data class CollectionItem(val id: String, val title: String, val subtitle: String,
@@ -40,7 +40,7 @@ internal data class CollectionItem(val id: String, val title: String, val subtit
 
 @Composable
 internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, state: AppState, controller: MusicController,
-    modifier: Modifier = Modifier, open: (String) -> Unit) {
+    modifier: Modifier = Modifier, rearranging: Boolean = false, finishRearranging: () -> Unit = {}, open: (String) -> Unit) {
     val listScroll = rememberLibraryListState(controller, "collections:${tab.name}:list")
     val gridScroll = rememberLibraryGridState(controller, "collections:${tab.name}:grid")
     val layout = state.preferences.collectionLayouts[tab] ?: CollectionLayout()
@@ -56,7 +56,6 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
         }.thenBy { it.title.lowercase() }
         entries.sortedWith(if (layout.descending) comparator.reversed() else comparator)
     }
-    val custom = layout.sort == CollectionSort.CUSTOM
     var dragged by remember(sorted) { mutableStateOf<List<CollectionItem>?>(null) }
     val sortedEntries = dragged ?: sorted
     fun move(from: Any, to: Any) {
@@ -65,8 +64,8 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
         val target = rows.indexOfFirst { it.id == to }
         if (source >= 0 && target >= 0) dragged = rows.apply { add(target, removeAt(source)) }
     }
-    val listReorder = rememberReorderableLazyListState(listScroll) { from, to -> move(from.key, to.key) }
-    val gridReorder = rememberReorderableLazyGridState(gridScroll) { from, to -> move(from.key, to.key) }
+    val rearrangeScroll = rememberLazyListState()
+    val reorder = rememberReorderableLazyListState(rearrangeScroll) { from, to -> move(from.key, to.key) }
     val gridCells = layout.columns?.let { GridCells.Fixed(it.coerceIn(2, 6)) } ?: GridCells.Adaptive(156.dp)
     var menu by remember { mutableStateOf(false) }
     fun update(change: (CollectionLayout) -> CollectionLayout) {
@@ -93,11 +92,15 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
             .draggableHandle(onDragStopped = { dragged?.let { rows -> update { it.copy(order = rows.map(CollectionItem::id)) } } }),
             contentAlignment = Alignment.Center) { Icon(AppIcon.DRAG.vector, null) }
     }
-    Column(modifier.fillMaxSize()) {
+    val navigationActive = LocalNavigationActive.current
+    Column(modifier.fillMaxSize().onKeyEvent {
+        if (navigationActive && rearranging && it.key == Key.Escape && it.type == KeyEventType.KeyUp) { finishRearranging(); true } else false
+    }) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(countLabel(entries.size, tab.label.lowercase().removeSuffix("s"), tab.label.lowercase()), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Box {
+            if (rearranging) AppIconButton(AppIcon.CHECK, "Finish rearranging", onClick = finishRearranging)
+            else Box {
                 AppIconButton(if (layout.view == CollectionView.GRID) AppIcon.GRID else AppIcon.LIST, "Collection view") { menu = true }
                 DropdownMenu(menu, { menu = false }) {
                     CollectionView.entries.forEach { view ->
@@ -125,25 +128,27 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
-        if (layout.view == CollectionView.LIST) LazyColumn(Modifier.fillMaxSize(), state = listScroll) {
+        if (rearranging) LazyColumn(Modifier.fillMaxSize(), state = rearrangeScroll) {
             items(sortedEntries, key = { it.id }) { entry ->
-                ReorderableItem(listReorder, entry.id, enabled = custom) { _ ->
+                ReorderableItem(reorder, entry.id) { _ ->
+                    ListItem(headlineContent = { Text(entry.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        leadingContent = { CollectionArtwork(entry.artwork, entry.title, entry.icon, Modifier.size(40.dp)) },
+                        trailingContent = { DragHandle(entry) })
+                }
+            }
+        } else if (layout.view == CollectionView.LIST) LazyColumn(Modifier.fillMaxSize(), state = listScroll) {
+            items(sortedEntries, key = { it.id }) { entry ->
                 CollectionActionHost(entry, tab, state, controller, { open(entry.id) }) { menu ->
                 ListItem(modifier = Modifier.combinedClickable(onClick = { open(entry.id) }, onLongClick = menu),
                     headlineContent = { Text(entry.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                     leadingContent = { CollectionArtwork(entry.artwork, entry.title, entry.icon, Modifier.size(48.dp)) },
                     supportingContent = { Text(entry.subtitle, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-                    trailingContent = { Row(verticalAlignment = Alignment.CenterVertically) {
-                        AppIconButton(AppIcon.MORE, "${tab.label.removeSuffix("s")} options: ${entry.title}", onClick = menu)
-                        if (custom) DragHandle(entry)
-                    } })
-                }
+                    trailingContent = { AppIconButton(AppIcon.MORE, "${tab.label.removeSuffix("s")} options: ${entry.title}", onClick = menu) })
                 }
             }
         } else LazyVerticalGrid(gridCells, Modifier.fillMaxSize(), state = gridScroll,
             contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(sortedEntries, key = { it.id }) { entry ->
-                ReorderableItem(gridReorder, entry.id, enabled = custom) { _ ->
                 CollectionActionHost(entry, tab, state, controller, { open(entry.id) }) { menu ->
                 ElevatedCard(modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium)
                     .combinedClickable(onClick = { open(entry.id) }, onLongClick = menu)) {
@@ -152,12 +157,10 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(entry.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             AppIconButton(AppIcon.MORE, "${tab.label.removeSuffix("s")} options: ${entry.title}", onClick = menu)
-                            if (custom) DragHandle(entry)
                         }
                         Text(entry.subtitle, style = MaterialTheme.typography.bodySmall, maxLines = 2,
                             overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                }
                 }
                 }
             }
@@ -170,7 +173,8 @@ internal fun CollectionBrowser(entries: List<CollectionItem>, tab: LibraryTab, s
             CollectionSort.RECENT -> if (entry.recentAt == 0L) "No songs" else formatScrollDate(entry.recentAt)
             CollectionSort.CUSTOM -> "${index + 1}"
         } }
-        if (layout.view == CollectionView.LIST) LibraryScrollbar(listScroll, entries.size, "Scroll ${tab.label.lowercase()}", label = ::indicator)
+        if (rearranging) LibraryScrollbar(rearrangeScroll, entries.size, "Scroll ${tab.label.lowercase()}", label = ::indicator)
+        else if (layout.view == CollectionView.LIST) LibraryScrollbar(listScroll, entries.size, "Scroll ${tab.label.lowercase()}", label = ::indicator)
         else LibraryScrollbar(gridScroll, entries.size, "Scroll ${tab.label.lowercase()}", label = ::indicator)
         }
     }

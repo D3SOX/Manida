@@ -45,7 +45,7 @@ internal fun SortIconButton(option: AppIcon, description: String, current: Strin
 }
 
 @Composable
-internal fun CollectionOrder(tab: LibraryTab, layout: CollectionLayout, controller: MusicController) {
+internal fun CollectionOrder(tab: LibraryTab, layout: CollectionLayout, controller: MusicController, rearrange: (() -> Unit)? = null) {
     var expanded by remember { mutableStateOf(false) }
     fun update(change: (CollectionLayout) -> CollectionLayout) {
         controller.updatePreferences { settings -> settings.copy(collectionLayouts = settings.collectionLayouts +
@@ -76,6 +76,13 @@ internal fun CollectionOrder(tab: LibraryTab, layout: CollectionLayout, controll
                 AppMenuItem(text = { Text(label) }, leadingIcon = { Icon((if (layout.descending) AppIcon.DESCENDING else AppIcon.ASCENDING).vector, null) },
                     modifier = Modifier.semantics { contentDescription = label },
                     onClick = { update { it.copy(descending = !it.descending) }; expanded = false })
+            }
+            if (rearrange != null) {
+                HorizontalDivider()
+                AppMenuItem(text = { Text("Rearrange") }, leadingIcon = { Icon(AppIcon.DRAG.vector, null) }, onClick = {
+                    update { it.copy(sort = CollectionSort.CUSTOM, descending = false) }
+                    rearrange(); expanded = false
+                })
             }
         }
     }

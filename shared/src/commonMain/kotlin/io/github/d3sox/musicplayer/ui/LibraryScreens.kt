@@ -72,6 +72,7 @@ internal fun LibraryScreens(state: AppState, controller: MusicController, modifi
         }
     }
     val currentIndex = pager.targetPage.coerceIn(0, tabs.lastIndex)
+    var rearrangingPlaylists by remember(tabs[currentIndex]) { mutableStateOf(false) }
     LaunchedEffect(destination) {
         if (destination != null && destination.revision != handledDestination) {
             selection.clear(); pager.scrollToPage(tabs.indexOf(destination.tab).coerceAtLeast(0))
@@ -129,9 +130,10 @@ internal fun LibraryScreens(state: AppState, controller: MusicController, modifi
                         onClick = { controller.updatePreferences { it.copy(songOrderReversed = !reversed) }; sortMenu = false })
                 }
             }
-            if (activeSongLists == 0 && currentTab in setOf(LibraryTab.ALBUMS, LibraryTab.ARTISTS, LibraryTab.ALBUM_ARTISTS,
+            if (activeSongLists == 0 && !rearrangingPlaylists && currentTab in setOf(LibraryTab.ALBUMS, LibraryTab.ARTISTS, LibraryTab.ALBUM_ARTISTS,
                     LibraryTab.GENRES, LibraryTab.FOLDERS, LibraryTab.PLAYLISTS))
-                CollectionOrder(currentTab, state.preferences.collectionLayouts[currentTab] ?: io.github.d3sox.musicplayer.settings.CollectionLayout(), controller)
+                CollectionOrder(currentTab, state.preferences.collectionLayouts[currentTab] ?: io.github.d3sox.musicplayer.settings.CollectionLayout(), controller,
+                    rearrange = if (currentTab == LibraryTab.PLAYLISTS) ({ rearrangingPlaylists = true }) else null)
             AppIconButton(AppIcon.SETTINGS, "Settings", onClick = onSettings)
             Box {
                 AppIconButton(AppIcon.MENU, "Music sources") { sourceMenu = true }
@@ -177,7 +179,8 @@ internal fun LibraryScreens(state: AppState, controller: MusicController, modifi
                 LibraryTab.FOLDERS -> GroupedSongs(tracks.groupBy { it.metadata.folder }, LibraryTab.FOLDERS, state, controller, handleBack, destination)
                 LibraryTab.FAVORITES -> SongList(tracks.filter { it.favorite }, controller, statistics = statistics, scrollSort = order, contextName = "Favorites")
                 LibraryTab.RECENT -> SongList(tracks.sortedByDescending { it.recentAt }, controller, scrollSort = LibrarySort.RECENT, contextName = "Recently added")
-                LibraryTab.PLAYLISTS -> PlaylistsScreen(state, controller, backEnabled = handleBack, destination = destination)
+                LibraryTab.PLAYLISTS -> PlaylistsScreen(state, controller, backEnabled = handleBack, destination = destination,
+                    rearranging = rearrangingPlaylists, finishRearranging = { rearrangingPlaylists = false })
                 LibraryTab.HISTORY -> ListeningHistoryScreen(state, controller, tracks)
                 LibraryTab.STATISTICS -> ListeningStatisticsScreen(state, controller, tracks, handleBack)
                 LibraryTab.RECOMMENDATIONS -> ListeningRecommendationsScreen(state, controller, tracks)
