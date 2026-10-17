@@ -533,7 +533,8 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
                 val server = library.findTrack(serverId) ?: return
                 if (library.findTrack(localId) == null) return
                 val queued = queueLoaded && queue.snapshot().entries.any { it.trackId == serverId || it.trackId == localId }
-                val linked = try { mergeTracks(serverId, localId) }
+                // The local song keeps its identity, so references to the file stay valid.
+                val linked = try { mergeTracks(localId, serverId) }
                     // A song with a running download or file edit is linked on a later pass.
                     catch (_: IllegalStateException) { return }
                 if (linked.favorite != server.favorite) serverChanges?.setFavorite(linked.id, linked.favorite)
