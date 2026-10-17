@@ -71,7 +71,7 @@ class DownloadService : JobService() {
     // Playlist downloads report how many songs are offline; single songs report their transferred bytes.
     private fun transferProgress(state: AppState): TransferProgress {
         val record = state.downloads.values.firstOrNull { it.status == DownloadStatus.DOWNLOADING }
-        val playlists = playlistDownloadProgress(state.playlists, state.tracks, state.downloads)
+        val playlists = playlistDownloadProgress(state.playlists, state.tracks, state.downloads, state.excludedDownloads)
             .filter { !it.complete && (record == null || record.trackId in it.playlist.trackIds) }
         if (playlists.isNotEmpty()) {
             val downloaded = playlists.sumOf { it.downloaded }

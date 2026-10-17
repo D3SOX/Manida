@@ -83,6 +83,7 @@ data class AppState(
     val sftp: SftpConfiguration? = null,
     val serverUploads: List<PendingServerUpload> = emptyList(),
     val downloads: Map<String, DownloadRecord> = emptyMap(),
+    val excludedDownloads: Set<String> = emptySet(),
     val downloadNetwork: DownloadNetwork = DownloadNetwork(),
     val playlists: List<Playlist> = emptyList(),
     val preferences: MusicSettings = MusicSettings(),
@@ -337,6 +338,11 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
                     completed = files
                     mutableState.update { it.copy(downloads = progress) }
                 }
+            }
+        } }
+        offline?.let { downloads -> scope.launch {
+            downloads.excluded.collect { excluded ->
+                operations.withLock { mutableState.update { it.copy(excludedDownloads = excluded) } }
             }
         } }
         offline?.let { downloads -> scope.launch {

@@ -37,6 +37,9 @@ class OfflineMusic(private val store: MusicStore, private val library: MusicLibr
     private val wake = Channel<Unit>(Channel.CONFLATED)
     private val mutableState = MutableStateFlow<Map<String, DownloadRecord>>(emptyMap())
     val state = mutableState.asStateFlow()
+    private val mutableExcluded = MutableStateFlow<Set<String>>(emptySet())
+    // Songs the user removed; automatic playlist downloads skip them.
+    val excluded = mutableExcluded.asStateFlow()
     private val activeTrack = MutableStateFlow<String?>(null)
     private val preferences = MusicPreferences(store)
     private val transfers = Mutex()
@@ -252,6 +255,7 @@ class OfflineMusic(private val store: MusicStore, private val library: MusicLibr
     // Refreshes run concurrently, so read and publish under one lock. Otherwise an older read can replace newer state.
     private suspend fun refresh() = refreshing.withLock {
         mutableState.value = store.list<DownloadRecord>("downloads").associateBy { it.trackId }
+        mutableExcluded.value = store.list<OfflineRequest>("offline-exclusions").map { it.trackId }.toSet()
     }
     override fun close() { processing?.cancel(); supervisor.cancel() }
     suspend fun closeAndJoin() { val task = processing; close(); task?.join(); supervisor.join() }
