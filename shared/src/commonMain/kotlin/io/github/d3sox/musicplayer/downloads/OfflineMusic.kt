@@ -213,6 +213,7 @@ class OfflineMusic(private val store: MusicStore, private val library: MusicLibr
     }
 
     private suspend fun process() {
+        dropDeviceFileDownloads()
         val paused = preferences.load().downloadsPaused || !networkPermitted()
         val connection = if (paused) null else client()
         val downloads = AudioDownloads(store, library, connection, directory, availableSpace)
@@ -237,6 +238,19 @@ class OfflineMusic(private val store: MusicStore, private val library: MusicLibr
         }
         PlaylistDownloads(playlists, library, downloads, connection, sourceAccessible).synchronize(excluded)
         downloads.enforceCacheBudget(preferences.load().cacheBytes, inUseTracks())
+    }
+
+    // A song whose file is on the device needs no download; this also drops copies made before it was linked to that file.
+    private suspend fun dropDeviceFileDownloads() {
+        val downloads = AudioDownloads(store, library, null, directory)
+        val playing = inUseTracks()
+        val tracks = library.tracks().associateBy { it.id }
+        for (record in store.list<DownloadRecord>("downloads")) {
+            val track = tracks[record.trackId] ?: continue
+            if (track.sources.none { it.kind == SourceKind.LOCAL && it.available && sourceAccessible(it.location) }) continue
+            store.database.records().delete("request:${track.id}")
+            if (record.status != DownloadStatus.COMPLETE || track.id !in playing) downloads.remove(track.id, unpin = false)
+        }
     }
 
     private suspend fun networkPermitted(): Boolean = network.value.let {

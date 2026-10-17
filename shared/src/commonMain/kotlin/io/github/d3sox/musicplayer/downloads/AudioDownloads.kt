@@ -108,7 +108,7 @@ class AudioDownloads(
     }
     suspend fun state(trackId: String): DownloadRecord? = store.read("download:$trackId")
 
-    suspend fun remove(trackId: String) = withContext(Dispatchers.IO) {
+    suspend fun remove(trackId: String, unpin: Boolean = true) = withContext(Dispatchers.IO) {
         state(trackId)?.path?.let { FileSystem.SYSTEM.delete(it.toPath(), mustExist = false) }
         val name = trackId.encodeUtf8().sha256().hex()
         FileSystem.SYSTEM.listOrNull(directory.toPath()).orEmpty().filter { it.name.startsWith("$name.") }.forEach {
@@ -117,7 +117,7 @@ class AudioDownloads(
         store.transaction {
             library.removeSource(trackId, "download:$trackId")
             store.database.records().delete("download:$trackId")
-            store.database.records().delete("pins:$trackId")
+            if (unpin) store.database.records().delete("pins:$trackId")
         }
     }
 

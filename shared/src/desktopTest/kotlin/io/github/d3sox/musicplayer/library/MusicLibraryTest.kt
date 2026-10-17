@@ -161,6 +161,28 @@ class MusicLibraryTest {
     }
 
     @Test
+    fun aLocalFileUploadedToTheServerIsFoundByItsSizeTitleAndLength() = runBlocking {
+        val directory = Files.createTempDirectory("same-file-copies")
+        val store = openMusicStore(directory.resolve("library.db").toString())
+        try {
+            val library = MusicLibrary(store)
+            suspend fun song(kind: SourceKind, title: String, size: Long, durationMs: Long = 180_000) =
+                library.importTrack(TrackMetadata(title, durationMs = durationMs),
+                    TrackSource("${kind.name}:$title:$size:$durationMs", kind, "$title.mp3", indexedSize = size)).id
+            val local = song(SourceKind.LOCAL, "Northern Light", 1_000)
+            val server = song(SourceKind.SERVER, " northern light", 1_000, 179_000)
+            song(SourceKind.LOCAL, "Re-encoded", 2_000); song(SourceKind.SERVER, "Re-encoded", 2_001)
+            song(SourceKind.LOCAL, "Edited", 3_000, 180_000); song(SourceKind.SERVER, "Edited", 3_000, 190_000)
+            song(SourceKind.LOCAL, "Twice on the server", 4_000)
+            song(SourceKind.SERVER, "Twice on the server", 4_000); song(SourceKind.SERVER, "Twice on the server", 4_000, 180_500)
+            song(SourceKind.LOCAL, "Unknown size", 0); song(SourceKind.SERVER, "Unknown size", 0)
+            assertEquals(listOf(server to local), library.sameFileCopies())
+            library.linkTracks(server, local)
+            assertEquals(emptyList(), library.sameFileCopies())
+        } finally { store.close(); directory.toFile().deleteRecursively() }
+    }
+
+    @Test
     fun aSongIdentityDoesNotContainItsDeviceLocationAndStaysTheSameAfterRestart() = runBlocking {
         val directory = Files.createTempDirectory("private-song-identity")
         val path = directory.resolve("library.db").toString()

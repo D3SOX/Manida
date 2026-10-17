@@ -35,6 +35,7 @@ class DownloadService : JobService() {
             try {
                 withContext(Dispatchers.IO) {
                     if (params.extras.getBoolean("refresh-playlists")) app.refreshOfflinePlaylists()
+                    app.controller.linkSameFiles()
                     offline.runPending()
                 }
                 retry = offline.state.value.values.any { it.status != DownloadStatus.COMPLETE }

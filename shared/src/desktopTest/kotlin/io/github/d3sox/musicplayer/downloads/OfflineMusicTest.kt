@@ -538,4 +538,34 @@ class OfflineMusicTest {
             assertContentEquals(Files.readAllBytes(original), Files.readAllBytes(Path.of(complete.path!!)))
         } finally { offline?.closeAndJoin(); store.close(); http.close(); failedHttp.close(); directory.toFile().deleteRecursively() }
     }
+
+    @Test
+    fun songsLinkedToADeviceFileDropTheirDownloadsButKeepTheirProtection() = runBlocking {
+        val directory = Files.createTempDirectory("device-file-downloads")
+        val store = openMusicStore(directory.resolve("library.db").toString())
+        val audio = Files.createDirectories(directory.resolve("audio"))
+        val library = MusicLibrary(store)
+        val offline = OfflineMusic(store, library, { error("Unlock your credential store") }, audio.toString(), Playlists(store),
+            sourceAccessible = { Files.exists(Path.of(it)) }, scheduleWork = {})
+        try {
+            val downloaded = library.importTrack(TrackMetadata("Downloaded"), TrackSource("server:fixture:downloaded", SourceKind.SERVER, "downloaded"))
+            val copy = Files.write(audio.resolve("downloaded.mp3"), byteArrayOf(1, 2, 3))
+            store.put("download:${downloaded.id}", "downloads", DownloadRecord(downloaded.id, DownloadStatus.COMPLETE, copy.toString(), 3, 3))
+            library.importTrack(downloaded.metadata, TrackSource("download:${downloaded.id}", SourceKind.DOWNLOAD, copy.toString()), linkTo = downloaded.id)
+            AudioDownloads(store, library, null, audio.toString()).pin(downloaded.id, "manual")
+            val requested = library.importTrack(TrackMetadata("Requested"), TrackSource("server:fixture:requested", SourceKind.SERVER, "requested"))
+            offline.request(listOf(requested.id))
+            for (track in listOf(downloaded, requested)) {
+                val file = Files.write(directory.resolve("${track.metadata.title}.mp3"), byteArrayOf(1, 2, 3)).toString()
+                val local = library.importTrack(track.metadata, TrackSource("local:$file", SourceKind.LOCAL, file))
+                library.linkTracks(track.id, local.id)
+            }
+            offline.runPending()
+            assertEquals(false, Files.exists(copy))
+            assertEquals(emptyMap(), offline.state.value)
+            assertEquals(null, store.database.records().read("request:${requested.id}"))
+            assertEquals(true, store.database.records().read("pins:${downloaded.id}") != null)
+            assertEquals(setOf(SourceKind.LOCAL, SourceKind.SERVER), library.findTrack(downloaded.id)!!.sources.map { it.kind }.toSet())
+        } finally { offline.closeAndJoin(); store.close(); directory.toFile().deleteRecursively() }
+    }
 }
