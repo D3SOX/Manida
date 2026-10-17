@@ -17,7 +17,9 @@ import io.github.d3sox.musicplayer.downloads.DownloadProblem
 @Composable
 internal fun DownloadsScreen(state: AppState, controller: MusicController, dismiss: () -> Unit) {
     val paused = state.preferences.downloadsPaused
-    val waiting = state.downloads.values.any { it.status != DownloadStatus.COMPLETE }
+    val playlists = state.playlistDownloads
+    val batch = state.downloadBatch
+    val waiting = state.downloads.values.any { it.status != DownloadStatus.COMPLETE } || batch.total > 0
     SettingsScreen(onDismissRequest = dismiss, title = { Text("Downloads") }, text = {
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(when {
@@ -26,12 +28,29 @@ internal fun DownloadsScreen(state: AppState, controller: MusicController, dismi
                 waiting && state.downloadNetwork.metered && !state.preferences.downloadOnMetered -> "Waiting for an unmetered network"
                 else -> "${countLabel(state.downloads.count { it.value.status == DownloadStatus.COMPLETE }, "song")} downloaded"
             })
+            if (batch.total > 0) Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("${batch.downloaded} of ${countLabel(batch.total, "song")} downloaded",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                LinearProgressIndicator(progress = { batch.fraction },
+                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Download progress" })
+            }
             TextButton(onClick = { controller.setDownloadsPaused(!paused) }) {
                 Text(if (paused) "Resume downloads" else "Pause downloads")
             }
             if (state.downloads.values.any { it.status == DownloadStatus.FAILED })
                 TextButton(onClick = controller::retryDownloads) { Text("Retry failed downloads") }
             LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                items(playlists, key = { "playlist:${it.playlist.id}" }) { progress ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(progress.playlist.name, style = MaterialTheme.typography.titleMedium)
+                        Text(if (progress.complete) "${countLabel(progress.total, "song")} downloaded"
+                            else "${progress.downloaded} of ${countLabel(progress.total, "song")} downloaded",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        LinearProgressIndicator(progress = { progress.fraction },
+                            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Playlist download progress: ${progress.playlist.name}" })
+                    }
+                }
+                if (playlists.isNotEmpty() && state.downloads.isNotEmpty()) item { HorizontalDivider() }
                 items(state.downloads.values.sortedBy { record -> state.tracks.firstOrNull { it.id == record.trackId }?.metadata?.title },
                     key = { it.trackId }) { record ->
                     val title = state.tracks.firstOrNull { it.id == record.trackId }?.metadata?.title ?: "Unavailable song"
@@ -58,7 +77,7 @@ internal fun DownloadsScreen(state: AppState, controller: MusicController, dismi
                             modifier = Modifier.semantics { contentDescription = "$removal: $title" }) { Text(removal) }
                     }
                 }
-                if (state.downloads.isEmpty()) item { Text("Download songs or enable automatic downloads on a playlist.") }
+                if (state.downloads.isEmpty() && playlists.isEmpty()) item { Text("Download songs or enable automatic downloads on a playlist.") }
             }
         }
     }, confirmButton = { PageAction("Done", onClick = dismiss) })

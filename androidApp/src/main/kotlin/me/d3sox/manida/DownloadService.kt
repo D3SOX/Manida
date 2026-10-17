@@ -9,9 +9,9 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
 import io.github.d3sox.musicplayer.downloads.DownloadStatus
-import io.github.d3sox.musicplayer.downloads.DownloadRecord
+import io.github.d3sox.musicplayer.app.AppState
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.sample
 
@@ -29,8 +29,8 @@ class DownloadService : JobService() {
         val task = scope.launch(start = CoroutineStart.LAZY) {
             var retry = false
             val progress = if (visibleTransfer) launch {
-                offline.state.mapNotNull { records -> records.values.firstOrNull { it.status == DownloadStatus.DOWNLOADING } }
-                    .distinctUntilChanged().sample(1_000).collect { record -> showTransfer(params, record) }
+                app.controller.state.map { transferProgress(it) }.distinctUntilChanged().sample(1_000)
+                    .collect { progress -> showTransfer(params, progress) }
             } else null
             try {
                 withContext(Dispatchers.IO) {
@@ -65,21 +65,39 @@ class DownloadService : JobService() {
 
     override fun onDestroy() { scope.cancel(); super.onDestroy() }
 
+    private data class TransferProgress(val title: String = "Manida", val text: String = "Downloading music", val percent: Int? = null)
+
+    // Batches of several songs report how many are done; a single song reports its transferred bytes.
+    private fun transferProgress(state: AppState): TransferProgress {
+        val record = state.downloads.values.firstOrNull { it.status == DownloadStatus.DOWNLOADING }
+        val song = state.tracks.firstOrNull { it.id == record?.trackId }?.metadata?.title ?: "Manida"
+        val batch = state.downloadBatch
+        if (batch.total > 1) {
+            val metadata = state.tracks.filter { it.id in batch.trackIds }.map { it.metadata }
+            // Name the playlist, album, or artist when the whole batch comes from one.
+            val title = state.playlistDownloads.firstOrNull { it.playlist.trackIds.containsAll(batch.trackIds) }?.playlist?.name
+                ?: metadata.map { it.album }.distinct().singleOrNull()?.takeIf { it.isNotBlank() }
+                ?: metadata.map { it.artist }.distinct().singleOrNull()?.takeIf { it.isNotBlank() }
+                ?: song
+            return TransferProgress(title, "Downloading · ${batch.downloaded} of ${batch.total} songs",
+                (batch.fraction * 100).toInt().coerceIn(0, 100))
+        }
+        if (record == null) return TransferProgress()
+        val percent = if (record.sizeBytes > 0) (record.bytesDownloaded.toDouble() / record.sizeBytes * 100).toInt().coerceIn(0, 100) else null
+        return TransferProgress(song, percent = percent)
+    }
+
     @androidx.annotation.RequiresApi(34)
-    private fun showTransfer(params: JobParameters, record: DownloadRecord? = null) {
-        val app = application as MusicApplication
-        val title = app.controller.state.value.tracks.firstOrNull { it.id == record?.trackId }?.metadata?.title ?: "Manida"
-        val knownSize = record != null && record.sizeBytes > 0
-        val percent = if (knownSize) (record.bytesDownloaded.toDouble() / record.sizeBytes * 100).toInt().coerceIn(0, 100) else 0
+    private fun showTransfer(params: JobParameters, progress: TransferProgress = TransferProgress()) {
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel("offline-downloads", "Music downloads", NotificationManager.IMPORTANCE_LOW))
         val notification = Notification.Builder(this, "offline-downloads")
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle(title)
-            .setContentText("Downloading music")
+            .setContentTitle(progress.title)
+            .setContentText(progress.text)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setProgress(if (knownSize) 100 else 0, percent, !knownSize)
+            .setProgress(if (progress.percent != null) 100 else 0, progress.percent ?: 0, progress.percent == null)
             .addAction(Notification.Action.Builder(null, "Pause downloads", PendingIntent.getBroadcast(this, 0,
                 Intent(this, DownloadActionReceiver::class.java).setAction(DownloadActionReceiver.PAUSE), PendingIntent.FLAG_IMMUTABLE)).build())
             .setContentIntent(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE))
