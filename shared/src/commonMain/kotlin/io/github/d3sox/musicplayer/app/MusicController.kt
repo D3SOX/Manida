@@ -60,6 +60,10 @@ import io.github.d3sox.musicplayer.downloads.OfflineMusic
 import io.github.d3sox.musicplayer.downloads.DownloadRecord
 import io.github.d3sox.musicplayer.downloads.DownloadStatus
 import io.github.d3sox.musicplayer.downloads.DownloadNetwork
+import io.github.d3sox.musicplayer.downloads.DownloadBatch
+import io.github.d3sox.musicplayer.downloads.PlaylistDownloadProgress
+import io.github.d3sox.musicplayer.downloads.nextDownloadBatch
+import io.github.d3sox.musicplayer.downloads.playlistDownloadProgress
 import io.github.d3sox.musicplayer.playlists.Playlist
 import io.github.d3sox.musicplayer.playlists.Playlists
 import io.github.d3sox.musicplayer.library.FileAudioAccess
@@ -84,6 +88,8 @@ data class AppState(
     val serverUploads: List<PendingServerUpload> = emptyList(),
     val downloads: Map<String, DownloadRecord> = emptyMap(),
     val excludedDownloads: Set<String> = emptySet(),
+    val playlistDownloads: List<PlaylistDownloadProgress> = emptyList(),
+    val downloadBatch: DownloadBatch = DownloadBatch(),
     val downloadNetwork: DownloadNetwork = DownloadNetwork(),
     val playlists: List<Playlist> = emptyList(),
     val preferences: MusicSettings = MusicSettings(),
@@ -345,6 +351,17 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
                 operations.withLock { mutableState.update { it.copy(excludedDownloads = excluded) } }
             }
         } }
+        if (offline != null) scope.launch {
+            mutableState.map { listOf(it.downloads, it.playlists, it.tracks, it.server?.serverId, it.excludedDownloads) }
+                .distinctUntilChanged().collect {
+                    operations.withLock { mutableState.update { state ->
+                        val playlists = playlistDownloadProgress(state.playlists, state.tracks, state.downloads,
+                            state.server?.serverId, state.excludedDownloads)
+                        state.copy(playlistDownloads = playlists,
+                            downloadBatch = nextDownloadBatch(state.downloadBatch.trackIds, state.downloads, playlists))
+                    } }
+                }
+        }
         offline?.let { downloads -> scope.launch {
             downloads.network.collect { network ->
                 operations.withLock { mutableState.update { it.copy(downloadNetwork = network) } }

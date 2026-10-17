@@ -10,7 +10,6 @@ import android.content.Intent
 import android.os.Build
 import io.github.d3sox.musicplayer.downloads.DownloadStatus
 import io.github.d3sox.musicplayer.app.AppState
-import io.github.d3sox.musicplayer.downloads.playlistDownloadProgress
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -68,22 +67,24 @@ class DownloadService : JobService() {
 
     private data class TransferProgress(val title: String = "Manida", val text: String = "Downloading music", val percent: Int? = null)
 
-    // Playlist downloads report how many songs are offline; single songs report their transferred bytes.
+    // Batches of several songs report how many are done; a single song reports its transferred bytes.
     private fun transferProgress(state: AppState): TransferProgress {
         val record = state.downloads.values.firstOrNull { it.status == DownloadStatus.DOWNLOADING }
-        val playlists = playlistDownloadProgress(state.playlists, state.tracks, state.downloads, state.server?.serverId, state.excludedDownloads)
-            .filter { !it.complete && (record == null || record.trackId in it.playlist.trackIds) }
-        if (playlists.isNotEmpty()) {
-            val downloaded = playlists.sumOf { it.downloaded }
-            val total = playlists.sumOf { it.total }
-            val fraction = playlists.sumOf { it.fraction.toDouble() * it.total } / total
-            return TransferProgress(playlists.singleOrNull()?.playlist?.name ?: "${playlists.size} playlists",
-                "Downloading playlist · $downloaded of $total songs", (fraction * 100).toInt().coerceIn(0, 100))
+        val song = state.tracks.firstOrNull { it.id == record?.trackId }?.metadata?.title ?: "Manida"
+        val batch = state.downloadBatch
+        if (batch.total > 1) {
+            val metadata = state.tracks.filter { it.id in batch.trackIds }.map { it.metadata }
+            // Name the playlist, album, or artist when the whole batch comes from one.
+            val title = state.playlistDownloads.firstOrNull { it.playlist.trackIds.containsAll(batch.trackIds) }?.playlist?.name
+                ?: metadata.map { it.album }.distinct().singleOrNull()?.takeIf { it.isNotBlank() }
+                ?: metadata.map { it.artist }.distinct().singleOrNull()?.takeIf { it.isNotBlank() }
+                ?: song
+            return TransferProgress(title, "Downloading · ${batch.downloaded} of ${batch.total} songs",
+                (batch.fraction * 100).toInt().coerceIn(0, 100))
         }
         if (record == null) return TransferProgress()
-        val title = state.tracks.firstOrNull { it.id == record.trackId }?.metadata?.title ?: "Manida"
         val percent = if (record.sizeBytes > 0) (record.bytesDownloaded.toDouble() / record.sizeBytes * 100).toInt().coerceIn(0, 100) else null
-        return TransferProgress(title, percent = percent)
+        return TransferProgress(song, percent = percent)
     }
 
     @androidx.annotation.RequiresApi(34)

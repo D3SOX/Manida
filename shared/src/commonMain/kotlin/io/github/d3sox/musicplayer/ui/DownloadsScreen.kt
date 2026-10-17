@@ -13,13 +13,13 @@ import io.github.d3sox.musicplayer.app.AppState
 import io.github.d3sox.musicplayer.app.MusicController
 import io.github.d3sox.musicplayer.downloads.DownloadStatus
 import io.github.d3sox.musicplayer.downloads.DownloadProblem
-import io.github.d3sox.musicplayer.downloads.playlistDownloadProgress
 
 @Composable
 internal fun DownloadsScreen(state: AppState, controller: MusicController, dismiss: () -> Unit) {
     val paused = state.preferences.downloadsPaused
-    val playlists = playlistDownloadProgress(state.playlists, state.tracks, state.downloads, state.server?.serverId, state.excludedDownloads)
-    val waiting = state.downloads.values.any { it.status != DownloadStatus.COMPLETE } || playlists.any { !it.complete }
+    val playlists = state.playlistDownloads
+    val batch = state.downloadBatch
+    val waiting = state.downloads.values.any { it.status != DownloadStatus.COMPLETE } || batch.total > 0
     SettingsScreen(onDismissRequest = dismiss, title = { Text("Downloads") }, text = {
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(when {
@@ -28,6 +28,12 @@ internal fun DownloadsScreen(state: AppState, controller: MusicController, dismi
                 waiting && state.downloadNetwork.metered && !state.preferences.downloadOnMetered -> "Waiting for an unmetered network"
                 else -> "${countLabel(state.downloads.count { it.value.status == DownloadStatus.COMPLETE }, "song")} downloaded"
             })
+            if (batch.total > 0) Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("${batch.downloaded} of ${countLabel(batch.total, "song")} downloaded",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                LinearProgressIndicator(progress = { batch.fraction },
+                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Download progress" })
+            }
             TextButton(onClick = { controller.setDownloadsPaused(!paused) }) {
                 Text(if (paused) "Resume downloads" else "Pause downloads")
             }
