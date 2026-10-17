@@ -957,7 +957,10 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
         library.setSourceAvailability(library.tracks().flatMap { track -> track.sources.filter {
             it.kind == SourceKind.SERVER && it.id.startsWith("server:${profile.serverId}:")
         }.map { it.id } }.toSet(), false)
-        operations.withLock { refresh() }
+        operations.withLock {
+            if (queueLoaded) engine.updateQueue(playableQueue(queue.snapshot()))
+            refresh()
+        }
     }
 
     private suspend fun importServer(client: io.github.d3sox.musicplayer.navidrome.NavidromeClient) {
