@@ -46,7 +46,7 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
         if (destination?.tab == io.github.d3sox.musicplayer.library.LibraryTab.PLAYLISTS && destination.revision != handledDestination) {
             val id = destination.collectionId
             if (id?.startsWith(FOLDER_PREFIX) == true) { folder = id.removePrefix(FOLDER_PREFIX); selected = null }
-            else { selected = id; folder = state.playlists.firstOrNull { it.id == id }?.folder }
+            else selected = id
             handledDestination = destination.revision
         }
     }
@@ -63,8 +63,9 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
     val scope = rememberCoroutineScope()
     val playlist = state.playlists.firstOrNull { it.id == selected }
     val recentAt = remember(state.tracks) { state.tracks.associate { it.id to it.recentAt } }
+    // An open playlist belongs to its current folder, which also covers playlists opened from the player.
     // A folder disappears once its last playlist moves out, so fall back to the closest folder that still exists.
-    val openFolder = generateSequence(folder, ::parentFolder).firstOrNull { name -> state.playlists.any { isInFolder(it.folder, name) } }
+    val openFolder = if (playlist != null) playlist.folder else generateSequence(folder, ::parentFolder).firstOrNull { name -> state.playlists.any { isInFolder(it.folder, name) } }
     fun collections(page: String?) = state.playlists.filter { it.folder == page }.map { collection ->
         CollectionItem(collection.id, collection.title,
             "${countLabel(collection.trackIds.size, "song")}${if (collection.rule != null) " · Smart playlist" else ""}${if (collection.autoDownload) " · Automatic downloads" else ""}",
@@ -80,12 +81,13 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
         CollectionItem(FOLDER_PREFIX + name, folderSegments(name).last(), countLabel(contents.size, "playlist"), null, AppIcon.FOLDER,
             songCount = trackIds.size, recentAt = trackIds.maxOfOrNull { recentAt[it] ?: 0 } ?: 0, trackIds = trackIds)
     }
+    fun closePlaylist() { folder = openFolder; selected = null }
     fun open(id: String) { if (id.startsWith(FOLDER_PREFIX)) folder = id.removePrefix(FOLDER_PREFIX) else selected = id }
     if (rearranging && backEnabled && selected == null) PlatformBackHandler(finishRearranging)
     val current = selected ?: openFolder?.let { FOLDER_PREFIX + it }
     val parent = (if (selected != null) openFolder else openFolder?.let(::parentFolder))?.let { FOLDER_PREFIX + it }
     AnimatedNavigation(current, parent, canGoBack = backEnabled && current != null,
-        onBack = { if (selected != null) selected = null else folder = openFolder?.let(::parentFolder) }, depth = { page -> when {
+        onBack = { if (selected != null) closePlaylist() else folder = openFolder?.let(::parentFolder) }, depth = { page -> when {
             page == null -> 0
             page.startsWith(FOLDER_PREFIX) -> folderSegments(page.removePrefix(FOLDER_PREFIX)).size
             else -> 1 + (state.playlists.firstOrNull { it.id == page }?.folder?.let(::folderSegments)?.size ?: 0)
@@ -132,7 +134,7 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
                 } == true }
             val editable = playlist.rule == null && playlist.server?.readOnly != true
             val header: @Composable () -> Unit = {
-                    PlaylistHero(playlist, state, controller, ordered.map { it.value.id }, back = { selected = null }, edit = { renaming = true }, delete = { deleting = true }, export = {
+                    PlaylistHero(playlist, state, controller, ordered.map { it.value.id }, back = ::closePlaylist, edit = { renaming = true }, delete = { deleting = true }, export = {
                         scope.launch {
                             fileBusy = true; fileMessage = null
                             try {
@@ -184,7 +186,7 @@ internal fun PlaylistsScreen(state: AppState, controller: MusicController, backE
             "This playlist will also be deleted from your music server when connected. The music files will stay in your library."
             else "The music files will stay in your library.") },
         confirmButton = { TextButton(onClick = {
-            controller.deletePlaylist(playlist.id); deleting = false; selected = null
+            controller.deletePlaylist(playlist.id); deleting = false; closePlaylist()
         }) { Text("Delete") } }, dismissButton = { TextButton(onClick = { deleting = false }) { Text("Cancel") } })
     val conflict = playlist?.conflict
     if (resolving && playlist != null && conflict != null) {

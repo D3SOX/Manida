@@ -519,6 +519,9 @@ class PlaylistsUiTest {
                 onNodeWithText("Save").performClick()
                 waitUntil(timeoutMillis = 3_000) { controller.state.value.playlists.any { it.name == "Road ▸ Coast ▸ Cliffs ▸ Dawn" } }
                 onNodeWithContentDescription("Back").performClick()
+                onNodeWithText("Road ▸ Coast ▸ Cliffs").assertIsDisplayed()
+                onNodeWithText("Dawn").assertIsDisplayed()
+                onNodeWithContentDescription("Back").performClick()
                 onNodeWithText("Cliffs").assertIsDisplayed()
                 onNodeWithContentDescription("Back").performClick()
                 onNodeWithText("Coast").assertIsDisplayed()
@@ -544,10 +547,11 @@ class PlaylistsUiTest {
                 onNodeWithText("Save").performClick()
                 waitUntil(timeoutMillis = 3_000) { controller.state.value.playlists.single { it.id == morning }.name == "Trips ▸ Morning" }
                 onNodeWithContentDescription("Back").performClick()
-                onNodeWithText("Night").assertIsDisplayed()
-                onNodeWithText("Morning").assertDoesNotExist()
-                onNodeWithContentDescription("Back").performClick()
                 onNodeWithText("Trips").assertIsDisplayed()
+                onNodeWithText("Morning").assertIsDisplayed()
+                onNodeWithContentDescription("Back").performClick()
+                onNodeWithText("Road").assertIsDisplayed()
+                onNodeWithText("Morning").assertDoesNotExist()
                 onNodeWithText("AC/DC").assertIsDisplayed()
             }
         } finally { runBlocking { controller.closeAndJoin() }; store.close(); directory.toFile().deleteRecursively() }
