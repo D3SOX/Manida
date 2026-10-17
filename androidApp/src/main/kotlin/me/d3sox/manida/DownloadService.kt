@@ -35,7 +35,10 @@ class DownloadService : JobService() {
             try {
                 withContext(Dispatchers.IO) {
                     if (params.extras.getBoolean("refresh-playlists")) app.refreshOfflinePlaylists()
-                    app.controller.linkSameFiles()
+                    // Linking only avoids redundant downloads, so its failure must not block them.
+                    try { app.controller.linkSameFiles() }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { /* The next scan, refresh or job links them. */ }
                     offline.runPending()
                 }
                 retry = offline.state.value.values.any { it.status != DownloadStatus.COMPLETE }
