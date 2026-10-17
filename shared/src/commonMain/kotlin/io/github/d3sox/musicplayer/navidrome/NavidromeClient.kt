@@ -119,6 +119,11 @@ class NavidromeClient(
         playlistSummaries().map { playlist(it.getValue("id").jsonPrimitive.content) }
     }
 
+    /** Maps each playlist ID to its last change time with a single request. */
+    suspend fun playlistVersions(): Map<String, String> = serverRequest {
+        playlistSummaries().associate { it.getValue("id").jsonPrimitive.content to it["changed"]?.jsonPrimitive?.content.orEmpty() }
+    }
+
     suspend fun playlist(id: String): ServerPlaylist = serverRequest {
         parsePlaylist(request("getPlaylist", listOf("id" to id)).getValue("playlist").jsonObject)
     }

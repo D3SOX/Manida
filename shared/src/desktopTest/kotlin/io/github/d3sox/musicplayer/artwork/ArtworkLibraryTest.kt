@@ -192,7 +192,7 @@ class ArtworkLibraryTest {
         val connection = NavidromeConnection(store, http, vault)
         val controller = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"), connection, artwork = artwork,
             playlists = io.github.d3sox.musicplayer.playlists.Playlists(store),
-            serverChanges = io.github.d3sox.musicplayer.navidrome.NavidromeChanges(store, library, connection::client))
+            serverChanges = io.github.d3sox.musicplayer.navidrome.NavidromeChanges(store, library, artwork, connection::client))
         try {
             withTimeout(3_000) { controller.state.first { !it.loading } }
             controller.connectServer("https://music.example.test", "fixture", "fixture-password").join()

@@ -115,7 +115,7 @@ class PlaylistsUiTest {
         val connection = NavidromeConnection(store, http, vault)
         val library = MusicLibrary(store)
         val playlists = Playlists(store)
-        val changes = NavidromeChanges(store, library, connection::client)
+        val changes = NavidromeChanges(store, library, client = connection::client)
         val name = "Publish UI ${Uuid.random()}"
         val playlist = runBlocking {
             connection.connect(address, ServerCredentials("fixture", "fixture-password"))
@@ -427,7 +427,7 @@ class PlaylistsUiTest {
         val vault = SecretServiceVault("io.github.d3sox.musicplayer.tests.${Uuid.random()}")
         val library = MusicLibrary(store)
         val connection = NavidromeConnection(store, http, vault)
-        val changes = NavidromeChanges(store, library, connection::client)
+        val changes = NavidromeChanges(store, library, client = connection::client)
         val controller = MusicController(library, PlaybackQueue(store), MpvPlaybackEngine("null"), connection,
             playlists = Playlists(store), serverChanges = changes)
         try {

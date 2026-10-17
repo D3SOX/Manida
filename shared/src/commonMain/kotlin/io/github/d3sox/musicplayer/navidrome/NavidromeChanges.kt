@@ -1,5 +1,6 @@
 package io.github.d3sox.musicplayer.navidrome
 
+import io.github.d3sox.musicplayer.artwork.ArtworkLibrary
 import io.github.d3sox.musicplayer.library.MusicLibrary
 import io.github.d3sox.musicplayer.library.SourceKind
 import io.github.d3sox.musicplayer.library.TrackSource
@@ -9,6 +10,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -27,7 +31,7 @@ private data class RatingChange(val sourceId: String, val songId: String, val ra
     val revision: String = Uuid.random().toString())
 
 class NavidromeChanges(private val store: MusicStore, private val library: MusicLibrary,
-    private val client: suspend () -> NavidromeClient?) : AutoCloseable {
+    private val artwork: ArtworkLibrary? = null, private val client: suspend () -> NavidromeClient?) : AutoCloseable {
     private val synchronization = Mutex()
     private val supervisor = SupervisorJob()
     private val scope = CoroutineScope(supervisor + Dispatchers.IO)
@@ -41,11 +45,18 @@ class NavidromeChanges(private val store: MusicStore, private val library: Music
             store.database.records().observe(kind).distinctUntilChanged().collect { wake.trySend(Unit) }
         }
         scope.launch {
+            var pulled: TimeMark? = null
             while (isActive) {
                 withTimeoutOrNull(30_000) { wake.receive() }
                 try { synchronize() }
                 catch (cancelled: CancellationException) { throw cancelled }
                 catch (_: Exception) { /* Retain the journal and retry after reconnection. */ }
+                if (pulled == null || pulled.elapsedNow() >= 5.minutes) {
+                    pulled = TimeSource.Monotonic.markNow()
+                    try { pullPlaylists() }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { /* Pull again on the next interval. */ }
+                }
             }
         }
     }
@@ -120,24 +131,55 @@ class NavidromeChanges(private val store: MusicStore, private val library: Music
         requireNotNull(library.findTrack(track.id))
     }
 
-    suspend fun importPlaylists(connection: NavidromeClient) {
+    /** Imports playlists edited on the server since the last import, along with their covers. */
+    suspend fun pullPlaylists() = synchronization.withLock { client()?.let { importPlaylists(it, changedOnly = true) } }
+
+    /**
+     * Imports the server's playlists. With [changedOnly], only playlists whose change time moved are downloaded,
+     * and those containing songs missing from the library wait for the next library refresh.
+     */
+    suspend fun importPlaylists(connection: NavidromeClient, changedOnly: Boolean = false) {
         val tracks = library.tracks()
         val mapping = tracks.flatMap { track -> track.sources.filter {
             it.kind == SourceKind.SERVER && it.id.startsWith("server:${connection.serverId}:")
         }.map { it.location to track.id } }.toMap()
-        for (remote in connection.playlists()) store.transaction {
-            val id = store.list<Playlist>("playlists").firstOrNull {
-                it.server?.serverId == connection.serverId && (it.server.id == remote.id ||
-                    (it.server.id == null && it.pendingSync && remote.owner == connection.username && remote.name == "Manida pending ${it.id}"))
-            }?.id ?: "server-playlist:${connection.serverId}:${remote.id}"
-            if (store.read<PlaylistRemoval>("playlist-removal:$id") != null) return@transaction
-            val previous = Playlists(store).get(id)
-            if (previous?.pendingSync != true) {
-                val ids = remote.songIds.map { requireNotNull(mapping[it]) { "Refresh the server library before importing its playlists" } }
+        val remotes = if (!changedOnly) connection.playlists() else {
+            val known = Playlists(store).all().mapNotNull { it.server?.takeIf { link -> link.serverId == connection.serverId && link.id != null } }
+                .associate { it.id to it.changed }
+            // Servers that omit change times get every playlist downloaded again.
+            connection.playlistVersions().filter { (id, changed) -> changed.isEmpty() || known[id] != changed }.keys.map { connection.playlist(it) }
+        }
+        for (remote in remotes) {
+            val imported = store.transaction {
+                val id = store.list<Playlist>("playlists").firstOrNull {
+                    it.server?.serverId == connection.serverId && (it.server.id == remote.id ||
+                        (it.server.id == null && it.pendingSync && remote.owner == connection.username && remote.name == "Manida pending ${it.id}"))
+                }?.id ?: "server-playlist:${connection.serverId}:${remote.id}"
+                if (store.read<PlaylistRemoval>("playlist-removal:$id") != null) return@transaction null
+                val previous = Playlists(store).get(id)
+                if (previous?.pendingSync == true) return@transaction null
+                val ids = remote.songIds.map { mapping[it] ?: if (changedOnly) return@transaction null
+                    else throw IllegalArgumentException("Refresh the server library before importing its playlists") }
                 val link = PlaylistServer(connection.serverId, remote.id, remote.name, remote.songIds, remote.owner,
-                    readOnly = remote.owner != connection.username, baselineDescription = remote.description, coverArt = remote.coverArt)
+                    readOnly = remote.owner != connection.username, baselineDescription = remote.description, coverArt = remote.coverArt,
+                    changed = remote.changed)
                 store.put("playlist:$id", "playlists", previous?.copy(name = remote.name, trackIds = ids, server = link, description = remote.description)
                     ?: Playlist(id, remote.name, ids, server = link, description = remote.description))
+                id to (remote.changed.isEmpty() || previous?.server?.changed != remote.changed)
+            } ?: continue
+            if (artwork != null) {
+                val (id, changed) = imported
+                val key = "server-playlist-cover:$id"
+                // Navidrome keeps a playlist's cover ID when its image changes, so its change time decides when to download again.
+                try { if (remote.coverArt == null) artwork.remove(key) else if (changed || artwork.path(key) == null) artwork.fetch(key, connection, remote.coverArt) }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) {
+                    // A missing cover must not prevent importing the playlist; forget its change time so the next pull retries it.
+                    store.transaction {
+                        val current = Playlists(store).get(id)
+                        current?.server?.let { store.put("playlist:$id", "playlists", current.copy(server = it.copy(changed = ""))) }
+                    }
+                }
             }
         }
     }

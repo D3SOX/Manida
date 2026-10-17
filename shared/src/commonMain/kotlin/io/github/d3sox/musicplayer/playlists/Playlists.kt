@@ -21,7 +21,7 @@ import io.github.d3sox.musicplayer.history.listeningStatistics
 @Serializable
 data class PlaylistServer(val serverId: String, val id: String?, val baselineName: String,
     val baselineSongIds: List<String>, val owner: String, val readOnly: Boolean = false, val baselineDescription: String = "",
-    val coverArt: String? = null)
+    val coverArt: String? = null, val changed: String = "")
 
 @Serializable
 data class PlaylistConflict(val name: String, val songIds: List<String>, val trackIds: List<String>, val deletionRequested: Boolean = false, val description: String = "")
