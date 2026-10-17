@@ -35,12 +35,13 @@ class NavidromeChangesTest {
         var cover = png(0x00FF00)
         var playlistRequests = 0
         var coverRequests = 0
+        var coverFails = false
         val http = HttpClient(MockEngine { request ->
             when (request.url.encodedPath) {
                 "/rest/getPlaylists.view" -> respond("""{"subsonic-response":{"status":"ok","playlists":{"playlist":[{"id":"mix","changed":"$changed"}]}}}""")
                 "/rest/getPlaylist.view" -> { playlistRequests++; respond("""{"subsonic-response":{"status":"ok","playlist":{"id":"mix","name":"$name",""" +
                     """"owner":"fixture","changed":"$changed","coverArt":"pl-mix","entry":[{"id":"song"}]}}}""") }
-                "/rest/getCoverArt.view" -> { coverRequests++; respond(cover, headers = io.ktor.http.headersOf(io.ktor.http.HttpHeaders.ContentType, "image/png")) }
+                "/rest/getCoverArt.view" -> if (coverFails) respond("broken", io.ktor.http.HttpStatusCode.InternalServerError) else { coverRequests++; respond(cover, headers = io.ktor.http.headersOf(io.ktor.http.HttpHeaders.ContentType, "image/png")) }
                 else -> error("Unexpected request: ${request.url.encodedPath}")
             }
         })
@@ -61,9 +62,12 @@ class NavidromeChangesTest {
             name = "Evening mix"
             changed = "t2"
             cover = png(0xFF0000)
+            coverFails = true
             changes.pullPlaylists()
             assertEquals("Evening mix", Playlists(store).get(playlist.id)!!.name)
-            assertContentEquals(io.github.d3sox.musicplayer.artwork.artworkPreview(cover), artwork.read(key))
+            coverFails = false
+            changes.pullPlaylists()
+            assertContentEquals(io.github.d3sox.musicplayer.artwork.artworkPreview(cover), artwork.read(key), "A failed cover download must be retried")
         } finally { http.close(); store.close(); directory.toFile().deleteRecursively() }
     }
 

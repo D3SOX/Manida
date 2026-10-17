@@ -172,7 +172,13 @@ class NavidromeChanges(private val store: MusicStore, private val library: Music
                 // Navidrome keeps a playlist's cover ID when its image changes, so its change time decides when to download again.
                 try { if (remote.coverArt == null) artwork.remove(key) else if (changed || artwork.path(key) == null) artwork.fetch(key, connection, remote.coverArt) }
                 catch (cancelled: CancellationException) { throw cancelled }
-                catch (_: Exception) { /* A missing cover must not prevent importing the playlist. */ }
+                catch (_: Exception) {
+                    // A missing cover must not prevent importing the playlist; forget its change time so the next pull retries it.
+                    store.transaction {
+                        val current = Playlists(store).get(id)
+                        current?.server?.let { store.put("playlist:$id", "playlists", current.copy(server = it.copy(changed = ""))) }
+                    }
+                }
             }
         }
     }
