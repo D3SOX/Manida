@@ -157,6 +157,12 @@ class OfflineMusic(private val store: MusicStore, private val library: MusicLibr
 
     fun retry() { wake.trySend(Unit) }
 
+    // The user asked for these downloads, so the platform may show the transfer and its progress.
+    fun downloadPlaylists() {
+        scheduleWork?.invoke(true)
+        wake.trySend(Unit)
+    }
+
     internal suspend fun withLibraryChanges(change: suspend () -> Unit) {
         changingLibrary = true
         try {

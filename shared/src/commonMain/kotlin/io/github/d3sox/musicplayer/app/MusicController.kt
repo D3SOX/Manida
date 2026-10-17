@@ -843,6 +843,7 @@ class MusicController(val library: MusicLibrary, val queue: PlaybackQueue, val e
     fun setPlaylistDownload(playlistId: String, enabled: Boolean) = action {
         requireNotNull(playlists) { "Playlists are unavailable" }.setAutoDownload(playlistId, enabled)
         refreshPlaylists()
+        if (enabled) offline?.downloadPlaylists()
     }
     fun dismissError(error: String) {
         mutableState.update { if (it.error == error) it.copy(error = null) else it }

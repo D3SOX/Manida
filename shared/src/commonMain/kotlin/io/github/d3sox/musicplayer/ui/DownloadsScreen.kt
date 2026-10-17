@@ -13,11 +13,13 @@ import io.github.d3sox.musicplayer.app.AppState
 import io.github.d3sox.musicplayer.app.MusicController
 import io.github.d3sox.musicplayer.downloads.DownloadStatus
 import io.github.d3sox.musicplayer.downloads.DownloadProblem
+import io.github.d3sox.musicplayer.downloads.playlistDownloadProgress
 
 @Composable
 internal fun DownloadsScreen(state: AppState, controller: MusicController, dismiss: () -> Unit) {
     val paused = state.preferences.downloadsPaused
     val waiting = state.downloads.values.any { it.status != DownloadStatus.COMPLETE }
+    val playlists = playlistDownloadProgress(state.playlists, state.tracks, state.downloads)
     SettingsScreen(onDismissRequest = dismiss, title = { Text("Downloads") }, text = {
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(when {
@@ -32,6 +34,17 @@ internal fun DownloadsScreen(state: AppState, controller: MusicController, dismi
             if (state.downloads.values.any { it.status == DownloadStatus.FAILED })
                 TextButton(onClick = controller::retryDownloads) { Text("Retry failed downloads") }
             LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                items(playlists, key = { "playlist:${it.playlist.id}" }) { progress ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(progress.playlist.name, style = MaterialTheme.typography.titleMedium)
+                        Text(if (progress.complete) "${countLabel(progress.total, "song")} downloaded"
+                            else "${progress.downloaded} of ${countLabel(progress.total, "song")} downloaded",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        LinearProgressIndicator(progress = { progress.fraction },
+                            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Playlist download progress: ${progress.playlist.name}" })
+                    }
+                }
+                if (playlists.isNotEmpty() && state.downloads.isNotEmpty()) item { HorizontalDivider() }
                 items(state.downloads.values.sortedBy { record -> state.tracks.firstOrNull { it.id == record.trackId }?.metadata?.title },
                     key = { it.trackId }) { record ->
                     val title = state.tracks.firstOrNull { it.id == record.trackId }?.metadata?.title ?: "Unavailable song"
@@ -58,7 +71,7 @@ internal fun DownloadsScreen(state: AppState, controller: MusicController, dismi
                             modifier = Modifier.semantics { contentDescription = "$removal: $title" }) { Text(removal) }
                     }
                 }
-                if (state.downloads.isEmpty()) item { Text("Download songs or enable automatic downloads on a playlist.") }
+                if (state.downloads.isEmpty() && playlists.isEmpty()) item { Text("Download songs or enable automatic downloads on a playlist.") }
             }
         }
     }, confirmButton = { PageAction("Done", onClick = dismiss) })
